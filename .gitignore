@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.import_linter_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# SHIRO: dados locais e segredos nunca vão para o git
+*.db
+*.db-wal
+*.db-shm
+*.db.bak
+shiro.toml
+.env
+logs/
+models/
+voices/
+recordings/
+
+# Avaliações: relatórios gerados
+evals/reports/
+
+# Editor / SO
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

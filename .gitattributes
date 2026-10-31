@@ -1,0 +1,5 @@
+# Finais de linha consistentes entre Windows e a CI
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.onnx binary

@@ -1,0 +1,149 @@
+[project]
+name = "shiro"
+version = "0.1.0.dev0"
+description = "Assistente pessoal com IA para Windows: voz, automação do PC e atividades. Local-first e seguro por padrão."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+authors = [{ name = "VitorAngN" }]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Win32 (MS Windows)",
+    "Natural Language :: Portuguese (Brazilian)",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "structlog>=24.4",
+    "tzdata>=2024.1; sys_platform == 'win32'",
+]
+
+[project.scripts]
+shiro = "shiro.cli:main"
+
+[project.urls]
+Repository = "https://github.com/VitorAngN/Shiro-Agente"
+Documentation = "https://github.com/VitorAngN/Shiro-Agente/tree/main/docs"
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.100",
+    "import-linter>=2.1",
+    "pre-commit>=4.0",
+    "pyright[nodejs]>=1.1.400",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.17",
+]
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/shiro"]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["docs"]  # trechos de código da documentação são ilustrativos
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F",   # pycodestyle + pyflakes
+    "I",             # imports ordenados
+    "N",             # nomes
+    "UP",            # sintaxe moderna
+    "B",             # bugbear
+    "A",             # sombras de builtins
+    "C4",            # comprehensions
+    "SIM",           # simplificações
+    "PTH",           # pathlib em vez de os.path
+    "DTZ",           # datetime sempre com fuso (importante para atividades)
+    "S",             # segurança (bandit)
+    "ASYNC",         # armadilhas de asyncio
+    "T20",           # sem print fora da CLI
+    "RUF",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+"src/shiro/cli.py" = ["T201"]
+
+# ---------------------------------------------------------------- pyright
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "standard"
+strict = [
+    "src/shiro/core",
+    "src/shiro/policy",
+    "src/shiro/llm",
+    "src/shiro/activities",
+    "src/shiro/settings.py",
+    "src/shiro/paths.py",
+]
+venvPath = "."
+venv = ".venv"
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers --strict-config"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "windows: requer Windows",
+    "ollama: requer Ollama rodando localmente (SHIRO_TEST_OLLAMA=1)",
+    "gpu: requer GPU NVIDIA (SHIRO_TEST_GPU=1)",
+]
+
+[tool.coverage.run]
+source = ["shiro"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 80
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]
+
+# ---------------------------------------------------------------- arquitetura
+[tool.importlinter]
+root_package = "shiro"
+
+[[tool.importlinter.contracts]]
+name = "Núcleo e política não dependem de adaptadores (ADR-0002)"
+type = "forbidden"
+source_modules = ["shiro.core", "shiro.policy"]
+forbidden_modules = [
+    "shiro.activities",
+    "shiro.cli",
+    "shiro.interfaces",
+    "shiro.llm",
+    "shiro.memory",
+    "shiro.persistence",
+    "shiro.scheduler",
+    "shiro.tools",
+    "shiro.voice",
+]
+
+[[tool.importlinter.contracts]]
+name = "Atividades dependem só do núcleo, não de infraestrutura (ADR-0009)"
+type = "forbidden"
+source_modules = ["shiro.activities"]
+forbidden_modules = [
+    "shiro.cli",
+    "shiro.interfaces",
+    "shiro.llm",
+    "shiro.persistence",
+    "shiro.voice",
+]
