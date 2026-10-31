@@ -77,6 +77,9 @@ class LocalLLMSettings(_Section):
     base_url: str = "http://127.0.0.1:11434"
     model: str = "qwen3:4b-instruct"  # provisório; ver ADR-0010
     num_ctx: int = Field(default=4096, ge=1024)
+    # Camadas do modelo na GPU: 99 = todas, 0 = só CPU. O cálculo automático do Ollama
+    # é conservador e deixava ~1/3 do modelo na CPU em placas de 4 GB (ADR-0010).
+    num_gpu: int = Field(default=99, ge=0)
     keep_alive: str = "10m"
 
 

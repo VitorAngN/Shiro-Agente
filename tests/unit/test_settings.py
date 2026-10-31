@@ -32,6 +32,7 @@ def test_defaults_fit_a_4gb_gpu() -> None:
     assert settings.voice.stt.device == "cpu"
     assert settings.voice.stt.compute_type == "int8"
     assert settings.llm.local.num_ctx <= 4096
+    assert settings.llm.local.num_gpu == 99
 
 
 def test_missing_file_uses_defaults(tmp_path: Path) -> None:

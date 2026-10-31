@@ -144,7 +144,12 @@ def post(host: str, path: str, payload: dict[str, Any] | None = None) -> dict[st
         return json.loads(response.read())
 
 
-def chat(host: str, model: str, num_ctx: int, text: str) -> dict[str, Any]:
+def chat(
+    host: str, model: str, num_ctx: int, text: str, num_gpu: int | None = None
+) -> dict[str, Any]:
+    options: dict[str, Any] = {"num_ctx": num_ctx, "temperature": 0}
+    if num_gpu is not None:
+        options["num_gpu"] = num_gpu
     started = time.perf_counter()
     result = post(
         host,
@@ -158,7 +163,7 @@ def chat(host: str, model: str, num_ctx: int, text: str) -> dict[str, Any]:
             "tools": TOOLS,
             "stream": False,
             "keep_alive": "10m",
-            "options": {"num_ctx": num_ctx, "temperature": 0},
+            "options": options,
         },
     )
     result["wall_s"] = time.perf_counter() - started
@@ -215,6 +220,11 @@ def main() -> int:
     parser.add_argument("--host", default="http://127.0.0.1:11434")
     parser.add_argument("--num-ctx", type=int, default=4096)
     parser.add_argument(
+        "--num-gpu",
+        type=int,
+        help="camadas na GPU (99 = todas); sem a opção, o Ollama decide",
+    )
+    parser.add_argument(
         "--dataset",
         type=Path,
         default=Path(__file__).parent / "datasets" / "comandos_ptbr.jsonl",
@@ -228,8 +238,12 @@ def main() -> int:
         if line.strip()
     ]
 
-    print(f"Modelo: {args.model} | contexto: {args.num_ctx} | casos: {len(cases)}")
-    warm = chat(args.host, args.model, args.num_ctx, "oi")
+    gpu_note = "automático" if args.num_gpu is None else str(args.num_gpu)
+    print(
+        f"Modelo: {args.model} | contexto: {args.num_ctx} | num_gpu: {gpu_note}"
+        f" | casos: {len(cases)}"
+    )
+    warm = chat(args.host, args.model, args.num_ctx, "oi", args.num_gpu)
     full_prompt = warm.get("prompt_eval_count", 0)
     full_rate = rate(full_prompt, warm.get("prompt_eval_duration", 0))
     print(f"Carga do modelo: {warm.get('load_duration', 0) / NS:.2f} s")
@@ -245,7 +259,7 @@ def main() -> int:
     print()
     rows: list[dict[str, Any]] = []
     for case in cases:
-        result = chat(args.host, args.model, args.num_ctx, case["fala"])
+        result = chat(args.host, args.model, args.num_ctx, case["fala"], args.num_gpu)
         tool_ok, args_ok = score(case, result)
         got = calls_of(result)
         rows.append(
@@ -283,6 +297,7 @@ def main() -> int:
         report = {
             "model": args.model,
             "num_ctx": args.num_ctx,
+            "num_gpu": args.num_gpu,
             "full_prompt_tokens": full_prompt,
             "full_prompt_tps": full_rate,
             "cases": rows,
