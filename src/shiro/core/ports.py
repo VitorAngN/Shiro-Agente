@@ -1,0 +1,112 @@
+"""Portas do núcleo: as interfaces que os adaptadores implementam (ADR-0002).
+
+O núcleo depende só destes ``Protocol``s. Implementações concretas (Ollama,
+SQLite, Windows) são ligadas em ``shiro.app``.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from datetime import datetime
+from typing import Any, Protocol
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from shiro.core.models import (
+    CompletionRequest,
+    CompletionResponse,
+    Decision,
+    DecisionKind,
+    RiskLevel,
+    ToolDefinition,
+    ToolResult,
+)
+
+
+class LLMError(Exception):
+    """O provedor de LLM falhou (rede, servidor fora do ar, resposta inválida)."""
+
+
+class LLMProvider(Protocol):
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def model(self) -> str: ...
+
+    async def complete(self, request: CompletionRequest) -> CompletionResponse:
+        """Gera a próxima mensagem. Levanta ``LLMError`` em caso de falha."""
+        ...
+
+    async def warm_up(self, request: CompletionRequest) -> None:
+        """Carrega o modelo e o prefixo do pedido no cache (ADR-0011)."""
+        ...
+
+
+class ToolSpec(BaseModel):
+    """Declaração de uma ferramenta: nome, argumentos e risco (ADR-0005)."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)
+
+    name: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+    description: str
+    args_model: type[BaseModel]
+    risk: RiskLevel
+    timeout_s: float = Field(default=10.0, gt=0)
+    output_trusted: bool = True
+    local_only: bool = False
+    parameters: dict[str, Any] | None = None
+    """Schema enviado ao modelo; quando ``None``, é gerado a partir de ``args_model``."""
+
+
+class ToolContext(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    trace_id: str
+    now: datetime
+
+
+class Tool(Protocol):
+    @property
+    def spec(self) -> ToolSpec: ...
+
+    def describe(self, args: BaseModel) -> str:
+        """Frase curta usada na confirmação, ex.: "definir o volume em 20%"."""
+        ...
+
+    async def run(self, args: BaseModel, ctx: ToolContext) -> ToolResult: ...
+
+
+class ToolCatalog(Protocol):
+    def get(self, name: str) -> Tool | None: ...
+
+    def definitions(self) -> tuple[ToolDefinition, ...]:
+        """Definições em ordem estável, para o cache de prefixo funcionar."""
+        ...
+
+
+class PolicyContext(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    tainted: bool = False
+    batch_size: int = Field(default=1, ge=1)
+
+
+class Policy(Protocol):
+    def evaluate(self, risk: RiskLevel, ctx: PolicyContext) -> Decision: ...
+
+
+class ConfirmationChannel(Protocol):
+    async def ask(self, prompt: str, kind: DecisionKind) -> bool:
+        """Pergunta ao usuário; ``True`` significa aprovado."""
+        ...
+
+
+class AuditSink(Protocol):
+    async def record(self, event_type: str, trace_id: str, payload: Mapping[str, Any]) -> None: ...
+
+
+class Clock(Protocol):
+    def now(self) -> datetime:
+        """Data e hora atuais, sempre com fuso."""
+        ...
