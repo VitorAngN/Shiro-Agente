@@ -5,6 +5,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (marco 1a · agente por texto)
+- `shiro chat`: conversa por texto com o agente, confirmação pelo teclado e modo verboso (`-v`).
+- Núcleo do agente: `AgentLoop` com limites de passos e tempo, escalonamento para a nuvem respeitando `local_only`, `IntentRouter` com gramática Tier 0 em pt-BR (inclui números por extenso), `EventBus` e verificação de ação alegada.
+- `PolicyEngine` com níveis R0–R4, taint por conteúdo externo, confirmação em lote e modo somente leitura.
+- Adaptador Ollama com o cliente oficial, aquecimento do prefixo e `num_gpu`.
+- Persistência em SQLite: migrações versionadas, histórico de conversas e auditoria append-only com hash encadeado.
+- Ferramentas: hora, clima (Open-Meteo), uso do sistema, volume, mídia, abrir e fechar apps da lista permitida. Adaptadores do Windows via Core Audio, teclas de mídia e ShellExecute.
+- Configuração: `general.city`, `agent.max_history_messages` e apps com `launch`, `process`, `name` e `aliases`.
+
 ### Alterado
 - Modelo local carregado inteiro na GPU (`num_gpu = 99`): geração de 13 para 45 tokens/s e latência p50 de 2,1 s para 0,63 s no benchmark (ADR-0011).
 - `keep_alive` do modelo local passa para 30 minutos, com aquecimento do prefixo do prompt ao iniciar (ADR-0011).

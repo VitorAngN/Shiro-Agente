@@ -7,7 +7,7 @@
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue)
 [![Licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-green)](LICENSE)
 
-**Status:** 🧱 Fase 0 · Fundação concluída · próxima: Fase 1 · MVP de voz
+**Status:** 🚧 Fase 1 · MVP de voz · marco 1a entregue: agente por texto com modelo local, ferramentas do PC e auditoria
 **Autor:** Vitor ([@VitorAngN](https://github.com/VitorAngN))
 
 ---
@@ -49,19 +49,34 @@ flowchart LR
 
 Detalhes completos em [docs/03-arquitetura.md](docs/03-arquitetura.md).
 
-## Como rodar (Fase 0)
+## Como rodar
 
-Requisitos: Windows 10/11, Python 3.12+, Git e [uv](https://docs.astral.sh/uv/).
+Requisitos: Windows 10/11, Git, [uv](https://docs.astral.sh/uv/) e [Ollama](https://ollama.com). GPU NVIDIA com 4 GB+ recomendada.
 
 ```powershell
 git clone https://github.com/VitorAngN/Shiro-Agente.git
 cd Shiro-Agente
 uv sync
-uv run pre-commit install
+ollama pull qwen3:4b-instruct
 
-uv run shiro --version
+uv run shiro chat -v         # conversa por texto; -v mostra camada, tempo e ferramentas
 uv run shiro config path     # mostra onde fica o shiro.toml
 uv run shiro config check    # valida a configuração
+```
+
+Exemplo de sessão:
+
+```text
+você > que horas são?
+shiro > São 17h24 de sábado, 31 de outubro.
+  [T0 · regra · 0,01 s · get_time ✓]
+você > quanto de memória ram eu tô usando?
+shiro > Você está usando 17,6 GB de um total de 23,8 GB de RAM, o que é 74% do uso.
+  [T1 · ollama/qwen3:4b-instruct · 2,36 s · system_info ✓]
+você > abre o vs code
+  ⚠ Abrir o VS Code? [confirmação: s/N] s
+shiro > Abrindo o VS Code.
+  [T0 · regra · 7,54 s · open_app ✓]
 ```
 
 Para personalizar, copie [`config/shiro.example.toml`](config/shiro.example.toml) para o caminho mostrado por `shiro config path`. Sem arquivo, o SHIRO usa padrões seguros.

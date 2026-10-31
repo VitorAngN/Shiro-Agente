@@ -12,7 +12,7 @@
 | Ollama | Instalador para Windows, rodando em `127.0.0.1:11434` (a partir da Fase 1) |
 | Git | Com `pre-commit` instalado |
 
-**Disponível hoje (Fase 0):**
+**Disponível hoje (marco 1a):**
 
 ```powershell
 # clonar e preparar
@@ -20,20 +20,21 @@ git clone https://github.com/VitorAngN/Shiro-Agente.git
 cd Shiro-Agente
 uv sync                       # cria .venv e instala dependências travadas
 uv run pre-commit install     # o hook do gitleaks baixa o Go sozinho na primeira execução
+ollama pull qwen3:4b-instruct # modelo local provisório (ADR-0010)
 
-# verificar
-uv run shiro --version
+# usar e verificar
+uv run shiro chat -v          # agente por texto, com diagnóstico de cada turno
 uv run shiro config check
 uv run pytest
 ```
 
-**Planejado para a Fase 1:**
+A configuração pessoal (apps, cidade do clima) vai no `shiro.toml` mostrado por `shiro config path`, fora do repositório. Ver `config/shiro.example.toml`.
+
+**Planejado para os próximos marcos:**
 
 ```powershell
-ollama pull qwen3:4b-instruct        # modelo local provisório (ADR-0010)
 uv run shiro secrets set gemini      # chave vai para o Gerenciador de Credenciais do Windows
-uv run shiro                         # modo completo, com voz
-uv run shiro chat                    # só texto, útil para depurar o agente
+uv run shiro                         # modo completo, com voz (marco 1b)
 ```
 
 ### Verificações locais

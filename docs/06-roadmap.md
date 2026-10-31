@@ -39,6 +39,20 @@ A fase é entregue em três marcos, cada um testável sozinho:
 | **1b · Voz** | Push-to-talk por atalho global; captura com `sounddevice`; Silero VAD; faster-whisper; Piper como processo separado com streaming por frase; toast do Windows; parada de emergência |
 | **1c · Atividades** | Entidade `ACTIVITY`; ferramentas para criar, listar, concluir, adiar, editar e excluir; interpretação de datas em pt-BR; confirmação falada da data; avisos antes do prazo pelo agendador |
 
+**Andamento do marco 1a:**
+
+| Item | Estado |
+|---|---|
+| `AgentLoop`, `EventBus`, `ContextBuilder`, `IntentRouter` com Tier 0 em pt-BR | ✅ |
+| `PolicyEngine` R0–R4 com taint, lote e modo somente leitura | ✅ |
+| Adaptador Ollama com `num_gpu`, `keep_alive` e aquecimento | ✅ |
+| SQLite com migrações, histórico e auditoria com hash encadeado | ✅ |
+| Ferramentas: hora, clima, sistema, volume, mídia, abrir e fechar apps | ✅ validadas no Windows real |
+| Verificação de ação alegada (RF-16) | ✅ |
+| `shiro chat` com confirmação pelo teclado | ✅ |
+| Adaptador Gemini (Tier 2), rate limiter, orçamento diário e fallback | ⏳ próximo passo, depende da chave de API |
+| Avaliação do agente completo (não só do modelo) com o conjunto em pt-BR | ⏳ |
+
 **Spikes desta fase:**
 
 - benchmark dos modelos locais candidatos → escolha do modelo padrão ([ADR-0003](adr/0003-roteamento-hibrido-de-llm.md));

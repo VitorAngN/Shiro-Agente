@@ -40,12 +40,11 @@ erDiagram
         text message_id FK
         text tool_name
         text args_json
-        text risk "R0..R4"
+        text risk "R0..R4, nulo se a ferramenta não existe"
         text decision "allow | confirmed | denied | blocked"
-        text status "pending | ok | error | timeout"
+        text status "ok | error | skipped"
         text result_summary
-        text error
-        text started_at
+        int duration_ms
         text finished_at
     }
     CONFIRMATION {
