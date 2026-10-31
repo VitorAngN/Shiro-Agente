@@ -14,6 +14,7 @@ Cada decisão importante fica registrada aqui, com o contexto e as alternativas 
 | [0008](0008-processo-de-usuario-no-windows.md) | Processo de usuário iniciado no logon, não serviço do Windows | Aceito |
 | [0009](0009-voz-e-atividades-no-mvp.md) | Voz e atividades no MVP | Aceito |
 | [0010](0010-hardware-gpu-4gb.md) | Ajustar a arquitetura para GPU de 4 GB | Aceito |
+| [0011](0011-ajustes-do-benchmark-local.md) | Ajustes do agente a partir do benchmark local | Aceito |
 
 ## Modelo
 

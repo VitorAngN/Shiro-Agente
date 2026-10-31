@@ -80,7 +80,7 @@ class LocalLLMSettings(_Section):
     # Camadas do modelo na GPU: 99 = todas, 0 = só CPU. O cálculo automático do Ollama
     # é conservador e deixava ~1/3 do modelo na CPU em placas de 4 GB (ADR-0010).
     num_gpu: int = Field(default=99, ge=0)
-    keep_alive: str = "10m"
+    keep_alive: str = "30m"  # ADR-0011
 
 
 class CloudLLMSettings(_Section):

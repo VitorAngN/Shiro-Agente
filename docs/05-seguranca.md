@@ -60,6 +60,7 @@ Com taint ativo, qualquer ação com efeito (R2+) passa a exigir confirmação, 
 | A-09 | **Servidor MCP malicioso** | Descrição de ferramenta com instruções ocultas | Ação indevida | Lista de servidores permitidos; ferramentas MCP entram como R2 até serem mapeadas manualmente; saída sempre não confiável |
 | A-10 | **Repúdio / falta de rastro** | "Eu não pedi isso" | Sem diagnóstico | Auditoria append-only com hash encadeado |
 | A-11 | **Escalada de privilégio** | SHIRO rodando como administrador | Dano ao sistema | Roda como usuário comum; nenhuma ferramenta pede elevação (UAC) |
+| A-12 | **Ação alegada sem execução** | Modelo responde "pronto, marquei" sem chamar ferramenta (observado no benchmark) | Usuário acredita em algo que não aconteceu: prazo perdido, app não aberto | Verificação de ação alegada no `AgentLoop`; Tier 0 para "terminei X"; casos próprios na avaliação ([ADR-0011](adr/0011-ajustes-do-benchmark-local.md)) |
 
 ## 4. Controles operacionais
 

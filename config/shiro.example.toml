@@ -23,7 +23,7 @@ base_url = "http://127.0.0.1:11434"
 model = "qwen3:4b-instruct" # provisório até o benchmark do marco 1a (ADR-0010)
 num_ctx = 4096             # cabe em GPU de 4 GB junto com os pesos
 num_gpu = 99               # 99 = todas as camadas na GPU; 0 = só CPU (ADR-0010)
-keep_alive = "10m"         # descarrega o modelo da GPU após inatividade
+keep_alive = "30m"         # descarrega o modelo da GPU após inatividade (ADR-0011)
 
 [llm.cloud]
 provider = "gemini"

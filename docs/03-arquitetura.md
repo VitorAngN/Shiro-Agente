@@ -155,6 +155,8 @@ Detalhes importantes:
 
 - Resultados de ferramentas que trazem conteúdo externo (página web, arquivo, MCP) entram no contexto **marcados como não confiáveis**. A partir daí a sessão fica com *taint* e o motor de políticas endurece (ver [Segurança](05-seguranca.md#taint)).
 - Resultados longos são truncados e resumidos antes de voltar ao modelo, para caber no contexto de 4096 tokens do modelo local ([ADR-0010](adr/0010-hardware-gpu-4gb.md)).
+- **Verificação de ação alegada:** antes de ir para o TTS, o texto final é comparado com as ferramentas realmente executadas no turno. Se ele afirma uma ação ("marquei", "abri", "pronto") que nenhuma ferramenta executou, a resposta é bloqueada e o turno é refeito ou escalado ([ADR-0011](adr/0011-ajustes-do-benchmark-local.md), RF-16).
+- A persona e as ferramentas vão sempre no início do pedido, na mesma ordem, para aproveitar o cache de prefixo do Ollama. O SHIRO aquece esse cache ao iniciar.
 - O texto final é dividido por frases e enviado ao TTS em streaming: o SHIRO começa a falar antes de terminar de gerar.
 
 ## 7. Fluxos principais
@@ -348,12 +350,10 @@ Valores medidos e estimados para o hardware real ([ADR-0010](adr/0010-hardware-g
 | Componente | Uso | Observação |
 |---|---|---|
 | Tela do Windows | ~0 | A tela não usa a placa NVIDIA; apps com aceleração de hardware podem usar |
-| Pesos do LLM de 3–4B em Q4_K_M | ~2,0–2,5 GB | Padrão provisório: `qwen3:4b-instruct` (2,5 GB) |
-| Contexto de 4096 tokens | ~0,6 GB (estimado) | Pode cair pela metade com cache quantizado (`q8_0`) |
-| Buffers de execução | ~0,3–0,5 GB | Estimativa |
+| LLM `qwen3:4b-instruct` com contexto de 4096 tokens | **2,96 GB (medido)** | Pesos, cache de contexto e buffers, com `num_gpu = 99` |
 | STT faster-whisper | 0 | Roda na CPU em int8 |
 | Piper TTS | 0 | Roda na CPU |
-| **Total** | **~3,0–3,6 GB** | Cabe em 4 GB sem transbordar para a CPU |
+| **Total na placa** | **3,1 de 4 GB (medido)** | Cabe sem transbordar para a CPU; ~1 GB livre |
 
 Mitigações: descarregar o modelo após inatividade (`keep_alive` do Ollama) e o **Modo Desempenho** (RF-26), que libera a GPU para jogos ou trabalho pesado e deixa ativos só o Tier 0 e a nuvem.
 
@@ -363,10 +363,10 @@ Mitigações: descarregar o modelo após inatividade (`keep_alive` do Ollama) e 
 |---|---|
 | Detecção de fim de fala (VAD) | ~300 ms |
 | STT de frase curta na CPU | ~500–1000 ms (a medir no marco 1b) |
-| LLM local até a chamada de ferramenta | ~1,0–1,5 s (geração medida: ~17,5 tokens/s) |
+| LLM local até a chamada de ferramenta | **0,6–1,1 s (medido, p50 0,63 s)**, com o prefixo em cache |
 | Execução da ferramenta | ~50–200 ms |
 | TTS até o primeiro áudio | ~150–300 ms |
-| **Total p50** | **meta ≤ 2,5 s** (RNF-01) · **estimativa atual 2,0–3,3 s** |
+| **Total p50** | **meta ≤ 2,5 s** (RNF-01) · **estimativa atual 1,6–2,9 s**, a confirmar com a voz no marco 1b |
 
 Cada estágio vira uma métrica com `trace_id`, então dá para ver onde o tempo é gasto.
 

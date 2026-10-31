@@ -6,11 +6,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 ## [Não lançado]
 
 ### Alterado
+- Modelo local carregado inteiro na GPU (`num_gpu = 99`): geração de 13 para 45 tokens/s e latência p50 de 2,1 s para 0,63 s no benchmark (ADR-0011).
+- `keep_alive` do modelo local passa para 30 minutos, com aquecimento do prefixo do prompt ao iniciar (ADR-0011).
 - Arquitetura ajustada para o hardware real, uma GTX 1650 com 4 GB de VRAM (ADR-0010): modelo local de 3–4B (provisório `qwen3:4b-instruct`), contexto de 4096 tokens e transcrição de voz na CPU.
 - Orçamento de VRAM e estimativas de latência atualizados em `docs/03-arquitetura.md`.
 
 ### Adicionado
 - Benchmark do modelo local no hardware real (`docs/benchmarks/2026-10-31-modelo-local.md`).
+- ADR-0011, requisito RF-16 e ameaça A-12: o SHIRO nunca confirma uma ação que nenhuma ferramenta executou.
 - Script `evals/bench_ollama.py`: mede velocidade e acerto de ferramentas de um modelo do Ollama com o formato de pedido do SHIRO.
 - Documentação inicial: visão e escopo, requisitos, arquitetura, modelo de dados, segurança, roadmap e guia de desenvolvimento.
 - ADRs 0001 a 0009, incluindo a decisão de levar voz e atividades para o MVP (ADR-0009).

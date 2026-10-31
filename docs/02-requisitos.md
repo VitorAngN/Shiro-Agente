@@ -27,6 +27,7 @@ Prioridade no formato MoSCoW: **M** (must), **S** (should), **C** (could). A fas
 | RF-13 | Fazer fallback para outro provedor em caso de erro, timeout ou limite de taxa | M | 1 |
 | RF-14 | Limitar o número de passos e o tempo de cada turno do agente | M | 1 |
 | RF-15 | Manter o contexto da conversa atual (ex.: "e fecha ele também") | M | 1 |
+| RF-16 | Nunca confirmar ao usuário uma ação que nenhuma ferramenta executou ([ADR-0011](adr/0011-ajustes-do-benchmark-local.md)) | M | 1 |
 
 ### 1.3 Controle do PC
 
