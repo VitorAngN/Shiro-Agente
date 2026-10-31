@@ -1,7 +1,10 @@
 """Clima atual e do dia (R0), via Open-Meteo, que é gratuito e sem chave.
 
-Privacidade: o nome da cidade é enviado ao Open-Meteo. A cidade padrão fica
-só no ``shiro.toml`` local, nunca no repositório.
+Ordem para decidir o lugar: a cidade dita no pedido, a cidade do ``shiro.toml``
+e, por fim, a localização detectada automaticamente (ADR-0013).
+
+Privacidade: o nome da cidade ou as coordenadas são enviados ao Open-Meteo. O
+resultado é marcado como ``local_only``: a localização não vai para a nuvem.
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ from pydantic import BaseModel, Field
 from shiro.core.models import RiskLevel, ToolResult
 from shiro.core.ports import ToolContext, ToolSpec
 from shiro.tools.builtin._base import Args, br_number, expect
+from shiro.tools.builtin.location import Locator
 
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -58,9 +62,12 @@ class WeatherArgs(Args):
 
 
 class WeatherTool:
-    def __init__(self, http: httpx.AsyncClient, default_city: str = "") -> None:
+    def __init__(
+        self, http: httpx.AsyncClient, default_city: str = "", locator: Locator | None = None
+    ) -> None:
         self._http = http
         self._default_city = default_city.strip()
+        self._locator = locator
         self._spec = ToolSpec(
             name="get_weather",
             description="Informa o clima atual e a previsão de hoje.",
@@ -68,6 +75,7 @@ class WeatherTool:
             risk=RiskLevel.R0,
             timeout_s=10.0,
             output_trusted=False,
+            local_only=True,
         )
 
     @property
@@ -80,18 +88,28 @@ class WeatherTool:
     async def run(self, args: BaseModel, ctx: ToolContext) -> ToolResult:
         args = expect(args, WeatherArgs)
         city = (args.city or self._default_city).strip()
-        if not city:
-            return ToolResult.failure(
-                "Não sei de qual cidade. Diga a cidade ou configure general.city no shiro.toml."
-            )
         try:
-            place = await self._geocode(city)
-            if place is None:
-                return ToolResult.failure(f"Não encontrei a cidade {city}.")
-            forecast = await self._forecast(place["latitude"], place["longitude"])
+            if city:
+                place = await self._geocode(city)
+                if place is None:
+                    return ToolResult.failure(f"Não encontrei a cidade {city}.")
+                name, latitude, longitude = (
+                    str(place.get("name", city)),
+                    place["latitude"],
+                    place["longitude"],
+                )
+            else:
+                detected = await self._locator.locate() if self._locator else None
+                if detected is None:
+                    return ToolResult.failure(
+                        "Não consegui descobrir onde você está. Diga a cidade ou configure "
+                        "general.city no shiro.toml."
+                    )
+                name, latitude, longitude = detected
+            forecast = await self._forecast(latitude, longitude)
         except (httpx.HTTPError, KeyError, ValueError, TypeError):
             return ToolResult.failure("Não consegui consultar o clima agora. Estou sem internet?")
-        return _describe(str(place.get("name", city)), forecast)
+        return _describe(name, forecast)
 
     async def _geocode(self, city: str) -> dict[str, Any] | None:
         response = await self._http.get(

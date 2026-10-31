@@ -49,6 +49,7 @@ Prioridade no formato MoSCoW: **M** (must), **S** (should), **C** (could). A fas
 | RF-31 | Criar rotinas nomeadas compostas por várias ações | S | 3 |
 | RF-32 | Pesquisar na web e resumir resultados citando as fontes | S | 3 |
 | RF-33 | Informar data, hora e clima | M | 1 |
+| RF-33a | Descobrir a cidade automaticamente para o clima, com opção de desligar ([ADR-0013](adr/0013-localizacao-automatica.md)) | S | 1 |
 
 <a id="atividades"></a>
 ### 1.5 Atividades

@@ -52,6 +52,8 @@ class GeneralSettings(_Section):
     language: str = "pt-BR"
     timezone: str = "America/Sao_Paulo"
     city: str = ""  # cidade padrão do clima; fica só no shiro.toml local
+    # Sem cidade configurada: "ip" detecta pela internet (ADR-0013); "off" desativa.
+    location: Literal["ip", "off"] = "ip"
 
     @field_validator("timezone")
     @classmethod
@@ -116,9 +118,10 @@ class STTSettings(_Section):
 
 
 class TTSSettings(_Section):
-    engine: Literal["piper"] = "piper"
-    voice: str = "pt_BR-faber-medium"
-    length_scale: float = Field(default=1.0, gt=0)
+    # Voz feminina pt-BR da SHIRO (ADR-0012); o spike do marco 1b confirma a escolha.
+    engine: Literal["kokoro", "piper"] = "kokoro"
+    voice: str = "pf_dora"
+    speed: float = Field(default=1.0, gt=0.5, le=2.0)
 
 
 class WakeWordSettings(_Section):

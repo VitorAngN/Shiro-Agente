@@ -1,0 +1,101 @@
+<!-- SHIRO · esboço conceitual (vetor). Design original do projeto, licença MIT. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 640" width="520" height="640" role="img" aria-label="Retrato conceitual da SHIRO: jovem de cabelo branco longo com franja, olhos ciano com um anel de interface vermelho no olho direito, fone com LED vermelho e jaqueta grafite de gola alta com o emblema 白">
+<defs>
+<linearGradient id="sh-hair" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#FFFFFF"></stop>
+<stop offset="1" stop-color="#D6DCE6"></stop>
+</linearGradient>
+<linearGradient id="sh-iris" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#0B5C70"></stop>
+<stop offset="0.55" stop-color="#1FB5C9"></stop>
+<stop offset="1" stop-color="#7CF2F8"></stop>
+</linearGradient>
+<linearGradient id="sh-jacket" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#202633"></stop>
+<stop offset="1" stop-color="#12161E"></stop>
+</linearGradient>
+<clipPath id="sh-eye-l"><path d="M198 276 C208 266 236 266 248 274 C246 296 232 305 222 305 C210 305 200 296 198 276 Z"></path></clipPath>
+<clipPath id="sh-eye-r"><path d="M272 274 C284 266 312 266 322 276 C320 296 310 305 298 305 C288 305 274 296 272 274 Z"></path></clipPath>
+<pattern id="sh-scan" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="4" height="1" fill="#FFFFFF" opacity="0.035"></rect></pattern>
+</defs>
+
+<rect width="520" height="640" fill="#11141B"></rect>
+<text x="300" y="470" text-anchor="middle" style="font-family: 'Noto Sans JP', 'Yu Gothic', 'Meiryo', sans-serif; font-weight: 900; font-size: 440px" fill="#171B24">白</text>
+<circle cx="260" cy="300" r="214" fill="none" stroke="#34E4F0" stroke-opacity="0.18" stroke-width="1" stroke-dasharray="2 6"></circle>
+<circle cx="260" cy="300" r="236" fill="none" stroke="#34E4F0" stroke-opacity="0.10" stroke-width="10" stroke-dasharray="1 22"></circle>
+<path d="M60 92 L60 60 L92 60" fill="none" stroke="#FF2E4D" stroke-width="2"></path>
+<path d="M460 92 L460 60 L428 60" fill="none" stroke="#34E4F0" stroke-opacity="0.6" stroke-width="2"></path>
+
+<path d="M150 190 C150 100 215 64 262 64 C318 64 374 104 372 190 C380 290 392 420 420 574 L392 548 L384 614 L354 540 L334 604 L318 470 L202 470 L188 604 L166 540 L138 614 L128 548 L100 574 C128 420 140 290 150 190 Z" fill="url(#sh-hair)"></path>
+<path d="M162 240 C158 340 150 450 124 560 M184 260 C182 360 178 450 164 540 M358 240 C362 340 370 450 396 560 M336 260 C338 360 344 450 356 540" fill="none" stroke="#C3CAD6" stroke-width="2" stroke-linecap="round"></path>
+<path d="M372 190 C380 290 392 420 420 574" fill="none" stroke="#34E4F0" stroke-opacity="0.75" stroke-width="2.5"></path>
+
+<path d="M234 348 L286 348 L291 456 L229 456 Z" fill="#F6E3DA"></path>
+<path d="M232 366 C250 392 270 392 288 366 L289 388 C270 410 250 410 231 388 Z" fill="#E6C5B8"></path>
+
+<path d="M52 640 C66 556 122 506 206 482 L260 502 L314 482 C398 506 454 556 468 640 Z" fill="url(#sh-jacket)"></path>
+<path d="M260 512 L260 640" stroke="#2E3746" stroke-width="3"></path>
+<path d="M206 482 C150 500 112 532 90 590" fill="none" stroke="#34E4F0" stroke-opacity="0.35" stroke-width="2"></path>
+<rect x="318" y="548" width="52" height="52" fill="#FF2E4D"></rect>
+<text x="344" y="589" text-anchor="middle" style="font-family: 'Noto Sans JP', 'Yu Gothic', 'Meiryo', sans-serif; font-weight: 900; font-size: 38px" fill="#FFFFFF">白</text>
+
+<path d="M200 444 L230 418 L260 430 L290 418 L320 444 L326 496 L260 518 L194 496 Z" fill="#1A1F29"></path>
+<path d="M222 434 L260 448 L298 434 L300 474 L260 490 L220 474 Z" fill="#5E0F1D"></path>
+<path d="M200 444 L230 418 L260 430 L290 418 L320 444" fill="none" stroke="#FF2E4D" stroke-width="2.5" stroke-linejoin="round"></path>
+
+<path d="M178 215 C176 138 344 138 342 215 C342 300 315 352 260 388 C205 352 178 300 178 215 Z" fill="#F6E3DA"></path>
+<ellipse cx="206" cy="324" rx="15" ry="5" fill="#FF8FA3" opacity="0.28"></ellipse>
+<ellipse cx="314" cy="324" rx="15" ry="5" fill="#FF8FA3" opacity="0.28"></ellipse>
+
+<path d="M200 250 C212 244 228 244 242 248" fill="none" stroke="#AEB6C3" stroke-width="3" stroke-linecap="round"></path>
+<path d="M278 248 C292 244 308 244 320 250" fill="none" stroke="#AEB6C3" stroke-width="3" stroke-linecap="round"></path>
+
+<path d="M198 276 C208 266 236 266 248 274 C246 296 232 305 222 305 C210 305 200 296 198 276 Z" fill="#FFFFFF"></path>
+<g clip-path="url(#sh-eye-l)">
+<ellipse cx="223" cy="287" rx="13.5" ry="16.5" fill="url(#sh-iris)"></ellipse>
+<ellipse cx="223" cy="289" rx="6" ry="8" fill="#062A35"></ellipse>
+<circle cx="217" cy="280" r="4.2" fill="#FFFFFF"></circle>
+<circle cx="229" cy="295" r="2" fill="#FFFFFF"></circle>
+</g>
+<path d="M196 275 C206 260 236 258 250 271" fill="none" stroke="#1B1E26" stroke-width="5" stroke-linecap="round"></path>
+<path d="M196 275 L187 270" stroke="#1B1E26" stroke-width="3" stroke-linecap="round"></path>
+<path d="M207 305 C215 309 231 309 241 302" fill="none" stroke="#8A93A3" stroke-width="1.5" stroke-linecap="round"></path>
+
+<path d="M272 274 C284 266 312 266 322 276 C320 296 310 305 298 305 C288 305 274 296 272 274 Z" fill="#FFFFFF"></path>
+<g clip-path="url(#sh-eye-r)">
+<ellipse cx="297" cy="287" rx="13.5" ry="16.5" fill="url(#sh-iris)"></ellipse>
+<ellipse cx="297" cy="289" rx="6" ry="8" fill="#062A35"></ellipse>
+<circle cx="291" cy="280" r="4.2" fill="#FFFFFF"></circle>
+<circle cx="303" cy="295" r="2" fill="#FFFFFF"></circle>
+</g>
+<circle cx="297" cy="287" r="21" fill="none" stroke="#FF2E4D" stroke-width="1.3" stroke-dasharray="3 4"></circle>
+<path d="M297 262 L297 257 M322 287 L327 287 M297 312 L297 317" stroke="#FF2E4D" stroke-width="1.3"></path>
+<path d="M270 271 C284 258 314 260 324 275" fill="none" stroke="#1B1E26" stroke-width="5" stroke-linecap="round"></path>
+<path d="M324 275 L333 270" stroke="#1B1E26" stroke-width="3" stroke-linecap="round"></path>
+<path d="M279 302 C289 309 305 309 313 305" fill="none" stroke="#8A93A3" stroke-width="1.5" stroke-linecap="round"></path>
+
+<path d="M262 314 L257 327 L264 328" fill="none" stroke="#D9A99A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M248 350 C256 355 266 355 274 349" fill="none" stroke="#B5585A" stroke-width="2.2" stroke-linecap="round"></path>
+
+<path d="M166 232 C156 146 206 92 262 92 C324 92 366 146 354 232 L340 204 L334 246 L316 196 L302 238 L288 188 L272 240 L258 184 L244 238 L228 192 L218 242 L204 198 L194 248 L182 206 Z" fill="url(#sh-hair)" stroke="#C9D0DB" stroke-width="1.2" stroke-linejoin="round"></path>
+<path d="M240 104 C232 150 230 190 228 192 M268 100 C270 140 274 170 272 238 M300 112 C308 150 314 180 316 196 M212 120 C202 160 200 180 204 198" fill="none" stroke="#C9D0DB" stroke-width="1.6" stroke-linecap="round"></path>
+
+<path d="M176 210 C166 270 168 340 180 420 C184 444 176 470 166 490 C194 466 204 424 200 362 C198 302 196 250 190 214 Z" fill="url(#sh-hair)" stroke="#C9D0DB" stroke-width="1.2"></path>
+<path d="M344 210 C354 270 352 340 340 420 C336 444 344 470 354 490 C326 466 316 424 320 362 C322 302 324 250 330 214 Z" fill="url(#sh-hair)" stroke="#C9D0DB" stroke-width="1.2"></path>
+
+<g transform="rotate(-22 336 166)">
+<rect x="322" y="160" width="30" height="9" rx="2" fill="#FF2E4D"></rect>
+<rect x="326" y="163" width="4" height="3" fill="#FFFFFF"></rect>
+<rect x="333" y="163" width="4" height="3" fill="#FFFFFF"></rect>
+</g>
+
+<path d="M152 248 C146 214 160 186 186 176" fill="none" stroke="#EEF1F6" stroke-width="6" stroke-linecap="round"></path>
+<rect x="140" y="242" width="26" height="48" rx="11" fill="#E3E8EF" stroke="#8A93A3" stroke-width="1.5"></rect>
+<circle cx="153" cy="258" r="7" fill="#FF2E4D" opacity="0.25"></circle>
+<circle cx="153" cy="258" r="3.6" fill="#FF2E4D"></circle>
+<path d="M156 290 C166 330 196 352 228 358" fill="none" stroke="#C9D0DB" stroke-width="3" stroke-linecap="round"></path>
+<circle cx="231" cy="358" r="4.5" fill="#1B1E26"></circle>
+
+<rect width="520" height="640" fill="url(#sh-scan)"></rect>
+<text x="60" y="604" style="font-family: 'JetBrains Mono', Consolas, monospace; font-size: 12px; letter-spacing: 2px" fill="#9AA3B2">UNIT 白-01 // CONCEITO v0.1</text>
+</svg>

@@ -14,13 +14,17 @@
 
 ## O que é
 
-O SHIRO é um assistente no estilo "Jarvis" que roda no próprio PC. Você aperta um atalho e fala:
+<img src="docs/assets/shiro-conceito.svg" alt="Esboço conceitual da SHIRO: cabelo branco, olhos ciano com anel de interface vermelho, fone com LED vermelho e jaqueta com o emblema 白" width="220" align="right">
 
-- **"Abre o Spotify e coloca o volume em 30"**: ele executa;
-- **"Anota o trabalho de cálculo pra sexta"**: ele registra a atividade, repete a data que entendeu e avisa antes do prazo;
-- **"O que eu tenho essa semana?"**: ele responde em voz alta.
+A **SHIRO** (白, "branco" em japonês) é uma assistente no estilo "Jarvis", com estética cyberpunk, que roda no próprio PC. Você aperta um atalho e fala:
 
-O modelo de linguagem é só o "cérebro" que escolhe o que fazer. Quem executa são **ferramentas** pequenas, testáveis e com nível de risco declarado. O SHIRO não depende de um único fornecedor de IA: pedidos simples ficam no PC, com um modelo local, e só o que exige mais raciocínio vai para a nuvem.
+- **"Abre o VS Code e coloca o volume em 30"**: ela executa;
+- **"Anota o trabalho de cálculo pra sexta"**: ela registra a atividade, repete a data que entendeu e avisa antes do prazo;
+- **"O que eu tenho essa semana?"**: ela responde em voz alta.
+
+O modelo de linguagem é só o "cérebro" que escolhe o que fazer. Quem executa são **ferramentas** pequenas, testáveis e com nível de risco declarado. A SHIRO não depende de um único fornecedor de IA: pedidos simples ficam no PC, com um modelo local, e só o que exige mais raciocínio vai para a nuvem. E ela nunca diz que fez algo que não fez.
+
+Persona, voz e visual: [docs/08-identidade.md](docs/08-identidade.md).
 
 ## Princípios
 
@@ -89,7 +93,7 @@ Para personalizar, copie [`config/shiro.example.toml`](config/shiro.example.toml
 | LLM local | Ollama, modelo de 3–4B escolhido por benchmark próprio (provisório: `qwen3:4b-instruct`) |
 | LLM nuvem | Gemini, Claude, OpenAI (adaptadores próprios) |
 | Fala → texto | faster-whisper na CPU + Silero VAD |
-| Texto → fala | Piper (`pt_BR-faber-medium`), como processo separado |
+| Texto → fala | Voz feminina pt-BR: Kokoro `pf_dora` (candidata) ou Piper, em processo separado |
 | Palavra de ativação | openWakeWord ("Ei, Shiro") |
 | Persistência | SQLite (WAL) + sqlite-vec |
 | Casa (futuro) | Home Assistant via MCP |
@@ -106,6 +110,7 @@ Para personalizar, copie [`config/shiro.example.toml`](config/shiro.example.toml
 | [05 · Segurança](docs/05-seguranca.md) | Níveis de risco, modelo de ameaças, mitigações |
 | [06 · Roadmap](docs/06-roadmap.md) | Fases, entregas e critérios de pronto |
 | [07 · Desenvolvimento](docs/07-desenvolvimento.md) | Ambiente, convenções, testes e avaliação |
+| [08 · Identidade](docs/08-identidade.md) | Quem é a SHIRO: persona, voz, aparência e paleta |
 | [ADRs](docs/adr/README.md) | Registro das decisões de arquitetura |
 | [Benchmarks](docs/benchmarks/2026-10-31-modelo-local.md) | Medições no hardware real |
 

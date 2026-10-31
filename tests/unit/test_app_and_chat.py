@@ -183,8 +183,8 @@ async def test_text_session_loop(tmp_path: Path, offline_http: httpx.AsyncClient
         await app.aclose()
 
     text = out.getvalue()
-    assert "shiro > Oi! Em que posso ajudar?" in text
-    assert "shiro > Volume em 30." in text
+    assert "shiro ▸ Oi! Em que posso ajudar?" in text
+    assert "shiro ▸ Volume em 30." in text
     assert "[T0 · regra" in text
     assert "set_volume ✓" in text
 
@@ -258,8 +258,36 @@ def test_chat_command_end_to_end(
     assert main(["chat", "-v", "-m", "volume em 30"]) == 0
 
     out = capsys.readouterr().out
-    assert "Não consegui falar com o Ollama" in out
-    assert "shiro > Volume em 30." in out
+    assert "modelo local offline" in out
+    assert "auditoria íntegra" in out
+    assert "shiro ▸ Volume em 30." in out
     assert volume.level == 30
     assert (isolated_env / "data" / "shiro.db").is_file()
     assert (isolated_env / "data" / "logs" / "shiro.log").is_file()
+
+
+def test_theme_paints_only_when_enabled() -> None:
+    from shiro.interfaces.theme import RED, Theme
+
+    plain, colored = Theme(color=False), Theme(color=True)
+
+    assert plain.assistant("Shiro", "Oi.") == "shiro ▸ Oi."
+    assert plain.status(True, "auditoria íntegra") == "[ ok ] auditoria íntegra"
+    assert plain.status(False, "modo somente leitura") == "[ !! ] modo somente leitura"
+    assert "白" in plain.banner("0.1.0") and "\x1b[" not in plain.banner("0.1.0")
+    assert colored.paint("x", RED) == "\x1b[38;2;255;46;77mx\x1b[0m"
+    assert colored.confirm("Abrir?").endswith("\x1b[0m")
+
+
+def test_colors_respect_no_color_and_pipes(monkeypatch: pytest.MonkeyPatch) -> None:
+    from shiro.interfaces.theme import colors_supported
+
+    class Tty(io.StringIO):
+        def isatty(self) -> bool:
+            return True
+
+    assert not colors_supported(io.StringIO())
+    monkeypatch.setenv("NO_COLOR", "1")
+    assert not colors_supported(Tty())
+    monkeypatch.delenv("NO_COLOR")
+    assert colors_supported(Tty())

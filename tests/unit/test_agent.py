@@ -246,7 +246,7 @@ async def test_untrusted_output_taints_the_turn() -> None:
         answers=[False],
     )
 
-    result = await h.agent.run_turn("como está o tempo?")
+    result = await h.agent.run_turn("dá uma olhada no tempo e organiza meus arquivos")
 
     tool_message = h.local.requests[1].messages[-1]
     assert tool_message.content.startswith(UNTRUSTED_PREFIX)

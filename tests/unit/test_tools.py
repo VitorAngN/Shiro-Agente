@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -12,6 +13,7 @@ from shiro.tools.builtin._base import br_number
 from shiro.tools.builtin.apps import AppTarget, CloseAppTool, OpenAppTool
 from shiro.tools.builtin.audio import ChangeVolumeTool, SetVolumeTool
 from shiro.tools.builtin.clock import GetTimeTool
+from shiro.tools.builtin.location import CACHE_TTL_S, GEOJS_URL, IpLocator, Place
 from shiro.tools.builtin.media import MediaAction, MediaControlTool
 from shiro.tools.builtin.system import (
     GB,
@@ -220,7 +222,7 @@ async def test_weather_uses_default_city() -> None:
 
 async def test_weather_errors_are_friendly() -> None:
     no_city = await run(WeatherTool(weather_client()))
-    assert "Não sei de qual cidade" in no_city.content
+    assert "Não consegui descobrir onde você está" in no_city.content
 
     unknown = await run(WeatherTool(weather_client(found=False)), city="Xyzópolis")
     assert unknown.content == "Não encontrei a cidade Xyzópolis."
@@ -230,3 +232,83 @@ async def test_weather_errors_are_friendly() -> None:
 
     tool = WeatherTool(httpx.AsyncClient(transport=httpx.MockTransport(offline)), "Curitiba")
     assert "sem internet" in (await run(tool)).content
+
+
+class FixedLocator:
+    def __init__(self, place: Place | None) -> None:
+        self.place = place
+        self.calls = 0
+
+    async def locate(self) -> Place | None:
+        self.calls += 1
+        return self.place
+
+
+async def test_weather_uses_detected_location_when_no_city() -> None:
+    locator = FixedLocator(Place("Curitiba", -25.43, -49.27))
+    tool = WeatherTool(weather_client(), locator=locator)
+
+    result = await run(tool)
+
+    assert result.ok
+    assert result.say is not None and result.say.startswith("Em Curitiba, 18 graus")
+    assert locator.calls == 1
+    assert tool.spec.local_only
+
+
+async def test_explicit_city_wins_over_detection() -> None:
+    locator = FixedLocator(Place("Outra", 0.0, 0.0))
+    result = await run(WeatherTool(weather_client(), locator=locator), city="Curitiba")
+    assert result.ok
+    assert locator.calls == 0
+
+
+def geojs_client(payload: dict[str, Any] | None, calls: list[int]) -> httpx.AsyncClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == GEOJS_URL
+        calls.append(1)
+        if payload is None:
+            raise httpx.ConnectError("offline", request=request)
+        return httpx.Response(200, json=payload)
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+GEOJS = {
+    "city": "Curitiba",
+    "region": "Paraná",
+    "latitude": "-25.4284",
+    "longitude": "-49.2733",
+    "timezone": "America/Sao_Paulo",
+}
+
+
+async def test_ip_locator_detects_and_caches(tmp_path: Path) -> None:
+    calls: list[int] = []
+    now = [1_000_000.0]
+    cache = tmp_path / "location.json"
+    locator = IpLocator(geojs_client(GEOJS, calls), cache, clock=lambda: now[0])
+
+    place = await locator.locate()
+    assert place == Place("Curitiba", -25.4284, -49.2733)
+    assert cache.is_file()
+
+    assert await locator.locate() == place  # do cache
+    assert len(calls) == 1
+
+    now[0] += CACHE_TTL_S + 1  # cache vencido: consulta de novo
+    await locator.locate()
+    assert len(calls) == 2
+
+
+async def test_ip_locator_failures_return_none(tmp_path: Path) -> None:
+    offline = IpLocator(geojs_client(None, []), tmp_path / "a.json")
+    assert await offline.locate() is None
+
+    nameless = IpLocator(geojs_client({**GEOJS, "city": "", "region": ""}, []), None)
+    assert await nameless.locate() is None
+
+    broken_cache = tmp_path / "b.json"
+    broken_cache.write_text("{não é json", encoding="utf-8")
+    recovered = IpLocator(geojs_client(GEOJS, []), broken_cache)
+    assert (await recovered.locate()) is not None

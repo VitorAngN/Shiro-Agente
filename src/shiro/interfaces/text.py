@@ -1,4 +1,4 @@
-"""Modo texto: conversa com o SHIRO pelo terminal (``shiro chat``).
+"""Modo texto: conversa com a SHIRO pelo terminal (``shiro chat``).
 
 Na Fase 1 é a forma de usar e depurar o agente antes da voz (marco 1b).
 """
@@ -12,6 +12,7 @@ from typing import TextIO
 
 from shiro.core.models import AgentResult, CallOutcome, DecisionKind, Tier
 from shiro.core.ports import LLMError
+from shiro.interfaces.theme import Theme
 
 _YES = {"s", "sim", "y", "yes", "confirmo", "pode"}
 _EXIT = {"sair", "exit", "quit", "tchau"}
@@ -22,13 +23,14 @@ type Reader = Callable[[str], str]
 class CliConfirmation:
     """Confirmação pelo teclado. No terminal, digitar já é uma confirmação física."""
 
-    def __init__(self, reader: Reader = input) -> None:
+    def __init__(self, reader: Reader = input, theme: Theme | None = None) -> None:
         self._reader = reader
+        self._theme = theme or Theme(color=False)
 
     async def ask(self, prompt: str, kind: DecisionKind) -> bool:
-        label = "confirmação física" if kind is DecisionKind.CONFIRM_PHYSICAL else "confirmação"
+        label = "confirmação física: " if kind is DecisionKind.CONFIRM_PHYSICAL else ""
         try:
-            answer = await asyncio.to_thread(self._reader, f"  ⚠ {prompt} [{label}: s/N] ")
+            answer = await asyncio.to_thread(self._reader, self._theme.confirm(f"{label}{prompt}"))
         except EOFError:
             return False
         return answer.strip().casefold() in _YES
@@ -67,28 +69,30 @@ class TextSession:
         verbose: bool,
         out: TextIO | None = None,
         reader: Reader = input,
+        theme: Theme | None = None,
     ) -> None:
         self._run_turn = run_turn
-        self._name = name.casefold()
+        self._name = name
         self._verbose = verbose
         self._out = out or sys.stdout
         self._reader = reader
+        self.theme = theme or Theme(color=False)
 
     def print(self, text: str) -> None:
         print(text, file=self._out, flush=True)
 
     async def send(self, text: str) -> AgentResult:
         result = await self._run_turn(text)
-        self.print(f"{self._name} > {result.text}")
+        self.print(self.theme.assistant(self._name, result.text))
         if self._verbose:
-            self.print(f"  {describe_result(result)}")
+            self.print(self.theme.meta(describe_result(result)))
         return result
 
     async def loop(self) -> None:
-        self.print("Digite sua mensagem. 'sair' encerra.")
+        self.print(self.theme.paint("Digite sua mensagem. 'sair' encerra.", (154, 163, 178)))
         while True:
             try:
-                text = (await asyncio.to_thread(self._reader, "você > ")).strip()
+                text = (await asyncio.to_thread(self._reader, self.theme.user_prompt())).strip()
             except (EOFError, KeyboardInterrupt):
                 self.print("")
                 return
@@ -101,7 +105,7 @@ class TextSession:
 
 def llm_down_message(host: str, error: LLMError) -> str:
     return (
-        f"Não consegui falar com o Ollama em {host}. Ele está aberto?\n"
-        f"  detalhe: {error}\n"
-        "  Os comandos do Tier 0 (volume, mídia, abrir apps, hora) continuam funcionando."
+        f"modelo local offline: o Ollama não respondeu em {host}. Ele está aberto?\n"
+        f"       detalhe: {error}\n"
+        "       Volume, mídia, apps, hora e clima continuam funcionando."
     )

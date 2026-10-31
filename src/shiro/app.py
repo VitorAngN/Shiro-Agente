@@ -34,12 +34,14 @@ from shiro.settings import Settings
 from shiro.tools.builtin.apps import AppLauncher, AppTarget, CloseAppTool, OpenAppTool
 from shiro.tools.builtin.audio import ChangeVolumeTool, SetVolumeTool, VolumeControl
 from shiro.tools.builtin.clock import GetTimeTool
+from shiro.tools.builtin.location import IpLocator, Locator
 from shiro.tools.builtin.media import MediaControlTool, MediaKeys
 from shiro.tools.builtin.system import PsutilProbe, SystemInfoTool, SystemProbe
 from shiro.tools.builtin.weather import WeatherTool
 from shiro.tools.registry import ToolRegistry
 
 DATABASE_FILE = "shiro.db"
+LOCATION_CACHE_FILE = "location.json"
 
 type Closer = Callable[[], Awaitable[None]]
 
@@ -83,13 +85,26 @@ def app_aliases(settings: Settings) -> dict[str, list[str]]:
     }
 
 
+def build_locator(settings: Settings, http: httpx.AsyncClient, data_dir: Path) -> Locator | None:
+    """Localizador para o clima: só quando não há cidade fixa e a detecção está ligada."""
+    general = settings.general
+    if general.city.strip() or general.location == "off":
+        return None
+    return IpLocator(http, data_dir / LOCATION_CACHE_FILE)
+
+
 def build_registry(
-    settings: Settings, *, desktop: Desktop, http: httpx.AsyncClient, probe: SystemProbe
+    settings: Settings,
+    *,
+    desktop: Desktop,
+    http: httpx.AsyncClient,
+    probe: SystemProbe,
+    locator: Locator | None = None,
 ) -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(GetTimeTool(ZoneInfo(settings.general.timezone)))
     registry.register(SystemInfoTool(probe))
-    registry.register(WeatherTool(http, settings.general.city))
+    registry.register(WeatherTool(http, settings.general.city, locator))
     if desktop.volume is not None:
         registry.register(SetVolumeTool(desktop.volume))
         registry.register(ChangeVolumeTool(desktop.volume))
@@ -134,6 +149,7 @@ async def build_app(
     *,
     confirmation: ConfirmationChannel,
     database_path: Path | str | None = None,
+    data_dir: Path | None = None,
     desktop: Desktop | None = None,
     local_llm: LLMProvider | None = None,
     http: httpx.AsyncClient | None = None,
@@ -147,14 +163,21 @@ async def build_app(
     if desktop is None:
         desktop = windows_desktop() if sys.platform == "win32" else Desktop()
 
-    database = await Database.open(database_path or paths.data_dir() / DATABASE_FILE)
+    data_dir = data_dir or paths.data_dir()
+    database = await Database.open(database_path or data_dir / DATABASE_FILE)
     closers.append(database.close)
     audit = SqliteAuditLog(database)
     bus = EventBus()
     bus.subscribe(TurnFinished, SqliteConversationStore(database).on_turn_finished)
 
     llm = local_llm or build_local_llm(settings)
-    registry = build_registry(settings, desktop=desktop, http=http, probe=probe or PsutilProbe())
+    registry = build_registry(
+        settings,
+        desktop=desktop,
+        http=http,
+        probe=probe or PsutilProbe(),
+        locator=build_locator(settings, http, data_dir),
+    )
     agent_settings = settings.agent
     agent = AgentLoop(
         router=IntentRouter(

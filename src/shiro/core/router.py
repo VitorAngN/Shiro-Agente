@@ -56,6 +56,13 @@ _CLOSE = re.compile(r"^(?:fecha|feche|fechar|encerra)\s+(?P<apps>.+)$")
 _APP_SEPARATOR = re.compile(r"\s+e\s+|\s*,\s*")
 _ARTICLE = re.compile(r"^(?:o|a|os|as)\s+")
 
+_WEATHER = re.compile(
+    r"^(?:como (?:esta|ta) o (?:tempo|clima)(?: hoje| agora| la fora)?"
+    r"|qual (?:e )?o clima(?: hoje| agora)?"
+    r"|(?:qual (?:e )?a )?previsao(?: do tempo)?(?: (?:pra|para|de) hoje)?"
+    r"|vai chover(?: hoje)?|ta (?:frio|calor)(?: la fora)?|clima)$"
+)
+
 _TIME = re.compile(
     r"^(?:que horas sao|que hora e|que horas e|que dia e hoje|qual a data de hoje|que dia e)$"
 )
@@ -112,6 +119,8 @@ class IntentRouter:
         for action, pattern in _MEDIA:
             if pattern.match(command):
                 return [("media_control", {"action": action})]
+        if _WEATHER.match(command):
+            return [("get_weather", {})]
         if _TIME.match(command):
             return [("get_time", {})]
         for tool, pattern in (("open_app", _OPEN), ("close_app", _CLOSE)):

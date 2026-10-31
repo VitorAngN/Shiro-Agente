@@ -7,7 +7,8 @@
 assistant_name = "Shiro"
 language = "pt-BR"
 timezone = "America/Sao_Paulo"
-city = ""                  # cidade padrão do clima (ex.: "Curitiba"); enviada ao Open-Meteo
+city = ""                  # cidade fixa para o clima (ex.: "Curitiba"); vazio = detectar
+location = "ip"            # sem cidade: "ip" detecta pela internet (ADR-0013); "off" desativa
 
 [agent]
 max_steps = 8              # limite de passos por turno
@@ -49,9 +50,9 @@ compute_type = "int8"
 language = "pt"
 
 [voice.tts]
-engine = "piper"
-voice = "pt_BR-faber-medium"
-length_scale = 1.0         # >1 fala mais devagar
+engine = "kokoro"          # voz feminina da SHIRO (ADR-0012); "piper" como alternativa
+voice = "pf_dora"
+speed = 1.0                # <1 fala mais devagar
 
 [voice.wake_word]          # Fase 2
 engine = "openwakeword"

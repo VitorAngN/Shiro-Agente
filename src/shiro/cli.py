@@ -44,6 +44,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
 async def _chat(settings: Settings, args: argparse.Namespace) -> int:
     # Importado aqui para "shiro --version" e "shiro config" não carregarem o agente.
+    import sys
+
     from shiro.app import build_app
     from shiro.core.ports import LLMError
     from shiro.interfaces.text import (
@@ -52,23 +54,40 @@ async def _chat(settings: Settings, args: argparse.Namespace) -> int:
         llm_down_message,
         use_safe_output,
     )
+    from shiro.interfaces.theme import Theme
     from shiro.observability.logging import configure_logging
 
     use_safe_output()
     configure_logging(settings.logging, paths.log_dir(), console=False)
-    app = await build_app(settings, confirmation=CliConfirmation())
+    theme = Theme.for_stream(sys.stdout)
+    app = await build_app(settings, confirmation=CliConfirmation(theme=theme))
     session = TextSession(
-        app.agent.run_turn, name=settings.general.assistant_name, verbose=args.verbose
+        app.agent.run_turn,
+        name=settings.general.assistant_name,
+        verbose=args.verbose,
+        theme=theme,
     )
     try:
-        if not args.no_warmup:
-            session.print(f"Preparando o modelo local ({settings.llm.local.model})...")
+        session.print(theme.banner(__version__))
+        model = settings.llm.local.model
+        if args.no_warmup:
+            session.print(theme.status(True, f"{model}: aquecimento pulado"))
+        else:
             try:
                 await app.agent.warm_up()
+                session.print(theme.status(True, f"{model} carregado"))
             except LLMError as exc:
-                session.print(llm_down_message(settings.llm.local.base_url, exc))
+                session.print(
+                    theme.status(False, llm_down_message(settings.llm.local.base_url, exc))
+                )
+        broken = await app.audit.verify()
+        if broken is None:
+            session.print(theme.status(True, "auditoria íntegra"))
+        else:
+            session.print(theme.status(False, f"auditoria: evento {broken} foi alterado"))
         if settings.policy.read_only_mode:
-            session.print("Modo somente leitura ativo: ações pedem confirmação.")
+            session.print(theme.status(False, "modo somente leitura: ações pedem confirmação"))
+        session.print("")
         if args.message:
             await session.send(args.message)
         else:

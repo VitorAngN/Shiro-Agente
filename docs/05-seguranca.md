@@ -51,7 +51,7 @@ Com taint ativo, qualquer ação com efeito (R2+) passa a exigir confirmação, 
 |---|---|---|---|---|
 | A-01 | **Prompt injection** | Página web, arquivo ou e-mail com instruções escondidas | Ação indevida | Taint + confirmação; conteúdo delimitado; ferramentas R4 inexistentes para o modelo |
 | A-02 | **Injeção de áudio** | Vídeo, live ou chamada dizendo "Ei, Shiro…" | Comando de terceiros | R3 exige confirmação física; o SHIRO ignora o próprio áudio; verificação de locutor no roadmap futuro |
-| A-03 | **Vazamento para a nuvem** | Contexto com dados pessoais roteado para o Tier 2 | Exposição de dados | Flag `local_only` em ferramentas e memórias; roteador bloqueia nuvem quando presente; teste automatizado (RNF-06) |
+| A-03 | **Vazamento para a nuvem** | Contexto com dados pessoais roteado para o Tier 2 | Exposição de dados | Flag `local_only` em ferramentas e memórias (inclui clima, que revela a localização); roteador bloqueia nuvem quando presente; teste automatizado (RNF-06) |
 | A-04 | **Erro do modelo** | Alucinação de argumentos ("apaga tudo") | Perda de dados | Validação Pydantic; pastas permitidas; lixeira com retenção; confirmação em lote com números concretos |
 | A-05 | **Exposição da API local** | Outro processo ou máquina da rede controlando o SHIRO | Controle remoto indevido | Escuta só em `127.0.0.1`; token obrigatório; CORS restrito ao painel |
 | A-06 | **Roubo de chaves de API** | Chave commitada ou em arquivo de texto | Uso indevido e custo | Gerenciador de Credenciais do Windows; `.gitignore`; `gitleaks` no pre-commit e na CI |

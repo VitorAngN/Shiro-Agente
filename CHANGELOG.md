@@ -5,6 +5,16 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (identidade e localização)
+- Identidade da SHIRO (ADR-0012): persona feminina de tom neutro com gíria de netrunner rara, voz feminina pt-BR (Kokoro `pf_dora` como candidata), paleta e esboço conceitual em `docs/assets/shiro-conceito.svg`. Documento `docs/08-identidade.md`.
+- Visual cyberpunk no `shiro chat`: banner, prompts `você ▸` / `shiro ▸`, cores da paleta e checagens de inicialização (modelo, auditoria, modo somente leitura). Respeita `NO_COLOR`.
+- Detecção automática da cidade para o clima pelo IP, com cache local de 24 h e opção `general.location = "off"` (ADR-0013).
+- Perguntas de clima no Tier 0 ("como tá o tempo?", "vai chover hoje?").
+
+### Alterado (identidade e localização)
+- A ferramenta de clima passa a ser `local_only`, porque revela a localização.
+- `voice.tts` passa a ter `engine = "kokoro"`, `voice = "pf_dora"` e `speed`, no lugar de `length_scale`.
+
 ### Adicionado (marco 1a · agente por texto)
 - `shiro chat`: conversa por texto com o agente, confirmação pelo teclado e modo verboso (`-v`).
 - Núcleo do agente: `AgentLoop` com limites de passos e tempo, escalonamento para a nuvem respeitando `local_only`, `IntentRouter` com gramática Tier 0 em pt-BR (inclui números por extenso), `EventBus` e verificação de ação alegada.

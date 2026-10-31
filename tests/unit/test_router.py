@@ -42,6 +42,9 @@ def calls(text: str) -> list[tuple[str, dict[str, Any]]] | None:
             [("open_app", {"app": "vscode"}), ("open_app", {"app": "discord"})],
         ),
         ("fecha o discord", [("close_app", {"app": "discord"})]),
+        ("como tá o tempo?", [("get_weather", {})]),
+        ("Shiro, vai chover hoje?", [("get_weather", {})]),
+        ("qual a previsão do tempo pra hoje", [("get_weather", {})]),
     ],
 )
 def test_tier0_matches(text: str, expected: list[tuple[str, dict[str, Any]]]) -> None:
@@ -57,6 +60,7 @@ def test_tier0_matches(text: str, expected: list[tuple[str, dict[str, Any]]]) ->
         "tá muito alto, diminui um pouco",
         "quanto de memória ram eu tô usando?",
         "terminei o trabalho de cálculo",
+        "como tá o tempo em Curitiba?",  # cidade explícita: o modelo extrai o argumento
         "",
     ],
 )

@@ -41,6 +41,8 @@ Tarefas pequenas e repetitivas no PC consomem atenção: abrir os mesmos program
 
 Um único usuário: o dono do PC. Usa o computador para estudo, desenvolvimento e lazer, fala português do Brasil e prefere respostas curtas e diretas.
 
+A assistente tem identidade própria: **a SHIRO** (白, "branco"), com persona feminina, tom neutro e estética cyberpunk. Ver [08 · Identidade](08-identidade.md).
+
 ## 6. Casos de uso principais
 
 | ID | Caso de uso | Exemplo de fala | Prioridade |
