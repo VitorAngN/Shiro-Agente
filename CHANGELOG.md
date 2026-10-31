@@ -11,6 +11,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ### Adicionado
 - Benchmark do modelo local no hardware real (`docs/benchmarks/2026-10-31-modelo-local.md`).
+- Script `evals/bench_ollama.py`: mede velocidade e acerto de ferramentas de um modelo do Ollama com o formato de pedido do SHIRO.
 - Documentação inicial: visão e escopo, requisitos, arquitetura, modelo de dados, segurança, roadmap e guia de desenvolvimento.
 - ADRs 0001 a 0009, incluindo a decisão de levar voz e atividades para o MVP (ADR-0009).
 - Requisitos de atividades com prazo por voz (RF-34 a RF-40) e meta de precisão de datas (RNF-16).
