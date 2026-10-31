@@ -1,0 +1,100 @@
+# SHIRO · configuração de exemplo
+# Copie para %APPDATA%\SHIRO\shiro.toml e ajuste.
+# Segredos (chaves de API) NÃO ficam aqui: use `shiro secrets set <provedor>`,
+# que grava no Gerenciador de Credenciais do Windows.
+
+[general]
+assistant_name = "Shiro"
+language = "pt-BR"
+timezone = "America/Sao_Paulo"
+
+[agent]
+max_steps = 8              # limite de passos por turno
+step_timeout_s = 20
+turn_timeout_s = 60
+
+[router]
+escalate_on_validation_failure = true   # T1 falhou 2x → tenta T2 se permitido
+cloud_triggers = ["pensa bem", "pesquisa", "analisa com calma"]
+
+[llm.local]
+provider = "ollama"
+base_url = "http://127.0.0.1:11434"
+model = "qwen3:8b"         # provisório até o benchmark da Fase 1 (ADR-0003)
+num_ctx = 8192
+keep_alive = "10m"         # descarrega o modelo da GPU após inatividade
+
+[llm.cloud]
+provider = "gemini"
+model = ""                 # definido após o benchmark da Fase 1
+fallback = ["anthropic", "openai"]
+daily_budget_usd = 0.50    # bloqueia o Tier 2 ao atingir
+rpm_limit = 5              # ajustar ao limite real mostrado no AI Studio
+
+[voice]
+enabled = true
+activation = "push_to_talk"            # push_to_talk | wake_word | both
+push_to_talk_hotkey = "ctrl+alt+space"
+input_device = "default"
+output_device = "default"
+
+[voice.stt]
+engine = "faster-whisper"
+model = "small"            # spike da Fase 1 compara small, medium e large-v3-turbo
+device = "cuda"            # cuda | cpu
+compute_type = "int8_float16"
+language = "pt"
+
+[voice.tts]
+engine = "piper"
+voice = "pt_BR-faber-medium"
+length_scale = 1.0         # >1 fala mais devagar
+
+[voice.wake_word]          # Fase 2
+engine = "openwakeword"
+model_path = ""
+threshold = 0.5
+follow_up_window_s = 5
+
+[policy]
+read_only_mode = true      # primeiras semanas: tudo R1+ pede confirmação por voz
+batch_confirm_threshold = 5
+confirmation_timeout_s = 30
+allowed_folders = ["~/Downloads", "~/Documents/SHIRO"]
+
+[policy.allowed_apps]
+spotify = "spotify.exe"
+vscode = "code"
+chrome = "chrome.exe"
+discord = "Discord.exe"
+
+[policy.emergency]
+hotkey = "ctrl+alt+shift+s"
+
+[activities]
+default_due_time = "23:59"     # usado quando só o dia é informado
+alert_offsets = ["1d", "2h"]   # avisos antes do prazo
+local_only = true              # atividades nunca vão para a nuvem
+
+[memory]
+embedding_model = "nomic-embed-text"   # via Ollama
+default_local_only = true
+
+[retention]
+messages_days = 90
+trash_days = 7
+audit_days = 365
+
+[api]                      # Fase 4
+enabled = false
+host = "127.0.0.1"
+port = 8765
+
+[logging]
+level = "INFO"
+max_file_mb = 10
+backups = 5
+
+# [mcp.servers.home_assistant]    # Fase 5
+# url = ""                        # URL do servidor MCP exposto pelo Home Assistant
+# default_risk = "R2"

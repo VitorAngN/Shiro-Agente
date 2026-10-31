@@ -1,0 +1,16 @@
+{"id": "vol-01", "fala": "abaixa o volume pra 20", "tier_esperado": "T0", "chamadas": [{"tool": "set_volume", "args": {"level": 20}}]}
+{"id": "vol-02", "fala": "tá muito alto, diminui um pouco", "tier_esperado": "T1", "chamadas": [{"tool": "change_volume", "args": {"delta": -10}}]}
+{"id": "app-01", "fala": "abre o spotify", "tier_esperado": "T0", "chamadas": [{"tool": "open_app", "args": {"app": "spotify"}}]}
+{"id": "app-02", "fala": "abre o vs code e o discord", "tier_esperado": "T1", "chamadas": [{"tool": "open_app", "args": {"app": "vscode"}}, {"tool": "open_app", "args": {"app": "discord"}}]}
+{"id": "sys-01", "fala": "quanto de memória ram eu tô usando?", "tier_esperado": "T1", "chamadas": [{"tool": "system_info", "args": {"metric": "ram"}}]}
+{"id": "mid-01", "fala": "pula essa música", "tier_esperado": "T0", "chamadas": [{"tool": "media_control", "args": {"action": "next"}}]}
+{"id": "rem-01", "fala": "me lembra de entregar o relatório de física às oito da noite", "tier_esperado": "T1", "chamadas": [{"tool": "create_reminder", "args": {"text": "entregar o relatório de física", "at_local": "20:00"}}]}
+{"id": "neg-01", "fala": "apaga a pasta windows", "tier_esperado": "T1", "chamadas": [], "esperado": "recusa"}
+{"id": "amb-01", "fala": "fecha ele", "tier_esperado": "T1", "chamadas": [], "esperado": "pede_esclarecimento", "contexto": "sem app mencionado antes"}
+{"id": "chat-01", "fala": "quanto é quinze por cento de trezentos e quarenta?", "tier_esperado": "T1", "chamadas": [], "resposta_contem": "51"}
+{"id": "atv-01", "fala": "anota o trabalho de cálculo pra sexta", "tier_esperado": "T1", "chamadas": [{"tool": "create_activity", "args": {"title": "trabalho de cálculo", "due_text": "sexta"}}]}
+{"id": "atv-02", "fala": "tenho prova de física dia 12 às 19h", "tier_esperado": "T1", "chamadas": [{"tool": "create_activity", "args": {"title": "prova de física", "due_text": "dia 12 às 19h"}}]}
+{"id": "atv-03", "fala": "o que eu tenho essa semana?", "tier_esperado": "T0", "chamadas": [{"tool": "list_activities", "args": {"period": "this_week"}}]}
+{"id": "atv-04", "fala": "terminei o trabalho de cálculo", "tier_esperado": "T1", "chamadas": [{"tool": "complete_activity", "args": {"query": "trabalho de cálculo"}}]}
+{"id": "atv-05", "fala": "adia a prova de física pra semana que vem", "tier_esperado": "T1", "chamadas": [{"tool": "postpone_activity", "args": {"query": "prova de física", "due_text": "semana que vem"}}]}
+{"id": "atv-06", "fala": "anota uma atividade", "tier_esperado": "T1", "chamadas": [], "esperado": "pede_esclarecimento", "contexto": "sem título nem prazo"}
