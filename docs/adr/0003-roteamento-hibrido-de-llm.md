@@ -1,6 +1,6 @@
 # ADR-0003 · Roteamento híbrido de LLM com adaptadores próprios
 
-- **Status:** Aceito
+- **Status:** Aceito · contexto de hardware e candidatos a modelo local substituídos pelo [ADR-0010](0010-hardware-gpu-4gb.md)
 - **Data:** 2026-10-30
 
 ## Contexto

@@ -35,7 +35,7 @@ def test_config_check_accepts_valid_file(
     capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     config = tmp_path / "valido.toml"
-    config.write_text('[llm.local]\nmodel = "qwen3:8b"\n', encoding="utf-8")
+    config.write_text('[llm.local]\nmodel = "qwen3:4b-instruct"\n', encoding="utf-8")
 
     assert main(["config", "check", "--file", str(config)]) == 0
     assert "configuração válida" in capsys.readouterr().out

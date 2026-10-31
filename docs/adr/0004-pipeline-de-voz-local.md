@@ -1,6 +1,6 @@
 # ADR-0004 · Pipeline de voz 100% local
 
-- **Status:** Aceito
+- **Status:** Aceito · local de execução do STT definido pelo [ADR-0010](0010-hardware-gpu-4gb.md) (CPU)
 - **Data:** 2026-10-30
 
 ## Contexto

@@ -6,13 +6,14 @@ Cada decisão importante fica registrada aqui, com o contexto e as alternativas 
 |---|---|---|
 | [0001](0001-python-como-linguagem-principal.md) | Python como linguagem principal | Aceito |
 | [0002](0002-monolito-modular-hexagonal.md) | Monólito modular com arquitetura hexagonal | Aceito |
-| [0003](0003-roteamento-hibrido-de-llm.md) | Roteamento híbrido de LLM com adaptadores próprios | Aceito |
-| [0004](0004-pipeline-de-voz-local.md) | Pipeline de voz 100% local | Aceito |
+| [0003](0003-roteamento-hibrido-de-llm.md) | Roteamento híbrido de LLM com adaptadores próprios | Aceito, em parte substituído pelo 0010 |
+| [0004](0004-pipeline-de-voz-local.md) | Pipeline de voz 100% local | Aceito, em parte substituído pelo 0010 |
 | [0005](0005-ferramentas-com-politica-de-risco.md) | Ferramentas com risco declarado e motor de políticas | Aceito |
 | [0006](0006-home-assistant-via-mcp.md) | Home Assistant via MCP para a casa | Proposto |
 | [0007](0007-sqlite-para-persistencia.md) | SQLite para persistência | Aceito |
 | [0008](0008-processo-de-usuario-no-windows.md) | Processo de usuário iniciado no logon, não serviço do Windows | Aceito |
 | [0009](0009-voz-e-atividades-no-mvp.md) | Voz e atividades no MVP | Aceito |
+| [0010](0010-hardware-gpu-4gb.md) | Ajustar a arquitetura para GPU de 4 GB | Aceito |
 
 ## Modelo
 

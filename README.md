@@ -71,9 +71,9 @@ Para personalizar, copie [`config/shiro.example.toml`](config/shiro.example.toml
 | Camada | Tecnologia |
 |---|---|
 | Linguagem | Python 3.12, `asyncio` |
-| LLM local | Ollama (modelo 8–9B, escolhido por benchmark próprio) |
+| LLM local | Ollama, modelo de 3–4B escolhido por benchmark próprio (provisório: `qwen3:4b-instruct`) |
 | LLM nuvem | Gemini, Claude, OpenAI (adaptadores próprios) |
-| Fala → texto | faster-whisper + Silero VAD |
+| Fala → texto | faster-whisper na CPU + Silero VAD |
 | Texto → fala | Piper (`pt_BR-faber-medium`), como processo separado |
 | Palavra de ativação | openWakeWord ("Ei, Shiro") |
 | Persistência | SQLite (WAL) + sqlite-vec |
@@ -92,6 +92,7 @@ Para personalizar, copie [`config/shiro.example.toml`](config/shiro.example.toml
 | [06 · Roadmap](docs/06-roadmap.md) | Fases, entregas e critérios de pronto |
 | [07 · Desenvolvimento](docs/07-desenvolvimento.md) | Ambiente, convenções, testes e avaliação |
 | [ADRs](docs/adr/README.md) | Registro das decisões de arquitetura |
+| [Benchmarks](docs/benchmarks/2026-10-31-modelo-local.md) | Medições no hardware real |
 
 ## Privacidade
 

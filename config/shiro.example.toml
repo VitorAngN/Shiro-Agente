@@ -20,8 +20,8 @@ cloud_triggers = ["pensa bem", "pesquisa", "analisa com calma"]
 [llm.local]
 provider = "ollama"
 base_url = "http://127.0.0.1:11434"
-model = "qwen3:8b"         # provisório até o benchmark da Fase 1 (ADR-0003)
-num_ctx = 8192
+model = "qwen3:4b-instruct" # provisório até o benchmark do marco 1a (ADR-0010)
+num_ctx = 4096             # cabe em GPU de 4 GB junto com os pesos
 keep_alive = "10m"         # descarrega o modelo da GPU após inatividade
 
 [llm.cloud]
@@ -40,9 +40,9 @@ output_device = "default"
 
 [voice.stt]
 engine = "faster-whisper"
-model = "small"            # spike da Fase 1 compara small, medium e large-v3-turbo
-device = "cuda"            # cuda | cpu
-compute_type = "int8_float16"
+model = "small"            # spike do marco 1b compara base e small na CPU
+device = "cpu"             # cpu | cuda (GPU fica para o LLM, ver ADR-0010)
+compute_type = "int8"
 language = "pt"
 
 [voice.tts]

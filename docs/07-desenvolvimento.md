@@ -6,8 +6,8 @@
 |---|---|
 | Windows | 10 ou 11, 64 bits |
 | Python | 3.12, gerenciado pelo `uv` |
-| GPU | NVIDIA 8 GB+, driver atualizado |
-| CUDA | faster-whisper na GPU precisa das bibliotecas cuBLAS e cuDNN da NVIDIA. O spike da Fase 1 documenta a instalação exata |
+| GPU | NVIDIA com 4 GB+ de VRAM, driver atualizado (referência: GTX 1650 4 GB, ver [ADR-0010](adr/0010-hardware-gpu-4gb.md)) |
+| CUDA | Não precisa instalar à parte: o Ollama traz o próprio runtime e a transcrição roda na CPU |
 | uv | Gerenciador de projeto e ambientes ([instalação](https://docs.astral.sh/uv/getting-started/installation/)) |
 | Ollama | Instalador para Windows, rodando em `127.0.0.1:11434` (a partir da Fase 1) |
 | Git | Com `pre-commit` instalado |
@@ -30,7 +30,7 @@ uv run pytest
 **Planejado para a Fase 1:**
 
 ```powershell
-ollama pull qwen3:8b                 # modelo local provisório
+ollama pull qwen3:4b-instruct        # modelo local provisório (ADR-0010)
 uv run shiro secrets set gemini      # chave vai para o Gerenciador de Credenciais do Windows
 uv run shiro                         # modo completo, com voz
 uv run shiro chat                    # só texto, útil para depurar o agente

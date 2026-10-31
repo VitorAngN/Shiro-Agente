@@ -25,6 +25,15 @@ def test_defaults_are_valid_and_safe() -> None:
     assert settings.memory.default_local_only is True
 
 
+def test_defaults_fit_a_4gb_gpu() -> None:
+    """ADR-0010: a GPU fica para o LLM, com contexto que cabe em 4 GB."""
+    settings = Settings()
+
+    assert settings.voice.stt.device == "cpu"
+    assert settings.voice.stt.compute_type == "int8"
+    assert settings.llm.local.num_ctx <= 4096
+
+
 def test_missing_file_uses_defaults(tmp_path: Path) -> None:
     assert load_settings(tmp_path / "nao-existe.toml") == Settings()
 

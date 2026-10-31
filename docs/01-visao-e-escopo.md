@@ -63,7 +63,7 @@ Um único usuário: o dono do PC. Usa o computador para estudo, desenvolvimento 
 
 | Tipo | Restrição |
 |---|---|
-| Hardware | PC com Windows e GPU NVIDIA de 8 GB+ de VRAM, compartilhada com o uso normal do PC |
+| Hardware | PC com Windows e GPU NVIDIA GTX 1650 com 4 GB de VRAM, compartilhada com o uso normal do PC ([ADR-0010](adr/0010-hardware-gpu-4gb.md)) |
 | Custo | Nuvem usada de forma econômica; plano gratuito do Gemini no início, com limites baixos |
 | Tempo | Projeto pessoal, desenvolvido em paralelo à faculdade; entregas em fases pequenas |
 | Privacidade | Áudio e arquivos pessoais não saem do PC sem autorização explícita |
@@ -72,8 +72,8 @@ Um único usuário: o dono do PC. Usa o computador para estudo, desenvolvimento 
 
 | Risco | Probabilidade | Impacto | Resposta |
 |---|---|---|---|
-| Modelo local de 8B erra chamadas de ferramenta em pt-BR | Média | Alto | Benchmark próprio na Fase 1; escalonar para a nuvem quando a validação falhar |
-| VRAM insuficiente para LLM e STT ao mesmo tempo | Média | Médio | Spike técnico na Fase 1; STT pode ir para a CPU |
+| Modelo local de 3–4B erra chamadas de ferramenta em pt-BR | Alta | Alto | Benchmark próprio no marco 1a; Tier 0 amplo; escalonar para a nuvem quando a validação falhar |
+| Transcrição na CPU lenta demais | Média | Médio | Spike no marco 1b compara os modelos `base` e `small`; STT já sai da GPU por decisão do ADR-0010 |
 | Palavra de ativação com muitos falsos disparos | Alta | Médio | Começar com atalho de teclado; wake word só na Fase 2, com metas medidas |
 | Limites do plano gratuito na nuvem | Alta | Baixo | Roteador com limitador de taxa e fallback local |
 | Escopo crescer demais | Alta | Alto | Roadmap com critérios de pronto; nada entra sem ADR ou item no roadmap |

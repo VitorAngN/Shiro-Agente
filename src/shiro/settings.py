@@ -75,8 +75,8 @@ class RouterSettings(_Section):
 class LocalLLMSettings(_Section):
     provider: Literal["ollama"] = "ollama"
     base_url: str = "http://127.0.0.1:11434"
-    model: str = "qwen3:8b"
-    num_ctx: int = Field(default=8192, ge=1024)
+    model: str = "qwen3:4b-instruct"  # provisório; ver ADR-0010
+    num_ctx: int = Field(default=4096, ge=1024)
     keep_alive: str = "10m"
 
 
@@ -96,8 +96,8 @@ class LLMSettings(_Section):
 class STTSettings(_Section):
     engine: Literal["faster-whisper"] = "faster-whisper"
     model: str = "small"
-    device: Literal["cuda", "cpu"] = "cuda"
-    compute_type: str = "int8_float16"
+    device: Literal["cuda", "cpu"] = "cpu"  # a GPU fica para o LLM (ADR-0010)
+    compute_type: str = "int8"
     language: str = "pt"
 
 

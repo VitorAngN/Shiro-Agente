@@ -154,7 +154,7 @@ async def run_turn(request: UserRequest) -> AgentResult:
 Detalhes importantes:
 
 - Resultados de ferramentas que trazem conteúdo externo (página web, arquivo, MCP) entram no contexto **marcados como não confiáveis**. A partir daí a sessão fica com *taint* e o motor de políticas endurece (ver [Segurança](05-seguranca.md#taint)).
-- Resultados longos são truncados e resumidos antes de voltar ao modelo, para caber no contexto de um modelo 8B.
+- Resultados longos são truncados e resumidos antes de voltar ao modelo, para caber no contexto de 4096 tokens do modelo local ([ADR-0010](adr/0010-hardware-gpu-4gb.md)).
 - O texto final é dividido por frases e enviado ao TTS em streaming: o SHIRO começa a falar antes de terminar de gerar.
 
 ## 7. Fluxos principais
@@ -341,30 +341,32 @@ Todos os eventos carregam `trace_id`, `ts` e são modelos Pydantic imutáveis.
 
 ## 11. Orçamentos
 
-### 11.1 VRAM (GPU de 8 GB)
+### 11.1 VRAM (GTX 1650, 4 GB)
 
-Estimativas iniciais, a medir no spike da Fase 1.
+Valores medidos e estimados para o hardware real ([ADR-0010](adr/0010-hardware-gpu-4gb.md), [benchmark](benchmarks/2026-10-31-modelo-local.md)).
 
-| Componente | Estimativa | Observação |
+| Componente | Uso | Observação |
 |---|---|---|
-| Windows + apps abertos | 0,5–1,5 GB | Navegador e jogos usam mais |
-| LLM 8–9B em Q4_K_M + contexto de 8K | ~5,5–6,5 GB | Maior consumidor |
-| STT faster-whisper `small` em int8 | ~0,5–1 GB | Pode ir para a CPU se faltar VRAM |
-| Piper TTS | ~0 | Roda na CPU |
-| **Total** | **~6,5–9 GB** | Apertado em 8 GB: o spike decide onde o STT roda |
+| Tela do Windows | ~0 | A tela não usa a placa NVIDIA; apps com aceleração de hardware podem usar |
+| Pesos do LLM de 3–4B em Q4_K_M | ~2,0–2,5 GB | Padrão provisório: `qwen3:4b-instruct` (2,5 GB) |
+| Contexto de 4096 tokens | ~0,6 GB (estimado) | Pode cair pela metade com cache quantizado (`q8_0`) |
+| Buffers de execução | ~0,3–0,5 GB | Estimativa |
+| STT faster-whisper | 0 | Roda na CPU em int8 |
+| Piper TTS | 0 | Roda na CPU |
+| **Total** | **~3,0–3,6 GB** | Cabe em 4 GB sem transbordar para a CPU |
 
-Mitigações: limitar o contexto do modelo local, descarregá-lo após inatividade (`keep_alive` do Ollama) e o **Modo Desempenho** (RF-26), que libera a GPU para jogos ou trabalho pesado e deixa ativos só o Tier 0 e a nuvem.
+Mitigações: descarregar o modelo após inatividade (`keep_alive` do Ollama) e o **Modo Desempenho** (RF-26), que libera a GPU para jogos ou trabalho pesado e deixa ativos só o Tier 0 e a nuvem.
 
 ### 11.2 Latência (Tier 1, comando curto)
 
-| Estágio | Meta |
+| Estágio | Meta / estimativa |
 |---|---|
 | Detecção de fim de fala (VAD) | ~300 ms |
-| STT de frase curta | ~300–500 ms |
-| LLM local até a chamada de ferramenta | ~500–1000 ms |
+| STT de frase curta na CPU | ~500–1000 ms (a medir no marco 1b) |
+| LLM local até a chamada de ferramenta | ~1,0–1,5 s (geração medida: ~17,5 tokens/s) |
 | Execução da ferramenta | ~50–200 ms |
 | TTS até o primeiro áudio | ~150–300 ms |
-| **Total p50** | **≤ 2,5 s** (RNF-01) |
+| **Total p50** | **meta ≤ 2,5 s** (RNF-01) · **estimativa atual 2,0–3,3 s** |
 
 Cada estágio vira uma métrica com `trace_id`, então dá para ver onde o tempo é gasto.
 
