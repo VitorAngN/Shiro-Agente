@@ -38,6 +38,8 @@ SYSTEM_PROMPT = "\n".join(
         "- Use uma ferramenta sempre que o pedido envolver uma ação no PC, lembretes",
         "  ou atividades.",
         "- Pedidos com várias ações: chame uma ferramenta para cada ação.",
+        "- Nunca diga que fez algo sem ter chamado a ferramenta correspondente. Só a",
+        "  ferramenta executa ações; sua resposta apenas confirma o que ela fez.",
         "- Nunca invente argumentos. Se faltar informação essencial (qual app, qual atividade,",
         "  qual prazo), pergunte antes de agir.",
         "- Prazos de atividades: copie a expressão de tempo exatamente como o usuário falou",
