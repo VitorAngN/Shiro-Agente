@@ -280,14 +280,24 @@ def test_theme_paints_only_when_enabled() -> None:
 
 
 def test_colors_respect_no_color_and_pipes(monkeypatch: pytest.MonkeyPatch) -> None:
+    import shiro.interfaces.theme as theme
     from shiro.interfaces.theme import colors_supported
 
     class Tty(io.StringIO):
         def isatty(self) -> bool:
             return True
 
+    # Um terminal falso não tem console do Windows por trás; o VT é testado à parte.
+    monkeypatch.setattr(theme, "_enable_windows_vt", lambda _stream: True)
     assert not colors_supported(io.StringIO())
     monkeypatch.setenv("NO_COLOR", "1")
     assert not colors_supported(Tty())
     monkeypatch.delenv("NO_COLOR")
     assert colors_supported(Tty())
+
+
+@pytest.mark.windows
+def test_windows_vt_fails_safely_without_a_console() -> None:
+    from shiro.interfaces.theme import _enable_windows_vt  # pyright: ignore[reportPrivateUsage]
+
+    assert _enable_windows_vt(io.StringIO()) is False
