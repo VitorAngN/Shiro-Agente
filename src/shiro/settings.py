@@ -15,13 +15,22 @@ Credenciais do Windows.
 from __future__ import annotations
 
 import ipaddress
+import re
 import tomllib
 from datetime import time
 from pathlib import Path
-from typing import Any, Literal, Self
+from typing import Annotated, Any, Literal, Self
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from shiro import paths
@@ -42,6 +51,7 @@ class GeneralSettings(_Section):
     assistant_name: str = Field(default="Shiro", min_length=1)
     language: str = "pt-BR"
     timezone: str = "America/Sao_Paulo"
+    city: str = ""  # cidade padrão do clima; fica só no shiro.toml local
 
     @field_validator("timezone")
     @classmethod
@@ -58,6 +68,7 @@ class AgentSettings(_Section):
     max_steps: int = Field(default=8, ge=1, le=32)
     step_timeout_s: float = Field(default=20.0, gt=0)
     turn_timeout_s: float = Field(default=60.0, gt=0)
+    max_history_messages: int = Field(default=8, ge=0, le=32)
 
     @model_validator(mode="after")
     def _turn_covers_step(self) -> Self:
@@ -128,6 +139,36 @@ class VoiceSettings(_Section):
     wake_word: WakeWordSettings = WakeWordSettings()
 
 
+class AppEntry(_Section):
+    """Um app que o SHIRO pode abrir e fechar."""
+
+    launch: str = Field(min_length=1)  # caminho, comando do PATH ou URI (ex.: "spotify:")
+    process: str = ""  # nome do processo para fechar (ex.: "Spotify.exe")
+    name: str = ""  # como o SHIRO fala o nome (ex.: "VS Code")
+    aliases: tuple[str, ...] = ()  # outros nomes falados (ex.: ["vs code", "code"])
+
+    @property
+    def label(self) -> str:
+        return self.name or self.launch
+
+    @property
+    def process_name(self) -> str:
+        if self.process:
+            return self.process
+        base = self.launch.replace("\\", "/").rsplit("/", 1)[-1]
+        return base if base.casefold().endswith(".exe") else ""
+
+
+def _apps_from_strings(value: Any) -> Any:
+    """Aceita ``spotify = "spotify:"`` como atalho para ``{launch = "spotify:"}``."""
+    if isinstance(value, dict):
+        return {
+            key: {"launch": item} if isinstance(item, str) else item
+            for key, item in value.items()  # pyright: ignore[reportUnknownVariableType]
+        }
+    return value
+
+
 class EmergencySettings(_Section):
     hotkey: str = "ctrl+alt+shift+s"
 
@@ -137,8 +178,19 @@ class PolicySettings(_Section):
     batch_confirm_threshold: int = Field(default=5, ge=1)
     confirmation_timeout_s: float = Field(default=30.0, gt=0)
     allowed_folders: tuple[str, ...] = ()
-    allowed_apps: dict[str, str] = Field(default_factory=dict[str, str])
+    allowed_apps: Annotated[dict[str, AppEntry], BeforeValidator(_apps_from_strings)] = Field(
+        default_factory=dict[str, AppEntry]
+    )
     emergency: EmergencySettings = EmergencySettings()
+
+    @field_validator("allowed_apps")
+    @classmethod
+    def _app_keys_are_identifiers(cls, value: dict[str, AppEntry]) -> dict[str, AppEntry]:
+        for key in value:
+            if not re.fullmatch(r"[a-z][a-z0-9_]*", key):
+                msg = f"nome de app inválido: {key!r} (use minúsculas, números e _)"
+                raise ValueError(msg)
+        return value
 
 
 class ActivitiesSettings(_Section):

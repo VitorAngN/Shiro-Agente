@@ -1,17 +1,20 @@
 """Linha de comando do SHIRO.
 
-Fase 0: só utilitários de diagnóstico. O assistente em si chega na Fase 1
-(ver ``docs/06-roadmap.md``).
+* ``shiro chat``: conversa por texto com o agente (marco 1a);
+* ``shiro config``: ver e validar a configuração.
+
+A voz chega no marco 1b (ver ``docs/06-roadmap.md``).
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
 from collections.abc import Sequence
 from pathlib import Path
 
 from shiro import __version__, paths
-from shiro.settings import ConfigError, load_settings
+from shiro.settings import ConfigError, Settings, load_settings
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -27,7 +30,52 @@ def _build_parser() -> argparse.ArgumentParser:
     config_commands.add_parser("path", help="mostra onde fica o shiro.toml")
     check = config_commands.add_parser("check", help="valida o shiro.toml")
     check.add_argument("--file", type=Path, help="valida outro arquivo em vez do padrão")
+
+    chat = commands.add_parser("chat", help="conversa com o SHIRO por texto")
+    chat.add_argument("-m", "--message", help="envia uma única mensagem e sai")
+    chat.add_argument(
+        "-v", "--verbose", action="store_true", help="mostra camada, modelo, tempo e ferramentas"
+    )
+    chat.add_argument(
+        "--no-warmup", action="store_true", help="não pré-carrega o modelo local ao iniciar"
+    )
     return parser
+
+
+async def _chat(settings: Settings, args: argparse.Namespace) -> int:
+    # Importado aqui para "shiro --version" e "shiro config" não carregarem o agente.
+    from shiro.app import build_app
+    from shiro.core.ports import LLMError
+    from shiro.interfaces.text import (
+        CliConfirmation,
+        TextSession,
+        llm_down_message,
+        use_safe_output,
+    )
+    from shiro.observability.logging import configure_logging
+
+    use_safe_output()
+    configure_logging(settings.logging, paths.log_dir(), console=False)
+    app = await build_app(settings, confirmation=CliConfirmation())
+    session = TextSession(
+        app.agent.run_turn, name=settings.general.assistant_name, verbose=args.verbose
+    )
+    try:
+        if not args.no_warmup:
+            session.print(f"Preparando o modelo local ({settings.llm.local.model})...")
+            try:
+                await app.agent.warm_up()
+            except LLMError as exc:
+                session.print(llm_down_message(settings.llm.local.base_url, exc))
+        if settings.policy.read_only_mode:
+            session.print("Modo somente leitura ativo: ações pedem confirmação.")
+        if args.message:
+            await session.send(args.message)
+        else:
+            await session.loop()
+    finally:
+        await app.aclose()
+    return 0
 
 
 def _config_path() -> int:
@@ -60,6 +108,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.config_command == "path":
             return _config_path()
         return _config_check(args.file)
-    print(f"shiro {__version__}: Fase 0 (fundação). O assistente chega na Fase 1.")
-    print("Use 'shiro config check' para validar a configuração ou 'shiro --help'.")
+    if args.command == "chat":
+        try:
+            settings = load_settings()
+        except ConfigError as exc:
+            print(f"✗ {exc}")
+            return 1
+        try:
+            return asyncio.run(_chat(settings, args))
+        except KeyboardInterrupt:
+            return 130
+    print(f"shiro {__version__}: Fase 1 (MVP de voz), marco 1a: agente por texto.")
+    print("Use 'shiro chat' para conversar, 'shiro config check' ou 'shiro --help'.")
     return 0

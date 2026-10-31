@@ -44,7 +44,10 @@ def test_example_config_is_valid() -> None:
 
     assert settings.general.assistant_name == "Shiro"
     assert settings.activities.default_due_time == time(23, 59)
-    assert settings.policy.allowed_apps["spotify"] == "spotify.exe"
+    spotify = settings.policy.allowed_apps["spotify"]
+    assert spotify.launch == "spotify:"
+    assert spotify.process_name == "Spotify.exe"
+    assert settings.policy.allowed_apps["vscode"].label == "VS Code"
 
 
 def test_environment_overrides_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -120,3 +123,24 @@ def test_settings_are_immutable() -> None:
 
     with pytest.raises(ValueError, match="frozen"):
         settings.agent.max_steps = 99  # type: ignore[misc]
+
+
+def test_allowed_apps_accept_short_form_and_derive_process(tmp_path: Path) -> None:
+    config = tmp_path / "apps.toml"
+    config.write_text(
+        '[policy.allowed_apps]\nnotepad = "C:/Windows/notepad.exe"\nspotify = "spotify:"\n',
+        encoding="utf-8",
+    )
+    apps = load_settings(config).policy.allowed_apps
+
+    assert apps["notepad"].process_name == "notepad.exe"
+    assert apps["notepad"].label == "C:/Windows/notepad.exe"
+    assert apps["spotify"].process_name == ""
+
+
+def test_allowed_apps_reject_bad_keys(tmp_path: Path) -> None:
+    config = tmp_path / "apps.toml"
+    config.write_text('[policy.allowed_apps]\n"VS Code" = "code"\n', encoding="utf-8")
+
+    with pytest.raises(ConfigError, match="nome de app inválido"):
+        load_settings(config)

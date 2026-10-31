@@ -18,7 +18,7 @@ def test_version(capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_without_command_explains_current_phase(capsys: pytest.CaptureFixture[str]) -> None:
     assert main([]) == 0
-    assert "Fase 0" in capsys.readouterr().out
+    assert "shiro chat" in capsys.readouterr().out
 
 
 def test_config_path_reports_missing_file(

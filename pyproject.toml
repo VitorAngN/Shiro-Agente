@@ -115,6 +115,9 @@ markers = [
 [tool.coverage.run]
 source = ["shiro"]
 branch = true
+# Adaptadores que só rodam no Windows real (COM, teclas de mídia, ShellExecute).
+# São verificados manualmente no PC; a lógica das ferramentas é testada com dublês.
+omit = ["src/shiro/tools/windows/*"]
 
 [tool.coverage.report]
 show_missing = true
@@ -141,6 +144,12 @@ forbidden_modules = [
     "shiro.tools",
     "shiro.voice",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Adaptadores não dependem da composição nem uns dos outros (ADR-0002)"
+type = "forbidden"
+source_modules = ["shiro.llm", "shiro.persistence", "shiro.tools", "shiro.voice"]
+forbidden_modules = ["shiro.app", "shiro.cli", "shiro.interfaces"]
 
 [[tool.importlinter.contracts]]
 name = "Atividades dependem só do núcleo, não de infraestrutura (ADR-0009)"
