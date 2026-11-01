@@ -119,7 +119,7 @@ local_only = true              # atividades nunca vão para a nuvem
 
 [memory]                   # "lembra que…" (ADR-0017); nunca vai para a nuvem
 enabled = true
-embedding_model = "Xenova/multilingual-e5-small"   # ONNX na CPU; baixado por "shiro setup"
+embedding_model = "Xenova/paraphrase-multilingual-MiniLM-L12-v2"   # ONNX na CPU (113 MB); "shiro setup"
 embedding_file = "onnx/model_int8.onnx"
 max_in_context = 3         # quantas memórias relevantes entram em cada pedido
 

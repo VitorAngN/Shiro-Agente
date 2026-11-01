@@ -20,6 +20,7 @@ Cada decisão importante fica registrada aqui, com o contexto e as alternativas 
 | [0014](0014-prazos-ancorados-na-fala.md) | Prazos ancorados na fala e atividades no Tier 0 | Aceito |
 | [0015](0015-implementacao-da-voz.md) | Implementação da voz (marco 1b) | Aceito |
 | [0016](0016-sempre-ligado.md) | Sempre ligado: bandeja, "Ei, Shiro" e início com o Windows | Aceito |
+| [0017](0017-memoria-local.md) | Memória de longo prazo local | Aceito |
 
 ## Modelo
 

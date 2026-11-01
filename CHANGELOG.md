@@ -5,6 +5,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (Fase 3 · memória)
+- Memória de longo prazo (ADR-0017):
+  - "lembra que…", "esquece…", "esquece tudo", "o que você sabe sobre mim?";
+  - busca por semelhança com `paraphrase-multilingual-MiniLM-L12-v2` em ONNX na CPU (10/10 no fato certo na calibração), com reserva por radicais sem download;
+  - recusa senhas, documentos e dados bancários;
+  - as memórias relevantes entram no contexto só do modelo local, e o turno não sobe para a nuvem.
+- `shiro setup`: baixa e prepara ouvido, voz e memória de uma vez.
+
 ### Adicionado (Fase 2 · sempre ligado)
 - Bandeja do Windows (`shiro tray` / `shiro-tray` sem console):
   - ícone por estado na paleta da SHIRO;

@@ -19,7 +19,7 @@ from shiro.core.ids import uuid7
 from shiro.core.models import ToolResult
 from shiro.core.ports import Clock
 from shiro.core.text import normalize
-from shiro.memory.embedding import Embedder
+from shiro.memory.embedding import Embedder, shares_stem
 from shiro.memory.models import Category, MemoryFact, MemoryStore
 
 _SENSITIVE = re.compile(
@@ -99,6 +99,8 @@ class MemoryService:
 
     async def forget(self, query: str) -> ToolResult:
         found = await self.search(query, limit=3, min_score=self._embedder.match_score)
+        # Apagar é definitivo: além da semelhança, exige uma palavra em comum.
+        found = [(f, s) for f, s in found if shares_stem(query, f.content)]
         if not found:
             return ToolResult.failure(f'Não achei nenhuma memória sobre "{query.strip()}".')
         best, score = found[0]

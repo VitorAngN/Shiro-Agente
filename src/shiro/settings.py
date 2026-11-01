@@ -249,7 +249,7 @@ class MemorySettings(_Section):
 
     enabled: bool = True
     # Repositório do Hugging Face com o modelo em ONNX; sem ele baixado, usa a reserva por palavras.
-    embedding_model: str = "Xenova/multilingual-e5-small"
+    embedding_model: str = "Xenova/paraphrase-multilingual-MiniLM-L12-v2"
     embedding_file: str = "onnx/model_int8.onnx"
     max_in_context: int = Field(default=3, ge=0, le=10)
     min_score: float | None = Field(default=None, gt=0, lt=1)  # vazio = padrão do modelo

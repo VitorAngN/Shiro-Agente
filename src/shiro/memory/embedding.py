@@ -51,6 +51,11 @@ _STOPWORDS = {
 }  # fmt: skip
 
 
+def shares_stem(a: str, b: str) -> bool:
+    """Têm pelo menos um radical em comum? Trava de segurança para apagar memórias."""
+    return bool(set(_stems(a)) & set(_stems(b)))
+
+
 def _stems(text: str) -> list[str]:
     words = [w for w in normalize(text).replace(",", " ").replace(".", " ").split() if w]
     return [w[:5] for w in words if w not in _STOPWORDS and len(w) > 1]
