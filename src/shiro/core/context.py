@@ -75,8 +75,10 @@ class ContextBuilder:
                 Message(
                     role=Role.SYSTEM,
                     content=(
-                        "Coisas que o usuário pediu para você lembrar. Use só se ajudarem a "
-                        f"responder; não as repita sem necessidade:\n{listed}"
+                        "Fatos que o usuário pediu para você lembrar, nas palavras dele "
+                        '("eu" e "meu" são o usuário, não você). Use só se ajudarem a '
+                        "responder e fale com ele na segunda pessoa (\"seu time\"):\n"
+                        f"{listed}"
                     ),
                 )
             )

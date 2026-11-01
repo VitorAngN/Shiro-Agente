@@ -121,7 +121,10 @@ def activity_tools(service: ActivityService) -> list[ActivityTool]:
     return [
         ActivityTool(
             name="create_activity",
-            description="Registra uma atividade (trabalho, prova, entrega) com prazo opcional.",
+            description=(
+                "Registra uma atividade ou tarefa com prazo opcional: trabalho, prova, entrega, "
+                "algo que o usuário precisa fazer ('preciso entregar o relatório sexta')."
+            ),
             args_model=CreateActivityArgs,
             risk=RiskLevel.R1,
             describe=lambda a: f"anotar {a.title}" + (f" ({a.due_text})" if a.due_text else ""),
