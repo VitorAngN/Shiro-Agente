@@ -204,6 +204,7 @@ def test_matching_and_offsets() -> None:
     assert [a.id for a in matching.find("física 3", items)] == ["2"]
     assert matching.find("redação", items) == []
     assert matching.find("de", items) == []
+    assert [a.id for a in matching.find("aquela prova de física", items)] == ["2"]
 
     assert parse_offset("1d") == timedelta(days=1)
     assert parse_offset("2h") == timedelta(hours=2)

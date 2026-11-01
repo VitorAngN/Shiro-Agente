@@ -21,6 +21,7 @@ Criar atividade por voz é o requisito central do projeto. Depender do modelo ac
    - o modelo copiou um pedaço: vale a expressão inteira que o contém ("às 8h" → "amanhã às 8h");
    - o modelo parafraseou e a frase tem uma só expressão de tempo: valem as palavras do usuário;
    - o modelo omitiu o prazo e a frase tem exatamente um, fora do título: vale esse;
+   - dia e hora separados na frase ("amanhã tenho prova às 10") contam como um prazo só;
    - em qualquer outra situação, fica o que o modelo mandou.
    O pedido do turno chega às ferramentas por `ToolContext.utterance`.
 3. **Tier 0 para as frases mais comuns** (`activities/rules.py`), plugado no roteador pela composição (`IntentRouter(rules=...)`, sem o núcleo depender de atividades):
@@ -29,7 +30,7 @@ Criar atividade por voz é o requisito central do projeto. Depender do modelo ac
    - "tenho que/tenho de X <prazo>";
    - "me lembra de/que X <quando>".
    O prazo precisa estar no fim e ser o único; pergunta ("?"), título genérico ("anota uma atividade") ou qualquer dúvida vai para o modelo.
-4. **Concluir no Tier 0** também para "já dei conta de X", "já fiz X" e "…, pode tirar da lista".
+4. **Concluir no Tier 0** também para "já dei conta de X", "já fiz X", "X já era", "X tá pronto" e "…, pode tirar da lista".
 5. **Resolvedor de prazos** passa a entender:
    - hora falada sem período e sem "h" ("às seis") como o próximo seis do relógio (6h ou 18h), como uma pessoa entenderia; "às 6h" continua literal;
    - "daqui a 40 minutos", "em 2 horas", "daqui a meia hora";

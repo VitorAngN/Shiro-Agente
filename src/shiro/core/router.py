@@ -74,6 +74,13 @@ _COMPLETE = re.compile(
     r"|^(?:marca|marque|pode marcar)\s+(?P<q2>.+?)\s+como\s+"
     r"(?:concluid[oa]|feit[oa]|pronto|pronta)$"
 )
+# "aquela prova de física já era, pode considerar feita"
+_DONE_STATE = re.compile(
+    r"^(?:(?:aquel[ea]s?|ess[ea]s?|est[ea]s?|o|a|os|as)\s+)?(?P<q>(?:\S+\s+){0,7}?\S+)\s+"
+    r"(?:ja era|ja foi|(?:ja\s+)?(?:ta|esta) (?:feit[oa]|pront[oa]|entregue))"
+    r"(?:\s+(?:pode\s+)?(?:considerar|considera|marcar|marca|tirar|tira)\s+(?:como\s+)?"
+    r"(?:feit[oa]|concluid[oa]|pront[oa]|da lista))?$"
+)
 _PERIODS = {
     "hoje": "today",
     "amanha": "tomorrow",
@@ -175,6 +182,8 @@ class IntentRouter:
         if match := _COMPLETE.match(command):
             query = (match["q"] or match["q2"] or match["q3"] or "").strip()
             return [("complete_activity", {"query": query})] if query else None
+        if match := _DONE_STATE.match(command):
+            return [("complete_activity", {"query": match["q"]})]
         if match := _LIST.match(command):
             spoken = match["p1"] or match["p2"] or match["p3"] or match["p4"]
             return [("list_activities", {"period": _PERIODS.get(spoken or "", "all")})]

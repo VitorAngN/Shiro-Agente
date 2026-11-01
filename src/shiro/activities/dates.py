@@ -440,6 +440,19 @@ def _contains(haystack: str, needle: str) -> bool:
     return bool(needle) and f" {needle} " in f" {haystack} "
 
 
+def _join_split(spans: list[Span], *, now: datetime, base: datetime | None) -> list[Span]:
+    """ "amanhã tenho prova às 10": dia e hora separados na frase viram um prazo só."""
+    if len(spans) != 2:
+        return spans
+    first, second = spans
+    plain = f"{first.plain} {second.plain}"
+    joined = resolve(plain, now=now, base=base)
+    alone = {resolve(s.plain, now=now, base=base).when for s in spans}
+    if not joined.ok or joined.when is None or joined.when in alone:
+        return spans
+    return [Span(first.start, second.end, f"{first.text} {second.text}", plain)]
+
+
 def ground(
     spoken: str | None,
     utterance: str,
@@ -455,11 +468,12 @@ def ground(
       expressão de tempo: usa a do usuário;
     * o modelo omitiu o prazo e a frase tem exatamente um, fora do título
       (``exclude``): usa esse;
+    * dia e hora separados na frase ("amanhã tenho prova às 10") contam como um só;
     * em qualquer dúvida, fica com o que o modelo mandou.
     """
     if not utterance.strip():
         return spoken
-    spans = locate(utterance, now=now, base=base)
+    spans = _join_split(locate(utterance, now=now, base=base), now=now, base=base)
     if not spans:
         return spoken
     target = _clean(spoken or "")

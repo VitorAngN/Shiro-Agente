@@ -20,6 +20,7 @@ import argparse
 import json
 import statistics
 import time
+import unicodedata
 import urllib.request
 from collections import Counter
 from pathlib import Path
@@ -181,11 +182,17 @@ def calls_of(result: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     return [(c["function"]["name"], c["function"].get("arguments") or {}) for c in calls]
 
 
+def _plain(text: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", text.casefold().strip())
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
 def args_match(expected: dict[str, Any], got: dict[str, Any]) -> bool:
+    """Texto confere se um contém o outro, sem diferenciar maiúsculas nem acentos."""
     for key, want in expected.items():
         have = got.get(key)
         if isinstance(want, str):
-            a, b = want.casefold().strip(), str(have or "").casefold().strip()
+            a, b = _plain(want), _plain(str(have or ""))
             if not a or not b or (a not in b and b not in a):
                 return False
         elif have != want:

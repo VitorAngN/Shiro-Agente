@@ -167,6 +167,9 @@ def test_locate_finds_time_expressions_in_a_sentence(utterance: str, spans: list
         # omitiu o prazo: usa o único da frase, se não for parte do título
         (None, "tenho prova de física dia 12 às 19h", "prova de física", "dia 12 às 19h"),
         (None, "estudar pra prova de sexta", "estudar pra prova de sexta", None),
+        # dia e hora separados na frase viram um prazo só
+        ("às 10", "amanhã tenho prova de química às 10, anota aí", "", "amanhã às 10"),
+        (None, "amanhã tenho prova de química às 10", "prova de química", "amanhã às 10"),
         # duas expressões: fica a que contém o que o modelo disse
         ("segunda", "adia o trabalho de sexta pra segunda", "", "pra segunda"),
         # duas expressões e nenhuma bate: fica o do modelo

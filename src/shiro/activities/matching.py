@@ -27,6 +27,21 @@ _STOPWORDS = {
     "para",
     "atividade",
     "tarefa",
+    # "aquela prova", "daquele relatório", "essa lista"
+    "aquele",
+    "aquela",
+    "aqueles",
+    "aquelas",
+    "daquele",
+    "daquela",
+    "esse",
+    "essa",
+    "desse",
+    "dessa",
+    "este",
+    "esta",
+    "deste",
+    "desta",
 }
 
 
