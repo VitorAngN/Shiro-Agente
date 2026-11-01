@@ -18,6 +18,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 - Avaliação: relógio fixo, prazos comparados pelo momento que produzem e tokens do pedido por caso.
 
 ### Corrigido (marco 1c)
+- A checagem de ação alegada deixava passar "Chamei a ferramenta para marcar…" e promessas como "Vou marcar como concluída" sem ferramenta chamada.
 - O schema compacto das ferramentas apagava o campo `title` (confundido com o metadado `title` do JSON Schema); o modelo recebia o campo como obrigatório sem definição e omitia o título.
 - "estudar 2 horas" não é mais lido como horário.
 - `evals/run_agent.py` não quebra mais com saída redirecionada no Windows (cp1252).

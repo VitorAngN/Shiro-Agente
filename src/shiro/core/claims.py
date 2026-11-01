@@ -14,17 +14,25 @@ import re
 
 from shiro.core.text import normalize
 
-# Verbos na 1ª pessoa do pretérito perfeito ("marquei", "abri"...).
+# Verbos na 1ª pessoa do pretérito perfeito ("marquei", "abri", "chamei a ferramenta"...).
 _PAST_VERBS = (
-    "abaixei|abri|adiei|agendei|ajustei|anotei|apaguei|aumentei|baixei|coloquei|conclui|"
-    "configurei|criei|defini|deixei|desliguei|diminui|executei|exclui|fechei|fiz|iniciei|"
-    "liguei|marquei|mudei|pausei|pulei|registrei|removi|retomei|salvei|silenciei|toquei|troquei"
+    "abaixei|abri|acionei|adiei|agendei|ajustei|anotei|apaguei|atualizei|aumentei|baixei|"
+    "cancelei|chamei|coloquei|conclui|configurei|criei|defini|deixei|desliguei|diminui|"
+    "executei|exclui|fechei|finalizei|fiz|iniciei|liguei|marquei|mudei|pausei|programei|"
+    "pulei|registrei|removi|renomeei|retomei|rodei|salvei|silenciei|terminei|toquei|troquei|usei"
+)
+# Ações que a SHIRO só faz por ferramenta: prometê-las sem chamar também engana.
+_ACTION_INFINITIVES = (
+    "abrir|adiar|agendar|ajustar|anotar|apagar|cancelar|concluir|criar|excluir|fechar|"
+    "lembrar|marcar|pausar|registrar|remover|renomear|salvar|tocar"
 )
 _CLAIMS = re.compile(
     rf"\b(?:{_PAST_VERBS})\b"
     r"|^(?:pronto|feito|prontinho)\b"
     r"|\b(?:foi|esta|ficou|ja esta) (?:marcad|conclui|criad|anotad|adiad|agendad|registrad|"
     r"salv|abert|fechad|ajustad|definid)\w*"
+    rf"|\b(?:acabei de|vou|estou|to) (?:te |lhe )?(?:{_ACTION_INFINITIVES}|"
+    r"marcando|anotando|criando|abrindo|fechando|ajustando|adiando|registrando)\b"
 )
 _NEGATIONS = {"nao", "nunca", "nem"}
 _SENTENCES = re.compile(r"[^.!?\n]+[.!?]?")

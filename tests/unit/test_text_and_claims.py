@@ -44,6 +44,11 @@ def test_normalize_removes_accents_and_punctuation() -> None:
         "Abri o Spotify para você.",
         "Sua atividade já está marcada.",
         "Criei o lembrete para as 20h.",
+        # caso real da avaliação: passou batido antes de "chamei" entrar na lista
+        "Chamei a ferramenta para marcar a prova de física como concluída.",
+        "Vou marcar a prova como concluída.",
+        "Acabei de anotar.",
+        "Tô abrindo o Spotify.",
     ],
 )
 def test_detects_claimed_actions(text: str) -> None:
@@ -62,6 +67,9 @@ def test_detects_claimed_actions(text: str) -> None:
         "Estou pronto para ajudar.",
         "Ainda não consigo marcar atividades.",
         "Agora são 17h05.",
+        "Vou precisar do nome do aplicativo.",
+        "Não chamei nenhuma ferramenta.",
+        "Posso marcar como concluída se você confirmar o nome.",
         "",
     ],
 )
