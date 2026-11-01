@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import time
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -28,6 +29,15 @@ from shiro.core.models import (
 from shiro.core.ports import LLMError
 
 _ERRORS = (errors.APIError, httpx.HTTPError, OSError, ValueError)
+
+
+@dataclass(frozen=True)
+class WebAnswer:
+    text: str
+    sources: tuple[tuple[str, str], ...]
+    """(título, endereço) de cada fonte usada."""
+    tokens_in: int = 0
+    tokens_out: int = 0
 
 
 class GeminiProvider:
@@ -69,6 +79,42 @@ class GeminiProvider:
             raise LLMError(msg) from exc
         latency_ms = round((time.perf_counter() - started) * 1000)
         return from_gemini(response, model=self._model, latency_ms=latency_ms)
+
+    async def search(self, query: str) -> WebAnswer:
+        """Pesquisa no Google pelo Gemini (grounding) e resume em português, com fontes."""
+        config = types.GenerateContentConfig(
+            system_instruction=(
+                "Responda em português do Brasil, em até três frases curtas, só com base nos "
+                "resultados da busca. Se não achar, diga que não achou."
+            ),
+            temperature=0.2,
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+        )
+        try:
+            response = await self._client.aio.models.generate_content(  # pyright: ignore[reportUnknownMemberType]
+                model=self._model, contents=query, config=config
+            )
+        except _ERRORS as exc:
+            msg = f"Gemini ({self._model}): {exc}"
+            raise LLMError(msg) from exc
+        sources: list[tuple[str, str]] = []
+        candidates = response.candidates or []
+        metadata = candidates[0].grounding_metadata if candidates else None
+        for chunk in (metadata.grounding_chunks or []) if metadata else []:
+            web = chunk.web
+            if (
+                web is not None
+                and web.uri
+                and (web.title or web.uri) not in (t for t, _ in sources)
+            ):
+                sources.append((web.title or web.uri, web.uri))
+        usage = response.usage_metadata
+        return WebAnswer(
+            text=(response.text or "").strip(),
+            sources=tuple(sources),
+            tokens_in=(usage.prompt_token_count or 0) if usage else 0,
+            tokens_out=(usage.candidates_token_count or 0) if usage else 0,
+        )
 
     async def warm_up(self, request: CompletionRequest) -> None:
         """A nuvem não tem modelo para carregar."""

@@ -61,18 +61,20 @@ class GuardedProvider:
         return self._inner.model
 
     async def complete(self, request: CompletionRequest) -> CompletionResponse:
+        await self.reserve()
+        response = await self._inner.complete(request)
+        await self.record(response.usage.prompt_tokens, response.usage.completion_tokens)
+        return response
+
+    async def reserve(self) -> None:
+        """Confere limites e conta mais um pedido (também usado pela pesquisa na web)."""
         await self._check()
         self._recent.append(self._clock())
-        response = await self._inner.complete(request)
-        usage = response.usage
+
+    async def record(self, tokens_in: int, tokens_out: int) -> None:
         await self._ledger.add(
-            self.name,
-            self.model,
-            usage.prompt_tokens,
-            usage.completion_tokens,
-            self._limits.cost(usage.prompt_tokens, usage.completion_tokens),
+            self.name, self.model, tokens_in, tokens_out, self._limits.cost(tokens_in, tokens_out)
         )
-        return response
 
     async def warm_up(self, request: CompletionRequest) -> None:
         await self._inner.warm_up(request)

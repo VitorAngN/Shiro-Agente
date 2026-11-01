@@ -50,6 +50,7 @@ class MemoryTool:
             risk=risk,
             timeout_s=20.0,  # a primeira chamada carrega o modelo de embedding
             local_only=True,
+            group="memory",
         )
         self._describe = describe
         self._action = action

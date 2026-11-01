@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections import deque
 from collections.abc import Mapping, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -144,6 +145,7 @@ class AgentLoop:
         self._limits = limits or AgentLimits()
         self._channel: Channel = channel
         self._memory = memory
+        self._groups_used: deque[frozenset[str]] = deque(maxlen=2)
         self._history: list[Message] = []
         self._utterances: dict[str, str] = {}
         self.session_id = uuid7()
@@ -155,11 +157,12 @@ class AgentLoop:
     def reset(self) -> None:
         """Começa uma conversa nova: esquece o histórico de curto prazo."""
         self._history.clear()
+        self._groups_used.clear()
 
     async def warm_up(self) -> None:
         """Carrega o modelo local e o prefixo do pedido no cache (ADR-0011)."""
         request = CompletionRequest(
-            messages=(self._context.system_message,), tools=self._tools.definitions()
+            messages=(self._context.system_message,), tools=self._tools.definitions_for("")
         )
         await self._providers[Tier.T1].warm_up(request)
 
@@ -187,6 +190,9 @@ class AgentLoop:
             update={"latency_ms": round((time.perf_counter() - started) * 1000)}
         )
         self._remember(text, result.text)
+        self._groups_used.append(
+            frozenset(g for c in result.calls if (g := self._tools.group_of(c.call.name)))
+        )
         await self._audit.record(
             "turn",
             trace_id,
@@ -236,7 +242,7 @@ class AgentLoop:
             tier, self._providers[tier], self._context.build(self._history, text, memories)
         )
         state.local_only = bool(memories)
-        definitions = self._tools.definitions()
+        definitions = self._tools.definitions_for(text, self._recent_groups())
         limits = self._limits
 
         for step in range(1, limits.max_steps + 1):
@@ -276,6 +282,13 @@ class AgentLoop:
 
         return state.result(_REPLY_TOO_MANY_STEPS, limits.max_steps)
 
+    def _recent_groups(self) -> frozenset[str]:
+        """Grupos de ferramentas usados nos últimos turnos ("e o outro arquivo?")."""
+        groups: set[str] = set()
+        for used in self._groups_used:
+            groups |= used
+        return frozenset(groups)
+
     async def _recall(self, text: str) -> Sequence[str]:
         if self._memory is None:
             return ()
@@ -311,7 +324,11 @@ class AgentLoop:
         )
         for call in response.tool_calls:
             done, invalid = await self._execute(
-                call, trace_id, batch=len(response.tool_calls), tainted=state.tainted
+                call,
+                trace_id,
+                batch=len(response.tool_calls),
+                tainted=state.tainted,
+                private=state.local_only,
             )
             state.executed.append(done)
             state.invalid += int(invalid)
@@ -345,7 +362,7 @@ class AgentLoop:
     # ------------------------------------------------------------------ execução
 
     async def _execute(
-        self, call: ToolCall, trace_id: str, *, batch: int, tainted: bool
+        self, call: ToolCall, trace_id: str, *, batch: int, tainted: bool, private: bool = False
     ) -> tuple[ExecutedCall, bool]:
         """Valida, aplica a política, confirma e executa. Devolve (resultado, inválida)."""
         started = time.perf_counter()
@@ -377,7 +394,9 @@ class AgentLoop:
                     ),
                 )
             else:
-                done = await self._authorize_and_run(tool, args, call, trace_id, batch, tainted)
+                done = await self._authorize_and_run(
+                    tool, args, call, trace_id, batch, tainted, private
+                )
 
         done = done.model_copy(
             update={"duration_ms": round((time.perf_counter() - started) * 1000)}
@@ -406,10 +425,18 @@ class AgentLoop:
         trace_id: str,
         batch: int,
         tainted: bool,
+        private: bool = False,
     ) -> ExecutedCall:
         spec = tool.spec
         decision = self._policy.evaluate(
-            spec.risk, PolicyContext(tainted=tainted, batch_size=batch)
+            spec.risk,
+            PolicyContext(
+                tainted=tainted,
+                batch_size=batch,
+                always_confirm=spec.confirm,
+                external=spec.external,
+                private_context=private,
+            ),
         )
         if decision.kind is DecisionKind.DENY:
             return ExecutedCall(

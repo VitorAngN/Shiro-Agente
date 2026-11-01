@@ -98,6 +98,7 @@ class FakeTool:
         output_trusted: bool = True,
         local_only: bool = False,
         timeout_s: float = 10.0,
+        group: str = "core",
     ) -> None:
         self._spec = ToolSpec(
             name=name,
@@ -107,6 +108,7 @@ class FakeTool:
             output_trusted=output_trusted,
             local_only=local_only,
             timeout_s=timeout_s,
+            group=group,
         )
         self._result = result
         self.calls: list[BaseModel] = []

@@ -5,6 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (Fase 3 · rotinas, arquivos e web)
+- Rotinas nomeadas ("modo estudo") no `shiro.toml`, validadas na partida, executadas no Tier 0 com cada passo pela política (ADR-0018).
+- Arquivos nas pastas permitidas (padrão: Downloads): listar, procurar, mover, renomear, mandar para a lixeira da SHIRO, restaurar e organizar por tipo, com o plano na confirmação.
+- Pesquisa na web com fontes pelo Gemini (grounding), nos limites e orçamento do Tier 2.
+- Ferramentas por assunto: memória, arquivos e web só aparecem para o modelo quando o pedido é do assunto ou o grupo foi usado há pouco.
+- Política: `confirm` (sempre confirma) e `external` (manda dados para fora; pede confirmação em turno com dados pessoais).
+
 ### Adicionado (Fase 3 · memória)
 - Memória de longo prazo (ADR-0017):
   - "lembra que…", "esquece…", "esquece tudo", "o que você sabe sobre mim?";

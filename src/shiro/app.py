@@ -12,7 +12,7 @@ import logging
 import sys
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -44,16 +44,19 @@ from shiro.persistence.database import Database
 from shiro.persistence.memory import SqliteMemoryStore
 from shiro.persistence.usage import SqliteUsageLedger
 from shiro.policy.engine import PolicyConfig, PolicyEngine
+from shiro.routines import ListRoutinesTool, RoutineRules, load_routines
 from shiro.scheduler.runner import Scheduler
 from shiro.secrets import get_api_key
 from shiro.settings import Settings
 from shiro.tools.builtin.apps import AppLauncher, AppTarget, CloseAppTool, OpenAppTool
 from shiro.tools.builtin.audio import ChangeVolumeTool, SetVolumeTool, VolumeControl
 from shiro.tools.builtin.clock import GetTimeTool
+from shiro.tools.builtin.files import AllowedFolders, Trash, file_tools
 from shiro.tools.builtin.location import IpLocator, Locator
 from shiro.tools.builtin.media import MediaControlTool, MediaKeys
 from shiro.tools.builtin.system import PsutilProbe, SystemInfoTool, SystemProbe
 from shiro.tools.builtin.weather import WeatherTool
+from shiro.tools.builtin.web import GuardedSearch, WebSearchTool
 from shiro.tools.registry import ToolRegistry
 
 log = logging.getLogger(__name__)
@@ -142,6 +145,37 @@ def build_registry(
     return registry
 
 
+# Palavras que trazem cada grupo de ferramentas para o pedido (texto normalizado, ADR-0018).
+TOOL_GATES = {
+    "memory": r"\b(?:lembr\w*|esquec\w*|memori\w*|guard\w*|grav\w*|sabe (?:sobre|de) mim)",
+    "files": (
+        r"\b(?:arquivo\w*|pasta\w*|download\w*|baix[ae]\w*|documento\w*|pdf|planilha\w*|foto\w*"
+        r"|imagens?|organiz\w*|lixeira|renome\w*|mov[ea]\w*|apag\w*|restaur\w*|exclu\w*)"
+    ),
+    "web": (
+        r"\b(?:pesquis\w*|internet|google|noticia\w*|procur\w* na|busca na|na web|quem ganhou"
+        r"|cotacao|resultado d[oa])"
+    ),
+}
+
+
+def build_web_searcher(settings: Settings, ledger: SqliteUsageLedger) -> GuardedSearch | None:
+    """Pesquisa na web pelo Gemini, nos mesmos limites do Tier 2 (precisa da chave)."""
+    cloud = settings.llm.cloud
+    key = get_api_key("gemini") if cloud.enabled else None
+    if not key:
+        return None
+    limits = CloudLimits(
+        rpm_limit=cloud.rpm_limit,
+        daily_request_limit=cloud.daily_request_limit,
+        daily_budget_usd=cloud.daily_budget_usd,
+        price_input_per_mtok=cloud.price_input_per_mtok,
+        price_output_per_mtok=cloud.price_output_per_mtok,
+    )
+    gemini = GeminiProvider(api_key=key, model=cloud.model)
+    return GuardedSearch(gemini, GuardedProvider(gemini, limits=limits, ledger=ledger))
+
+
 def build_local_llm(settings: Settings) -> OllamaProvider:
     local = settings.llm.local
     return OllamaProvider(
@@ -193,12 +227,19 @@ class App:
     activities: ActivityService | None = None
     scheduler: Scheduler | None = None
     memory: MemoryService | None = None
+    trash: Trash | None = None
+    problems: list[str] = field(default_factory=list[str])
+    """Avisos da montagem (rotina inválida etc.), para a CLI e a bandeja mostrarem."""
     _closers: list[Closer] = field(default_factory=list[Closer])
 
     def start_background(self) -> None:
-        """Liga o agendador de avisos e lembretes."""
+        """Liga o agendador de avisos e lembretes e esvazia a lixeira vencida."""
         if self.scheduler is not None:
             self.scheduler.start()
+        if self.trash is not None:
+            removed = self.trash.purge(timedelta(days=self.settings.retention.trash_days))
+            if removed:
+                log.info("lixeira: %d itens vencidos apagados", removed)
 
     async def aclose(self) -> None:
         if self.scheduler is not None:
@@ -277,6 +318,21 @@ async def build_app(
         )
         for memory_tool in memory_tools(memory):
             registry.register(memory_tool)
+    folders = AllowedFolders(settings.policy.allowed_folders)
+    trash: Trash | None = None
+    if folders:
+        trash = Trash(data_dir / "trash", clock)
+        for file_tool in file_tools(folders, trash, settings.retention.trash_days):
+            registry.register(file_tool)
+    searcher = build_web_searcher(settings, SqliteUsageLedger(database))
+    if searcher is not None:
+        registry.register(WebSearchTool(searcher))
+    for group, pattern in TOOL_GATES.items():
+        registry.gate(group, pattern)
+    routines, problems = load_routines(settings.routines, registry)
+    registry.register(ListRoutinesTool(routines))
+    for problem in problems:
+        log.warning(problem)
     notify_with = notifier or LogNotifier()
 
     async def on_job(job: Job) -> None:
@@ -291,6 +347,7 @@ async def build_app(
             apps=app_aliases(settings),
             cloud_triggers=settings.router.cloud_triggers,
             rules=(
+                RoutineRules(routines),
                 ActivityRules(clock.now),
                 *((MemoryRules(clock.now),) if memory is not None else ()),
             ),
@@ -329,5 +386,7 @@ async def build_app(
         activities=activities,
         scheduler=scheduler,
         memory=memory,
+        trash=trash,
+        problems=problems,
         _closers=closers,
     )

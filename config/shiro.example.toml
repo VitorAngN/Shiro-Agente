@@ -117,6 +117,18 @@ reminder_default_time = "09:00" # lembrete com dia mas sem horário
 alert_offsets = ["1d", "2h"]   # avisos antes do prazo
 local_only = true              # atividades nunca vão para a nuvem
 
+# Rotinas (ADR-0018): cada passo é uma ferramenta, e passa pela política como se fosse pedido sozinho.
+# "modo estudo", "ativa a rotina estudo" ou um apelido exato disparam a rotina.
+# [routines.estudo]
+# description = "fecha distrações, abre o VS Code e baixa o volume"
+# aliases = ["hora de estudar"]
+# steps = [
+#   { tool = "close_app", args = { app = "discord" } },
+#   { tool = "open_app", args = { app = "vscode" } },
+#   { tool = "set_volume", args = { level = 30 } },
+#   { tool = "media_control", args = { action = "pause" } },
+# ]
+
 [memory]                   # "lembra que…" (ADR-0017); nunca vai para a nuvem
 enabled = true
 embedding_model = "Xenova/paraphrase-multilingual-MiniLM-L12-v2"   # ONNX na CPU (113 MB); "shiro setup"

@@ -6,7 +6,7 @@ SQLite, Windows) são ligadas em ``shiro.app``.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, Set
 from datetime import datetime
 from typing import Any, Protocol
 
@@ -55,6 +55,12 @@ class ToolSpec(BaseModel):
     timeout_s: float = Field(default=10.0, gt=0)
     output_trusted: bool = True
     local_only: bool = False
+    confirm: bool = False
+    """Sempre pede confirmação, mesmo fora do modo somente leitura (ex.: organizar uma pasta)."""
+    external: bool = False
+    """Manda dados para fora do PC (ex.: pesquisa na web)."""
+    group: str = "core"
+    """Grupo de assunto: fora de "core", só aparece para o modelo quando o pedido é do assunto."""
     parameters: dict[str, Any] | None = None
     """Schema enviado ao modelo; quando ``None``, é gerado a partir de ``args_model``."""
 
@@ -86,12 +92,24 @@ class ToolCatalog(Protocol):
         """Definições em ordem estável, para o cache de prefixo funcionar."""
         ...
 
+    def definitions_for(
+        self, text: str, extra_groups: Set[str] = frozenset()
+    ) -> tuple[ToolDefinition, ...]:
+        """Só as ferramentas do núcleo e dos grupos do assunto do pedido (ADR-0018)."""
+        ...
+
+    def group_of(self, name: str) -> str | None: ...
+
 
 class PolicyContext(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     tainted: bool = False
     batch_size: int = Field(default=1, ge=1)
+    always_confirm: bool = False
+    external: bool = False
+    private_context: bool = False
+    """O turno tem dados pessoais (memórias, arquivos): mandar algo para fora pede confirmação."""
 
 
 class MemoryRecall(Protocol):

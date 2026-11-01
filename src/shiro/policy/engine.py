@@ -47,6 +47,13 @@ class PolicyEngine:
             return Decision(
                 kind=DecisionKind.CONFIRM_VOICE, reason=f"ação em lote ({ctx.batch_size} itens)"
             )
+        if ctx.external and ctx.private_context:
+            return Decision(
+                kind=DecisionKind.CONFIRM_VOICE,
+                reason="vai mandar para a internet algo de um pedido com dados pessoais",
+            )
+        if ctx.always_confirm and risk.rank >= 1:
+            return Decision(kind=DecisionKind.CONFIRM_VOICE, reason="ação que sempre confirma")
         if self._config.read_only_mode and risk.rank >= 1:
             return Decision(kind=DecisionKind.CONFIRM_VOICE, reason="modo somente leitura ativo")
         return Decision(kind=DecisionKind.ALLOW, reason="permitido")

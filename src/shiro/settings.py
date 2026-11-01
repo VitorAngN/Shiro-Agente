@@ -211,7 +211,8 @@ class PolicySettings(_Section):
     read_only_mode: bool = True
     batch_confirm_threshold: int = Field(default=5, ge=1)
     confirmation_timeout_s: float = Field(default=30.0, gt=0)
-    allowed_folders: tuple[str, ...] = ()
+    # Pastas que as ferramentas de arquivo enxergam (ADR-0018). Nada fora delas.
+    allowed_folders: tuple[str, ...] = ("~/Downloads",)
     allowed_apps: Annotated[dict[str, AppEntry], BeforeValidator(_apps_from_strings)] = Field(
         default_factory=dict[str, AppEntry]
     )
@@ -242,6 +243,19 @@ class ActivitiesSettings(_Section):
                 msg = f"alerta inválido: {item!r} (use, por exemplo, '30m', '2h' ou '1d')"
                 raise ValueError(msg)
         return value
+
+
+class RoutineStep(_Section):
+    tool: str = Field(min_length=1)
+    args: dict[str, Any] = Field(default_factory=dict[str, Any])
+
+
+class RoutineSettings(_Section):
+    """Uma rotina nomeada: passos executados em ordem, cada um pela política (RF-31)."""
+
+    description: str = ""
+    aliases: tuple[str, ...] = ()
+    steps: tuple[RoutineStep, ...] = Field(min_length=1, max_length=20)
 
 
 class MemorySettings(_Section):
@@ -323,6 +337,7 @@ class Settings(BaseSettings):
     policy: PolicySettings = PolicySettings()
     activities: ActivitiesSettings = ActivitiesSettings()
     memory: MemorySettings = MemorySettings()
+    routines: dict[str, RoutineSettings] = Field(default_factory=dict[str, RoutineSettings])
     retention: RetentionSettings = RetentionSettings()
     api: ApiSettings = ApiSettings()
     logging: LoggingSettings = LoggingSettings()

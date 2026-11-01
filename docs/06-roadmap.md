@@ -98,11 +98,12 @@ Decisões no [ADR-0016](adr/0016-sempre-ligado.md).
 
 | Entrega | Detalhe |
 |---|---|
-| Memória | Fatos explícitos, embeddings locais, `local_only`, comandos para lembrar, listar e esquecer |
-| Rotinas | Rotinas nomeadas e persistentes |
-| Arquivos | Pastas permitidas, lixeira do SHIRO, operações em lote com dry-run |
-| Confirmação | `CONFIRM_PHYSICAL` via toast com botões |
-| Web | Busca e resumo com fontes (Tier 2) |
+| Memória | ✅ Fatos explícitos, embeddings locais (MiniLM multilíngue), `local_only`, lembrar, listar e esquecer ([ADR-0017](adr/0017-memoria-local.md)) |
+| Rotinas | ✅ Rotinas nomeadas no `shiro.toml`, validadas na partida, cada passo pela política |
+| Arquivos | ✅ Pastas permitidas, lixeira da SHIRO com restauração, organizar com o plano na confirmação |
+| Confirmação | ✅ `CONFIRM_PHYSICAL` por janela "Sim/Não" na bandeja (ADR-0016) |
+| Web | ✅ Busca e resumo com fontes pelo Gemini, nos limites do Tier 2 |
+| Escala | ✅ Ferramentas por assunto: o modelo só vê os grupos do pedido ([ADR-0018](adr/0018-rotinas-arquivos-web.md)) |
 
 **Pronto quando:** rotina "modo estudo" funcionando de ponta a ponta e lixeira restaurando arquivos corretamente nos testes.
 
