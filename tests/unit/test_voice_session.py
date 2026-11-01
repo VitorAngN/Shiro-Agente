@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator, Callable
 import numpy as np
 import pytest
 
-from shiro.cli_voice import word_error_rate
+from shiro.cli_voice import command_meaning, word_error_rate
 from shiro.core.models import AgentResult, DecisionKind, Tier
 from shiro.interfaces.voice import (
     Phase,
@@ -331,3 +331,25 @@ def test_word_error_rate() -> None:
     assert word_error_rate("abre o spotify", "abre spotify") == pytest.approx(1 / 3)
     assert word_error_rate("", "") == 0
     assert word_error_rate("", "oi") == 1
+
+
+def test_command_meaning_compares_deadlines_by_moment() -> None:
+    from datetime import datetime
+
+    from shiro.activities.rules import ActivityRules
+    from shiro.core.router import IntentRouter
+    from tests.fakes import SAO_PAULO
+
+    now = datetime(2026, 11, 4, 10, 0, tzinfo=SAO_PAULO)
+    router = IntentRouter(apps={}, cloud_triggers=(), rules=(ActivityRules(lambda: now),))
+
+    def meaning(text: str) -> object:
+        return command_meaning(router.match_tier0(text), now)
+
+    spoken = "tenho prova de física dia doze às sete da noite"
+    assert meaning(spoken) == meaning("Tenho prova de física dia 12 a 7 da noite.")
+    assert meaning(spoken) != meaning("Tenho prova de física dia 12 às 7 da manhã.")
+    assert meaning("me lembra de tirar a roupa do varal às seis") == meaning(
+        "Me lembra de tirar a roupa do varal a 6."
+    )
+    assert meaning("como vai") is None

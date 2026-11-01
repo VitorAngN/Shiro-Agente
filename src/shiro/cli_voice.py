@@ -76,7 +76,15 @@ def _app_labels(settings: Settings) -> list[str]:
     return [entry.label for entry in settings.policy.allowed_apps.values()]
 
 
+_last_step: dict[str, int] = {}
+
+
 def _progress(name: str, done: int, total: int | None) -> None:
+    if not sys.stdout.isatty():  # redirecionado: uma linha a cada 25%, sem "\r"
+        if total and (step := 100 * done // total // 25) != _last_step.get(name):
+            _last_step[name] = step
+            print(f"  {name}: {25 * step}%", flush=True)
+        return
     share = f"{100 * done / total:5.1f}%" if total else f"{done / 2**20:.0f} MB"
     print(f"\r  {name}: {share}", end="", flush=True)
 
@@ -377,6 +385,34 @@ BENCH_PHRASES = (
 )
 
 
+_DEADLINE_KEYS = ("due_text", "when_text")
+_WER_OK = 0.25
+
+
+def command_meaning(calls: Any, now: datetime) -> Any:
+    """Chamadas do Tier 0 comparáveis: prazos viram data e hora, textos são normalizados.
+
+    "às sete da noite" e "a 7 da noite" são o mesmo comando.
+    """
+    from shiro.activities.dates import resolve
+    from shiro.core.text import normalize
+
+    if not calls:
+        return None
+    meaning: list[tuple[str, dict[str, object]]] = []
+    for call in calls:
+        args: dict[str, object] = {}
+        for key, value in call.arguments.items():
+            if key in _DEADLINE_KEYS and isinstance(value, str):
+                args[key] = resolve(value, now=now).when
+            elif isinstance(value, str):
+                args[key] = normalize(value).rstrip(".")
+            else:
+                args[key] = value
+        meaning.append((call.name, args))
+    return meaning
+
+
 def word_error_rate(reference: str, hypothesis: str) -> float:
     from shiro.core.text import normalize
 
@@ -418,8 +454,7 @@ async def _bench(settings: Settings, args: argparse.Namespace) -> int:
     )
 
     def intent(text: str) -> object:
-        calls = router.match_tier0(text)
-        return [(c.name, c.arguments) for c in calls] if calls else None
+        return command_meaning(router.match_tier0(text), now)
 
     report: dict[str, Any] = {"phrases": list(BENCH_PHRASES), "tts": {}, "stt": []}
     clips: dict[str, list[Any]] = {}
@@ -455,13 +490,16 @@ async def _bench(settings: Settings, args: argparse.Namespace) -> int:
             for phrase, audio in zip(BENCH_PHRASES, audios, strict=True):
                 transcript = await stt.transcribe(audio)
                 expected, got = intent(phrase), intent(transcript.text)
+                wer = word_error_rate(phrase, transcript.text)
+                # Sem comando do Tier 0 (ex.: pergunta ao modelo), vale a fidelidade do texto.
+                ok = expected == got if expected is not None else wer <= _WER_OK
                 rows.append(
                     {
                         "phrase": phrase,
                         "heard": transcript.text,
                         "latency_s": transcript.latency_ms / 1000,
-                        "wer": word_error_rate(phrase, transcript.text),
-                        "intent_ok": expected is None or expected == got,
+                        "wer": wer,
+                        "intent_ok": ok,
                     }
                 )
                 mark = "✓" if rows[-1]["intent_ok"] else "✗"

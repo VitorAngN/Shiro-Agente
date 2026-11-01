@@ -45,7 +45,8 @@ _REMIND = re.compile(
     r"(?P<rest>.+)$"
 )
 _NOTE = re.compile(
-    r"^(?:anota|anote|registra|registre|adiciona|adicione|salva|salve)(?:\s+ai)?"
+    # "a nota": o Whisper costuma separar "anota" em duas palavras.
+    r"^(?:anota|anote|a nota|registra|registre|adiciona|adicione|salva|salve)(?:\s+ai)?"
     r"(?:\s+(?:na lista|nas atividades|na agenda|nas tarefas))?(?:\s+que)?(?:\s+eu)?"
     r"(?:\s+(?:tenho que|tenho de|preciso|vou ter|tenho|devo))?\s+(?P<rest>.+)$"
 )

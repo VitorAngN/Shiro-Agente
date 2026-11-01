@@ -74,6 +74,8 @@ def at(day: int, hour: int = 23, minute: int = 59, month: int = 11, year: int = 
         ("hoje às seis", WEDNESDAY, at(4, 18, 0)),
         ("às seis", SUNDAY, at(1, 6, 0)),  # 4h da manhã: ainda vem o das 6h
         ("às 6h", WEDNESDAY, at(5, 6, 0)),  # escrito com "h": literal
+        ("a 6", WEDNESDAY, at(4, 18, 0)),  # o Whisper costuma escrever "às" como "a"
+        ("dia 12 a 7 da noite", SUNDAY, at(12, 19, 0)),
         ("amanhã às 8", WEDNESDAY, at(5, 8, 0)),  # outro dia: literal
         # relativo a agora
         ("daqui a 40 minutos", WEDNESDAY, at(4, 10, 40)),

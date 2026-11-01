@@ -34,6 +34,10 @@ rules = ActivityRules(lambda: WEDNESDAY)
             ("create_activity", {"title": "comprar café"}),
         ),
         (
+            "A nota que eu preciso comprar café.",  # como o Whisper às vezes transcreve
+            ("create_activity", {"title": "comprar café"}),
+        ),
+        (
             "anota aí o trabalho de cálculo pra sexta, por favor",
             ("create_activity", {"title": "trabalho de cálculo", "due_text": "pra sexta"}),
         ),

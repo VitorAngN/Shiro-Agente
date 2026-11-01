@@ -334,10 +334,10 @@ def resolve(
     raw = _clean(text or "")
     if relative := _relative_time(_strip_leading(raw, ("pra", "para", "so")), now):
         return relative
-    cleaned = _strip_fillers(raw)
-    if not cleaned:
+    if not _strip_fillers(raw):
         return Resolution(when=None)
-    found_time, rest, problem, ambiguous = _extract_time(cleaned)
+    # O horário sai antes dos conectivos: "a 6" (como o Whisper escreve "às 6") é horário.
+    found_time, rest, problem, ambiguous = _extract_time(raw)
     rest = _strip_fillers(rest)
     today = now.date()
     if problem:
