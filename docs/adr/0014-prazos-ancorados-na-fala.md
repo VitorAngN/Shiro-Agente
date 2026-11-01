@@ -30,7 +30,7 @@ Criar atividade por voz é o requisito central do projeto. Depender do modelo ac
    - "tenho que/tenho de X <prazo>";
    - "me lembra de/que X <quando>".
    O prazo precisa estar no fim e ser o único; pergunta ("?"), título genérico ("anota uma atividade") ou qualquer dúvida vai para o modelo.
-4. **Concluir no Tier 0** também para "já dei conta de X", "já fiz X", "X já era", "X tá pronto" e "…, pode tirar da lista".
+4. **Concluir no Tier 0** também para "já dei conta de X", "já fiz X", "X já era", "X tá pronto", "risca X", "dá baixa em X" e "…, pode tirar da lista".
 5. **Resolvedor de prazos** passa a entender:
    - hora falada sem período e sem "h" ("às seis") como o próximo seis do relógio (6h ou 18h), como uma pessoa entenderia; "às 6h" continua literal;
    - "daqui a 40 minutos", "em 2 horas", "daqui a meia hora";

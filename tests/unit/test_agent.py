@@ -122,7 +122,7 @@ async def test_claimed_action_without_tool_is_retried() -> None:
         ]
     )
 
-    result = await h.agent.run_turn("pode riscar o trabalho de cálculo, já resolvi")
+    result = await h.agent.run_turn("o trabalho de cálculo eu resolvi ontem")
 
     assert result.text == "Ainda não consigo marcar atividades como concluídas."
     assert result.claim_blocked
@@ -135,7 +135,7 @@ async def test_claimed_action_without_tool_is_retried() -> None:
 async def test_repeated_claim_never_reaches_the_user() -> None:
     h = Harness([reply("Pronto, marquei."), reply("Feito! Marquei.")])
 
-    result = await h.agent.run_turn("pode riscar o trabalho de cálculo, já resolvi")
+    result = await h.agent.run_turn("o trabalho de cálculo eu resolvi ontem")
 
     assert "nenhuma ação foi feita" in result.text
     assert "marquei" not in result.text.casefold()
@@ -157,7 +157,7 @@ async def test_claim_escalates_to_cloud_when_local_keeps_claiming() -> None:
         cloud=[reply("Não tenho uma ferramenta para isso ainda.")],
     )
 
-    result = await h.agent.run_turn("pode riscar o trabalho, já resolvi")
+    result = await h.agent.run_turn("o trabalho eu resolvi ontem")
 
     assert result.tier is Tier.T2
     assert result.text == "Não tenho uma ferramenta para isso ainda."

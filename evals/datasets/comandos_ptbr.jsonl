@@ -25,4 +25,5 @@
 {"id": "rem-03", "fala": "me lembra amanhã de manhã de ligar pro dentista", "tier_esperado": "T1", "chamadas": [{"tool": "create_reminder", "args": {"text": "ligar pro dentista", "when_text": "amanhã de manhã"}}]}
 {"id": "rem-04", "fala": "lembra de tirar o bolo do forno daqui a 40 minutos", "tier_esperado": "T0", "chamadas": [{"tool": "create_reminder", "args": {"text": "tirar o bolo do forno", "when_text": "daqui a 40 minutos"}}]}
 {"id": "clm-02", "fala": "aquela prova de física já era, pode considerar feita", "tier_esperado": "T0", "chamadas": [{"tool": "complete_activity", "args": {"query": "prova de física"}}]}
-{"id": "clm-03", "fala": "pode riscar a prova de física, já fiz", "tier_esperado": "T1", "chamadas": [{"tool": "complete_activity", "args": {"query": "prova de física"}}]}
+{"id": "clm-03", "fala": "pode riscar a prova de física, já fiz", "tier_esperado": "T0", "chamadas": [{"tool": "complete_activity", "args": {"query": "prova de física"}}]}
+{"id": "clm-04", "fala": "pode tirar a prova de física das pendentes, essa eu já entreguei", "tier_esperado": "T1", "chamadas": [{"tool": "complete_activity", "args": {"query": "prova de física"}}]}

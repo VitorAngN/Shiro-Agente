@@ -102,4 +102,10 @@ def test_router_tries_plugged_rules_after_its_own() -> None:
     assert pronto is not None
     assert pronto[0].arguments == {"query": "relatorio"}
     assert router.match_tier0("a festa já foi ótima") is None
+    risca = router.match_tier0("pode riscar a prova de física, já fiz")
+    assert risca is not None
+    assert risca[0].arguments == {"query": "a prova de fisica"}
+    baixa = router.match_tier0("dá baixa na lista de cálculo")
+    assert baixa is not None
+    assert baixa[0].arguments == {"query": "lista de calculo"}
     assert router.match_tier0("como vai você") is None

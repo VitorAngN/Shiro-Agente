@@ -12,7 +12,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 - Tier 0: "terminei X", "marca X como feita", "o que eu tenho essa semana/amanhã/hoje?", "o que tá atrasado?".
 - Avisos no terminal do `shiro chat`.
 - Prazos ancorados na fala do usuário (ADR-0014): se o modelo corta ou parafraseia o prazo ("às 8h" para "amanhã às 8h"), vale o que o usuário disse.
-- Tier 0 para criar atividades e lembretes nas frases comuns: "tenho prova de física dia 12 às 19h", "tenho que entregar o relatório sexta", "anota que eu preciso comprar café", "me lembra de X às seis". Também "já dei conta de X", "já fiz X" e "X já era / tá pronto" para concluir.
+- Tier 0 para criar atividades e lembretes nas frases comuns: "tenho prova de física dia 12 às 19h", "tenho que entregar o relatório sexta", "anota que eu preciso comprar café", "me lembra de X às seis". Também "já dei conta de X", "já fiz X", "X já era / tá pronto", "risca X" e "dá baixa em X" para concluir.
 - Dia e hora separados na frase ("amanhã tenho prova às 10") contam como um prazo só.
 - Prazos: "às seis" vira o próximo seis do relógio (6h ou 18h); "daqui a 40 minutos", "em 2 horas"; "de manhã", "à tarde", "à noite".
 - Avaliação: relógio fixo, prazos comparados pelo momento que produzem e tokens do pedido por caso.

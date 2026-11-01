@@ -31,3 +31,6 @@ evals/reports/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Relatórios locais da avaliação
+evals/results/

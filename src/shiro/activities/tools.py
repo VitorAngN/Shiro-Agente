@@ -138,8 +138,9 @@ def activity_tools(service: ActivityService) -> list[ActivityTool]:
         ActivityTool(
             name="complete_activity",
             description=(
-                "Marca uma atividade como concluída. Use quando o usuário disser que terminou, "
-                "entregou ou já fez."
+                "Marca uma atividade como concluída e a tira da lista de pendentes. Use quando o "
+                "usuário disser que terminou, entregou, já fez ou deu conta, ou pedir para riscar, "
+                "dar baixa ou tirar da lista algo que fez."
             ),
             args_model=QueryArgs,
             risk=RiskLevel.R1,
