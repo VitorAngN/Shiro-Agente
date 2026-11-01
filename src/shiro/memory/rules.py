@@ -25,6 +25,8 @@ _FORGET = re.compile(
     r"^(?:pode\s+)?(?:esquece|esqueca|esquecer)\s+"
     r"(?:que\s+|o que eu (?:te )?(?:falei|disse) sobre\s+|sobre\s+|da\s+|do\s+)?(?P<q>.+)$"
 )
+# "de manhã" sozinho é hábito ("prefiro reuniões de manhã"), não prazo.
+_DAY_PART_ONLY = re.compile(r"^(?:(?:a|de|pela|na|no|a)\s+)?(?:manha|tarde|noite)(?:\s+cedo)?$")
 _LIST = re.compile(
     r"^(?:o que voce (?:sabe|lembra|guardou) (?:sobre mim|de mim)"
     r"|quais sao (?:as )?suas memorias|o que (?:tem|esta) na (?:sua )?memoria)$"
@@ -46,7 +48,8 @@ class MemoryRules:
         if match := _REMEMBER.match(plain):
             start = len(tokens) - len(match["fact"].split())
             fact = " ".join(t for t, _ in tokens[start:])
-            if dates.locate(fact, now=self._now()):
+            spans = dates.locate(fact, now=self._now())
+            if any(not _DAY_PART_ONLY.match(span.plain) for span in spans):
                 return None  # tem prazo: é atividade ou lembrete, o modelo decide
             return [("remember_fact", {"text": fact})]
         if (match := _FORGET.match(plain)) and len(match["q"].split()) <= 8:

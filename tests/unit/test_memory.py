@@ -133,6 +133,10 @@ rules = MemoryRules(lambda: NOW)
         ("esquece que eu gosto de café", ("forget_fact", {"query": "eu gosto de café"})),
         ("esquece o que eu falei sobre a Ana", ("forget_fact", {"query": "a Ana"})),
         ("esquece tudo", ("forget_all_memories", {})),
+        (
+            "lembra que eu prefiro reuniões de manhã",  # parte do dia não é prazo
+            ("remember_fact", {"text": "eu prefiro reuniões de manhã"}),
+        ),
         ("o que você sabe sobre mim?", ("list_memories", {})),
     ],
 )
