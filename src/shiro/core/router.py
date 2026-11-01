@@ -73,6 +73,9 @@ _COMPLETE = re.compile(
     r"|^ja fiz\s+(?P<q3>.+?)" + _OFF_THE_LIST + r"$"
     r"|^(?:pode\s+)?(?:risca|riscar|risque|da baixa (?:n[oa]|em))\s+(?P<q4>.+?)"
     r"(?:\s+(?:que\s+)?(?:eu\s+)?ja\s+(?:fiz|terminei|entreguei|acabei))?$"
+    # "tira X das pendentes, essa eu já entreguei"
+    r"|^(?:pode\s+)?(?:tirar|tira|remover|remove)\s+(?P<q5>.+?)\s+(?:das pendentes|da lista)"
+    r"(?:\s+(?:que|essa|esse|pois|porque)?\s*(?:eu\s+)?ja\s+(?:fiz|terminei|entreguei|acabei))?$"
     r"|^(?:marca|marque|pode marcar)\s+(?P<q2>.+?)\s+como\s+"
     r"(?:concluid[oa]|feit[oa]|pronto|pronta)$"
 )
@@ -182,7 +185,9 @@ class IntentRouter:
             if pattern.match(command):
                 return [("media_control", {"action": action})]
         if match := _COMPLETE.match(command):
-            query = (match["q"] or match["q2"] or match["q3"] or match["q4"] or "").strip()
+            query = (
+                match["q"] or match["q2"] or match["q3"] or match["q4"] or match["q5"] or ""
+            ).strip()
             return [("complete_activity", {"query": query})] if query else None
         if match := _DONE_STATE.match(command):
             return [("complete_activity", {"query": match["q"]})]
