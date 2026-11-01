@@ -6,7 +6,7 @@ SQLite, Windows) são ligadas em ``shiro.app``.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import Any, Protocol
 
@@ -92,6 +92,12 @@ class PolicyContext(BaseModel):
 
     tainted: bool = False
     batch_size: int = Field(default=1, ge=1)
+
+
+class MemoryRecall(Protocol):
+    """Memórias que ajudam a responder um pedido (RF-42). Sempre ``local_only``."""
+
+    async def relevant(self, text: str) -> Sequence[str]: ...
 
 
 class Policy(Protocol):

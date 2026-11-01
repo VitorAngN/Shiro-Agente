@@ -47,6 +47,7 @@ from shiro.core.ports import (
     ConfirmationChannel,
     LLMError,
     LLMProvider,
+    MemoryRecall,
     Policy,
     PolicyContext,
     Tool,
@@ -126,6 +127,7 @@ class AgentLoop:
         context: ContextBuilder,
         limits: AgentLimits | None = None,
         channel: Channel = "text",
+        memory: MemoryRecall | None = None,
     ) -> None:
         if Tier.T1 not in providers:
             msg = "o agente precisa de um provedor no Tier 1"
@@ -141,6 +143,7 @@ class AgentLoop:
         self._context = context
         self._limits = limits or AgentLimits()
         self._channel: Channel = channel
+        self._memory = memory
         self._history: list[Message] = []
         self._utterances: dict[str, str] = {}
         self.session_id = uuid7()
@@ -227,7 +230,12 @@ class AgentLoop:
 
     async def _run_llm(self, text: str, trace_id: str) -> AgentResult:
         tier = Tier.T2 if self._router.wants_cloud(text) and Tier.T2 in self._providers else Tier.T1
-        state = _TurnState(tier, self._providers[tier], self._context.build(self._history, text))
+        # Memórias só no modelo local: com elas no contexto, o turno não sobe para a nuvem.
+        memories = await self._recall(text) if tier is Tier.T1 else ()
+        state = _TurnState(
+            tier, self._providers[tier], self._context.build(self._history, text, memories)
+        )
+        state.local_only = bool(memories)
         definitions = self._tools.definitions()
         limits = self._limits
 
@@ -267,6 +275,16 @@ class AgentLoop:
             return state.result(final or _REPLY_EMPTY, step)
 
         return state.result(_REPLY_TOO_MANY_STEPS, limits.max_steps)
+
+    async def _recall(self, text: str) -> Sequence[str]:
+        if self._memory is None:
+            return ()
+        try:
+            async with asyncio.timeout(2.0):
+                return await self._memory.relevant(text)
+        except Exception:  # memória é ajuda, nunca motivo para o turno falhar
+            log.warning("memória indisponível neste turno", exc_info=True)
+            return ()
 
     async def _complete(
         self, state: _TurnState, definitions: tuple[ToolDefinition, ...]

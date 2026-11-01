@@ -117,9 +117,11 @@ reminder_default_time = "09:00" # lembrete com dia mas sem horário
 alert_offsets = ["1d", "2h"]   # avisos antes do prazo
 local_only = true              # atividades nunca vão para a nuvem
 
-[memory]
-embedding_model = "nomic-embed-text"   # via Ollama
-default_local_only = true
+[memory]                   # "lembra que…" (ADR-0017); nunca vai para a nuvem
+enabled = true
+embedding_model = "Xenova/multilingual-e5-small"   # ONNX na CPU; baixado por "shiro setup"
+embedding_file = "onnx/model_int8.onnx"
+max_in_context = 3         # quantas memórias relevantes entram em cada pedido
 
 [retention]
 messages_days = 90

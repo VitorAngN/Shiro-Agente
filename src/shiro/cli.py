@@ -53,6 +53,7 @@ def _build_parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "tray", help="a SHIRO na bandeja, com console (o modo sem console é shiro-tray)"
     )
+    commands.add_parser("setup", help="baixa e prepara os modelos (ouvido, voz e memória)")
     start = commands.add_parser("autostart", help="iniciar com o Windows (na bandeja)")
     start.add_argument("action", choices=("on", "off", "status"))
     return parser
@@ -213,12 +214,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         from shiro.tray_main import main as tray_main
 
         return tray_main()
-    if args.command in ("chat", "voice"):
+    if args.command in ("chat", "voice", "setup"):
         try:
             settings = load_settings()
         except ConfigError as exc:
             print(f"✗ {exc}")
             return 1
+        if args.command == "setup":
+            args.voice_command = "setup"
+            return run_voice(settings, args)
         if args.command == "voice":
             return run_voice(settings, args)
         try:

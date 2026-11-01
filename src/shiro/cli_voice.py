@@ -214,6 +214,13 @@ async def _listen(settings: Settings, args: argparse.Namespace) -> int:
 
 
 async def _setup(settings: Settings, args: argparse.Namespace) -> int:
+    """Prepara tudo o que precisa de download: ouvido, voz e memória."""
+    voice = await _setup_voice(settings)
+    memory = await _setup_memory(settings)
+    return voice or memory
+
+
+async def _setup_voice(settings: Settings) -> int:
     import httpx
 
     from shiro.voice.models import DownloadError, ensure_kokoro, kokoro_installed
@@ -245,13 +252,43 @@ async def _setup(settings: Settings, args: argparse.Namespace) -> int:
     except (DownloadError, httpx.HTTPError) as exc:
         print(f"\n✗ {exc}")
         return 1
-    print(f"\n✓ Kokoro em {files.model.parent}")
+    print(f"✓ Kokoro em {files.model.parent}")
     tts, status = _tts(settings, "kokoro")
     try:
         audio = await tts.synthesize("Sistema de voz pronto.")
     finally:
         await tts.aclose()
     print(f"✓ {status}: teste gerou {_seconds(audio.duration)} de fala")
+    return 0
+
+
+async def _setup_memory(settings: Settings) -> int:
+    import httpx
+
+    from shiro.downloads import DownloadError
+    from shiro.memory.setup import build_embedder, ensure_embedding_model
+
+    memory = settings.memory
+    if not memory.enabled:
+        return 0
+    if "/" not in memory.embedding_model:
+        print(
+            f"! memória: '{memory.embedding_model}' não é um modelo do Hugging Face; uso a reserva"
+        )
+        return 0
+    try:
+        timeout = httpx.Timeout(30.0, read=60.0)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            await ensure_embedding_model(client, memory, paths.data_dir(), _progress)
+    except (DownloadError, httpx.HTTPError) as exc:
+        print(f"\n✗ memória: {exc} (continuo com a reserva por palavras)")
+        return 1
+    embedder = build_embedder(memory, paths.data_dir())
+    started = time.perf_counter()
+    vectors = await embedder.embed(["eu torço pro Coritiba", "qual é o meu time?"], query=False)
+    score = float(vectors[0] @ vectors[1])
+    took = _seconds(time.perf_counter() - started)
+    print(f"✓ memória: {embedder.name} pronto ({took}; teste de semelhança {score:.2f})")
     return 0
 
 

@@ -33,10 +33,15 @@ from shiro.core.router import IntentRouter
 from shiro.llm.gemini import GeminiProvider
 from shiro.llm.guard import CloudLimits, FallbackProvider, GuardedProvider
 from shiro.llm.ollama import OllamaProvider
+from shiro.memory.rules import MemoryRules
+from shiro.memory.service import MemoryService
+from shiro.memory.setup import build_embedder
+from shiro.memory.tools import memory_tools
 from shiro.persistence.activities import SqliteActivityStore, SqliteJobStore
 from shiro.persistence.audit import SqliteAuditLog
 from shiro.persistence.conversation import SqliteConversationStore
 from shiro.persistence.database import Database
+from shiro.persistence.memory import SqliteMemoryStore
 from shiro.persistence.usage import SqliteUsageLedger
 from shiro.policy.engine import PolicyConfig, PolicyEngine
 from shiro.scheduler.runner import Scheduler
@@ -187,6 +192,7 @@ class App:
     cloud_status: str = "nuvem desligada"
     activities: ActivityService | None = None
     scheduler: Scheduler | None = None
+    memory: MemoryService | None = None
     _closers: list[Closer] = field(default_factory=list[Closer])
 
     def start_background(self) -> None:
@@ -260,6 +266,17 @@ async def build_app(
     )
     for tool in activity_tools(activities):
         registry.register(tool)
+    memory: MemoryService | None = None
+    if settings.memory.enabled:
+        memory = MemoryService(
+            store=SqliteMemoryStore(database),
+            embedder=build_embedder(settings.memory, data_dir),
+            clock=clock,
+            max_in_context=settings.memory.max_in_context,
+            min_score=settings.memory.min_score,
+        )
+        for memory_tool in memory_tools(memory):
+            registry.register(memory_tool)
     notify_with = notifier or LogNotifier()
 
     async def on_job(job: Job) -> None:
@@ -273,7 +290,10 @@ async def build_app(
         router=IntentRouter(
             apps=app_aliases(settings),
             cloud_triggers=settings.router.cloud_triggers,
-            rules=(ActivityRules(clock.now),),
+            rules=(
+                ActivityRules(clock.now),
+                *((MemoryRules(clock.now),) if memory is not None else ()),
+            ),
         ),
         providers=providers,
         tools=registry,
@@ -288,6 +308,7 @@ async def build_app(
         bus=bus,
         clock=clock,
         channel=channel,
+        memory=memory,
         context=ContextBuilder(assistant_name=settings.general.assistant_name),
         limits=AgentLimits(
             max_steps=agent_settings.max_steps,
@@ -307,5 +328,6 @@ async def build_app(
         cloud_status=cloud_status,
         activities=activities,
         scheduler=scheduler,
+        memory=memory,
         _closers=closers,
     )

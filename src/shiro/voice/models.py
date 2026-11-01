@@ -11,16 +11,32 @@
 
 from __future__ import annotations
 
-import hashlib
 import importlib.util
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import httpx
 
-HUGGING_FACE = "https://huggingface.co"
+from shiro.downloads import (
+    COMPLETE_MARK,
+    HUGGING_FACE,
+    KNOWN_SHA256,
+    DownloadError,
+    Progress,
+    download,
+    ensure_hf_files,
+)
+
+# Reexportados para quem já importava daqui (testes e CLI).
+__all__ = [
+    "HUGGING_FACE",
+    "KNOWN_SHA256",
+    "DownloadError",
+    "Progress",
+    "download",
+    "ensure_hf_files",
+]
+
 WHISPER_FILES = {
     "config.json",
     "model.bin",
@@ -28,7 +44,6 @@ WHISPER_FILES = {
     "vocabulary.txt",
     "preprocessor_config.json",
 }
-_COMPLETE = ".completo"
 
 KOKORO_RELEASE = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/"
 KOKORO_MODELS = {
@@ -44,22 +59,6 @@ OPENWAKEWORD_BUILTIN = {
     "alexa": "alexa_v0.1.onnx",
     "hey_mycroft": "hey_mycroft_v0.1.onnx",
 }
-# Conferidos em 2026-11-01. Variantes sem hash aqui são aceitas como vierem.
-KNOWN_SHA256 = {
-    "kokoro-v1.0.int8.onnx": "6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb",
-    "voices-v1.0.bin": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d",
-    "melspectrogram.onnx": "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
-    "embedding_model.onnx": "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
-    "hey_jarvis_v0.1.onnx": "94a13cfe60075b132f6a472e7e462e8123ee70861bc3fb58434a73712ee0d2cb",
-    "alexa_v0.1.onnx": "6ff566a01d12670e8d9e3c59da32651db1575d17272a601b7f8a39283dfbae3e",
-    "hey_mycroft_v0.1.onnx": "c2a311e8fa1338de89c31b3b46dc4dffd4af2f9a8d6ddead48893c2d301b1f18",
-}
-
-type Progress = Callable[[str, int, int | None], None]
-
-
-class DownloadError(RuntimeError):
-    pass
 
 
 @dataclass(frozen=True)
@@ -82,51 +81,6 @@ def kokoro_installed() -> bool:
     return importlib.util.find_spec("kokoro_onnx") is not None
 
 
-async def download(
-    client: httpx.AsyncClient,
-    url: str,
-    dest: Path,
-    progress: Progress | None = None,
-    *,
-    sha256: str | None = None,
-    git_blob: str | None = None,
-) -> str:
-    """Baixa para ``dest`` (via arquivo ``.part``) e devolve o SHA-256.
-
-    ``sha256`` e ``git_blob`` (SHA-1 de blob do git) são conferidos se informados;
-    sem eles, vale o hash fixado em ``KNOWN_SHA256``, se houver.
-    """
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    partial = dest.with_suffix(dest.suffix + ".part")
-    digest = hashlib.sha256()
-    async with client.stream("GET", url, follow_redirects=True) as response:
-        if response.status_code != 200:
-            msg = f"download de {dest.name} falhou: HTTP {response.status_code}"
-            raise DownloadError(msg)
-        total = int(response.headers.get("content-length", 0)) or None
-        done = 0
-        with partial.open("wb") as out:
-            async for chunk in response.aiter_bytes(1 << 20):
-                out.write(chunk)
-                digest.update(chunk)
-                done += len(chunk)
-                if progress is not None:
-                    progress(dest.name, done, total)
-    sha = digest.hexdigest()
-    expected = sha256 or KNOWN_SHA256.get(dest.name)
-    mismatch = expected is not None and sha != expected
-    if git_blob is not None and not mismatch:
-        content = partial.read_bytes()
-        blob = hashlib.sha1(f"blob {len(content)}\0".encode() + content, usedforsecurity=False)
-        mismatch = blob.hexdigest() != git_blob
-    if mismatch:
-        partial.unlink(missing_ok=True)
-        msg = f"{dest.name}: hash diferente do esperado; arquivo descartado"
-        raise DownloadError(msg)
-    partial.replace(dest)
-    return sha
-
-
 async def ensure_kokoro(
     client: httpx.AsyncClient, data_dir: Path, variant: str, progress: Progress | None = None
 ) -> KokoroFiles:
@@ -147,41 +101,28 @@ def whisper_dir(data_dir: Path, model: str) -> Path:
 
 
 def whisper_ready(data_dir: Path, model: str) -> bool:
-    return (whisper_dir(data_dir, model) / _COMPLETE).is_file()
+    return (whisper_dir(data_dir, model) / COMPLETE_MARK).is_file()
 
 
 async def ensure_whisper(
     client: httpx.AsyncClient, data_dir: Path, model: str, progress: Progress | None = None
 ) -> Path:
     """Pasta com o modelo do Whisper pronto, baixando o que faltar."""
-    folder = whisper_dir(data_dir, model)
-    if (folder / _COMPLETE).is_file():
-        return folder
     repo = whisper_repo(model)
-    response = await client.get(f"{HUGGING_FACE}/api/models/{repo}/tree/main")
-    if response.status_code != 200:
-        msg = f"modelo {repo} não encontrado no Hugging Face (HTTP {response.status_code})"
-        raise DownloadError(msg)
-    entries: list[dict[str, Any]] = response.json()
-    wanted = [e for e in entries if e.get("type") == "file" and e.get("path") in WHISPER_FILES]
-    if not any(e["path"] == "model.bin" for e in wanted):
-        msg = f"{repo} não parece um modelo do faster-whisper"
-        raise DownloadError(msg)
-    for entry in wanted:
-        dest = folder / entry["path"]
-        if dest.is_file() and dest.stat().st_size == entry.get("size"):
-            continue
-        lfs = entry.get("lfs")
-        await download(
+    try:
+        return await ensure_hf_files(
             client,
-            f"{HUGGING_FACE}/{repo}/resolve/main/{entry['path']}",
-            dest,
+            whisper_dir(data_dir, model),
+            repo,
+            WHISPER_FILES,
             progress,
-            sha256=lfs["oid"] if lfs else None,
-            git_blob=None if lfs else entry.get("oid"),
+            required="model.bin",
         )
-    (folder / _COMPLETE).write_text(repo, encoding="utf-8")
-    return folder
+    except DownloadError as exc:
+        if "não tem" in str(exc):
+            msg = f"{repo} não parece um modelo do faster-whisper"
+            raise DownloadError(msg) from exc
+        raise
 
 
 @dataclass(frozen=True)

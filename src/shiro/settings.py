@@ -245,7 +245,14 @@ class ActivitiesSettings(_Section):
 
 
 class MemorySettings(_Section):
-    embedding_model: str = "nomic-embed-text"
+    """Memória de longo prazo (RF-41 a RF-44, ADR-0017)."""
+
+    enabled: bool = True
+    # Repositório do Hugging Face com o modelo em ONNX; sem ele baixado, usa a reserva por palavras.
+    embedding_model: str = "Xenova/multilingual-e5-small"
+    embedding_file: str = "onnx/model_int8.onnx"
+    max_in_context: int = Field(default=3, ge=0, le=10)
+    min_score: float | None = Field(default=None, gt=0, lt=1)  # vazio = padrão do modelo
     default_local_only: bool = True
 
 

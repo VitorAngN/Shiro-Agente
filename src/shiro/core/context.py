@@ -59,6 +59,26 @@ class ContextBuilder:
     def system_message(self) -> Message:
         return self._system
 
-    def build(self, history: Sequence[Message], text: str) -> list[Message]:
-        """Persona, histórico recente (já limitado pelo agente) e a fala atual."""
-        return [self._system, *history, Message(role=Role.USER, content=text)]
+    def build(
+        self, history: Sequence[Message], text: str, memories: Sequence[str] = ()
+    ) -> list[Message]:
+        """Persona, histórico recente (já limitado pelo agente), memórias e a fala atual.
+
+        As memórias entram como mensagem de sistema logo antes da fala, e não na
+        persona: assim o começo do pedido continua igual e o cache de prefixo do
+        modelo local (ADR-0011) continua valendo.
+        """
+        messages = [self._system, *history]
+        if memories:
+            listed = "\n".join(f"- {m}" for m in memories)
+            messages.append(
+                Message(
+                    role=Role.SYSTEM,
+                    content=(
+                        "Coisas que o usuário pediu para você lembrar. Use só se ajudarem a "
+                        f"responder; não as repita sem necessidade:\n{listed}"
+                    ),
+                )
+            )
+        messages.append(Message(role=Role.USER, content=text))
+        return messages
