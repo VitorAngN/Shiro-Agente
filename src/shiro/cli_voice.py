@@ -409,6 +409,22 @@ async def _bench(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+class _HeardBy:
+    """Guarda o que o Whisper rápido ouviu, para o relatório."""
+
+    def __init__(self, stt: Any) -> None:
+        self._stt = stt
+        self.heard: list[str] = []
+
+    async def load(self) -> None:
+        await self._stt.load()
+
+    async def transcribe(self, audio: Any) -> Any:
+        transcript = await self._stt.transcribe(audio)
+        self.heard.append(transcript.text)
+        return transcript
+
+
 class _CollectedWake:
     def __init__(self) -> None:
         self.got: list[str] = []
@@ -449,13 +465,14 @@ async def _bench_wake(settings: Settings, engine: str) -> list[dict[str, Any]]:
             audio = await tts.synthesize(phrase)
             events = _CollectedWake()
             got = events.got
+            heard = _HeardBy(check)
             listener = WakeListener(
                 microphone=ReplayMicrophone([audio]), events=events, is_idle=lambda: True
             )
             started = time.perf_counter()
             await listener.run_whisper(
                 vad=SileroVAD(),
-                check=check,
+                check=heard,
                 full=full,
                 phrases=word.phrases,
                 listen=_endpoint(settings),
@@ -463,10 +480,13 @@ async def _bench_wake(settings: Settings, engine: str) -> list[dict[str, Any]]:
             )
             kind = got[0].split(":", 1)[0] if got else None
             ok = kind == expected
-            rows.append({"phrase": phrase, "expected": expected, "got": got, "ok": ok})
+            rows.append(
+                {"phrase": phrase, "heard": heard.heard, "expected": expected, "got": got, "ok": ok}
+            )
             mark = "✓" if ok else "✗"
             took = _seconds(time.perf_counter() - started)
             print(f"  {mark} {phrase:40} → {', '.join(got) or 'ignorada'} ({took})")
+            print(f"      ouviu: {' | '.join(heard.heard) or '(nada)'}")
     finally:
         await tts.aclose()
     return rows
