@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from shiro import __version__, paths
@@ -31,7 +31,15 @@ def _build_parser() -> argparse.ArgumentParser:
     check = config_commands.add_parser("check", help="valida o shiro.toml")
     check.add_argument("--file", type=Path, help="valida outro arquivo em vez do padrão")
 
-    chat = commands.add_parser("chat", help="conversa com o SHIRO por texto")
+    secrets = commands.add_parser("secrets", help="chaves de API no cofre do Windows")
+    secrets_commands = secrets.add_subparsers(dest="secrets_command", metavar="ação", required=True)
+    secrets_set = secrets_commands.add_parser("set", help="guarda a chave de um provedor")
+    secrets_set.add_argument("provider", choices=("gemini", "anthropic", "openai"))
+    secrets_commands.add_parser("status", help="mostra quais chaves estão configuradas")
+    secrets_delete = secrets_commands.add_parser("delete", help="apaga a chave de um provedor")
+    secrets_delete.add_argument("provider", choices=("gemini", "anthropic", "openai"))
+
+    chat = commands.add_parser("chat", help="conversa com a SHIRO por texto")
     chat.add_argument("-m", "--message", help="envia uma única mensagem e sai")
     chat.add_argument(
         "-v", "--verbose", action="store_true", help="mostra camada, modelo, tempo e ferramentas"
@@ -85,6 +93,7 @@ async def _chat(settings: Settings, args: argparse.Namespace) -> int:
             session.print(theme.status(True, "auditoria íntegra"))
         else:
             session.print(theme.status(False, f"auditoria: evento {broken} foi alterado"))
+        session.print(theme.status(app.cloud_llm is not None, app.cloud_status))
         if settings.policy.read_only_mode:
             session.print(theme.status(False, "modo somente leitura: ações pedem confirmação"))
         session.print("")
@@ -105,6 +114,35 @@ def _config_path() -> int:
     return 0
 
 
+def _secrets(args: argparse.Namespace, prompt: Callable[[str], str] | None = None) -> int:
+    import getpass
+
+    from shiro import secrets
+
+    if args.secrets_command == "status":
+        for provider in secrets.PROVIDERS:
+            source = secrets.key_source(provider)
+            print(f"  {provider}: {'configurada (' + source + ')' if source else 'sem chave'}")
+        return 0
+    if args.secrets_command == "delete":
+        try:
+            removed = secrets.delete_api_key(args.provider)
+        except secrets.SecretError as exc:
+            print(f"✗ {exc}")
+            return 1
+        print("✓ chave apagada" if removed else "nenhuma chave guardada para esse provedor")
+        return 0
+    ask = prompt or getpass.getpass
+    value = ask(f"Cole a chave de API do {args.provider} (não aparece na tela): ")
+    try:
+        secrets.set_api_key(args.provider, value)
+    except (ValueError, secrets.SecretError) as exc:
+        print(f"✗ {exc}")
+        return 1
+    print(f"✓ chave do {args.provider} guardada no cofre de credenciais do sistema")
+    return 0
+
+
 def _config_check(file: Path | None) -> int:
     try:
         settings = load_settings(file)
@@ -114,7 +152,14 @@ def _config_check(file: Path | None) -> int:
     print("✓ configuração válida")
     print(f"  modelo local: {settings.llm.local.model}")
     cloud = settings.llm.cloud
-    print(f"  nuvem: {cloud.provider} (orçamento diário US$ {cloud.daily_budget_usd:.2f})")
+    from shiro.secrets import key_source
+
+    source = key_source(cloud.provider)
+    key = f"chave no {source}" if source else "sem chave"
+    print(
+        f"  nuvem: {cloud.provider}/{cloud.model}, {key} "
+        f"(até {cloud.daily_request_limit} pedidos/dia, US$ {cloud.daily_budget_usd:.2f})"
+    )
     print(f"  ativação por voz: {settings.voice.activation}")
     print(f"  modo somente leitura: {'sim' if settings.policy.read_only_mode else 'não'}")
     return 0
@@ -123,6 +168,8 @@ def _config_check(file: Path | None) -> int:
 def main(argv: Sequence[str] | None = None) -> int:
     """Ponto de entrada do comando ``shiro``."""
     args = _build_parser().parse_args(argv)
+    if args.command == "secrets":
+        return _secrets(args)
     if args.command == "config":
         if args.config_command == "path":
             return _config_path()

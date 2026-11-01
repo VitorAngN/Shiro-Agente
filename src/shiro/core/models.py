@@ -54,6 +54,8 @@ class ToolCall(_Frozen):
     id: str
     name: str
     arguments: dict[str, Any] = Field(default_factory=dict[str, Any])
+    signature: str | None = None
+    """Metadado opaco do provedor (ex.: assinatura de pensamento do Gemini, em base64)."""
 
 
 class Message(_Frozen):

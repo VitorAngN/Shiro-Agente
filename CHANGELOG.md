@@ -5,6 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (marco 1a concluído)
+- Tier 2 com Gemini pelo SDK oficial (`google-genai`): conversão de mensagens e ferramentas, assinaturas de pensamento preservadas entre passos, chamada automática de funções desligada.
+- Proteções da nuvem: limite por minuto, limite diário de pedidos, orçamento diário estimado (`provider_usage`) e cadeia de fallback. Se a nuvem falha ou passa do limite, a SHIRO volta para o modelo local.
+- `shiro secrets set|status|delete`: chaves de API no Gerenciador de Credenciais do Windows (`keyring`); a chave nunca aparece na tela nem em logs.
+- `evals/run_agent.py`: avaliação do agente completo (Tier 0, modelo, política e ferramentas) com o PC simulado.
+- `AgentLoop.reset()` para começar uma conversa nova.
+
 ### Adicionado (identidade e localização)
 - Identidade da SHIRO (ADR-0012): persona feminina de tom neutro com gíria de netrunner rara, voz feminina pt-BR (Kokoro `pf_dora` como candidata), paleta e esboço conceitual em `docs/assets/shiro-conceito.svg`. Documento `docs/08-identidade.md`.
 - Visual cyberpunk no `shiro chat`: banner, prompts `você ▸` / `shiro ▸`, cores da paleta e checagens de inicialização (modelo, auditoria, modo somente leitura). Respeita `NO_COLOR`.

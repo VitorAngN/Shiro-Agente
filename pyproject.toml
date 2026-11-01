@@ -18,7 +18,9 @@ classifiers = [
 ]
 dependencies = [
     "aiosqlite>=0.20",
+    "google-genai>=1.0",
     "httpx>=0.27",
+    "keyring>=25",
     "ollama>=0.5",
     "psutil>=6.0",
     "pycaw>=20240316 ; sys_platform == 'win32'",

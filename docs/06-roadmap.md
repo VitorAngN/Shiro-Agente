@@ -50,8 +50,8 @@ A fase é entregue em três marcos, cada um testável sozinho:
 | Ferramentas: hora, clima, sistema, volume, mídia, abrir e fechar apps | ✅ validadas no Windows real |
 | Verificação de ação alegada (RF-16) | ✅ |
 | `shiro chat` com confirmação pelo teclado | ✅ |
-| Adaptador Gemini (Tier 2), rate limiter, orçamento diário e fallback | ⏳ próximo passo, depende da chave de API |
-| Avaliação do agente completo (não só do modelo) com o conjunto em pt-BR | ⏳ |
+| Adaptador Gemini (Tier 2), rate limiter, orçamento diário e fallback | ✅ (falta só a chave: `shiro secrets set gemini`) |
+| Avaliação do agente completo (não só do modelo) com o conjunto em pt-BR | ✅ `evals/run_agent.py` |
 
 **Spikes desta fase:**
 

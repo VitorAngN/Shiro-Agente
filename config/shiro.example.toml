@@ -28,12 +28,16 @@ num_ctx = 4096             # cabe em GPU de 4 GB junto com os pesos
 num_gpu = 99               # 99 = todas as camadas na GPU; 0 = só CPU (ADR-0010)
 keep_alive = "30m"         # descarrega o modelo da GPU após inatividade (ADR-0011)
 
-[llm.cloud]
+[llm.cloud]                # chave: "shiro secrets set gemini" (fica no cofre do Windows)
+enabled = true
 provider = "gemini"
-model = ""                 # definido após o benchmark da Fase 1
-fallback = ["anthropic", "openai"]
-daily_budget_usd = 0.50    # bloqueia o Tier 2 ao atingir
+model = "gemini-3.5-flash-lite"
+fallback = []              # adaptadores Anthropic e OpenAI ainda não implementados
 rpm_limit = 5              # ajustar ao limite real mostrado no AI Studio
+daily_request_limit = 200  # acima disso, volta para o modelo local até o dia seguinte (UTC)
+daily_budget_usd = 0.50    # idem, pelo custo estimado
+price_input_per_mtok = 0.0 # US$ por milhão de tokens; 0 no plano gratuito
+price_output_per_mtok = 0.0
 
 [voice]
 enabled = true

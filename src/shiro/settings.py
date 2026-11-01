@@ -97,11 +97,16 @@ class LocalLLMSettings(_Section):
 
 
 class CloudLLMSettings(_Section):
+    enabled: bool = True  # sem chave configurada, a nuvem fica desligada de qualquer forma
     provider: CloudProvider = "gemini"
-    model: str = ""
-    fallback: tuple[CloudProvider, ...] = ("anthropic", "openai")
-    daily_budget_usd: float = Field(default=0.5, ge=0)
+    model: str = "gemini-3.5-flash-lite"
+    fallback: tuple[CloudProvider, ...] = ()  # adaptadores Anthropic e OpenAI: ainda não
     rpm_limit: int = Field(default=5, ge=1)
+    daily_request_limit: int = Field(default=200, ge=1)
+    daily_budget_usd: float = Field(default=0.5, ge=0)
+    # Preço por milhão de tokens; 0 no plano gratuito. Base do orçamento diário.
+    price_input_per_mtok: float = Field(default=0.0, ge=0)
+    price_output_per_mtok: float = Field(default=0.0, ge=0)
 
 
 class LLMSettings(_Section):

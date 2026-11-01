@@ -106,6 +106,18 @@ class AuditSink(Protocol):
     async def record(self, event_type: str, trace_id: str, payload: Mapping[str, Any]) -> None: ...
 
 
+class UsageLedger(Protocol):
+    """Uso diário dos provedores de nuvem (tabela ``provider_usage``)."""
+
+    async def today(self, provider: str) -> tuple[int, float]:
+        """(requisições, custo estimado em US$) do provedor hoje."""
+        ...
+
+    async def add(
+        self, provider: str, model: str, tokens_in: int, tokens_out: int, cost_usd: float
+    ) -> None: ...
+
+
 class Clock(Protocol):
     def now(self) -> datetime:
         """Data e hora atuais, sempre com fuso."""

@@ -25,11 +25,15 @@ from shiro.core.events import TurnFinished
 from shiro.core.models import Tier
 from shiro.core.ports import ConfirmationChannel, LLMProvider
 from shiro.core.router import IntentRouter
+from shiro.llm.gemini import GeminiProvider
+from shiro.llm.guard import CloudLimits, FallbackProvider, GuardedProvider
 from shiro.llm.ollama import OllamaProvider
 from shiro.persistence.audit import SqliteAuditLog
 from shiro.persistence.conversation import SqliteConversationStore
 from shiro.persistence.database import Database
+from shiro.persistence.usage import SqliteUsageLedger
 from shiro.policy.engine import PolicyConfig, PolicyEngine
+from shiro.secrets import get_api_key
 from shiro.settings import Settings
 from shiro.tools.builtin.apps import AppLauncher, AppTarget, CloseAppTool, OpenAppTool
 from shiro.tools.builtin.audio import ChangeVolumeTool, SetVolumeTool, VolumeControl
@@ -128,6 +132,33 @@ def build_local_llm(settings: Settings) -> OllamaProvider:
     )
 
 
+def build_cloud_llm(
+    settings: Settings, ledger: SqliteUsageLedger
+) -> tuple[LLMProvider | None, str]:
+    """Provedor do Tier 2 e uma frase de estado para mostrar ao usuário."""
+    cloud = settings.llm.cloud
+    if not cloud.enabled:
+        return None, "nuvem desligada no shiro.toml"
+    limits = CloudLimits(
+        rpm_limit=cloud.rpm_limit,
+        daily_request_limit=cloud.daily_request_limit,
+        daily_budget_usd=cloud.daily_budget_usd,
+        price_input_per_mtok=cloud.price_input_per_mtok,
+        price_output_per_mtok=cloud.price_output_per_mtok,
+    )
+    chain: list[LLMProvider] = []
+    for name in (cloud.provider, *cloud.fallback):
+        if name != "gemini":
+            continue  # adaptadores Anthropic e OpenAI ainda não existem
+        key = get_api_key("gemini")
+        if key:
+            gemini = GeminiProvider(api_key=key, model=cloud.model)
+            chain.append(GuardedProvider(gemini, limits=limits, ledger=ledger))
+    if not chain:
+        return None, f"nuvem sem chave: rode 'shiro secrets set {cloud.provider}'"
+    return FallbackProvider(chain), f"nuvem: {cloud.provider}/{cloud.model}"
+
+
 @dataclass
 class App:
     settings: Settings
@@ -136,6 +167,8 @@ class App:
     database: Database
     audit: SqliteAuditLog
     local_llm: LLMProvider
+    cloud_llm: LLMProvider | None = None
+    cloud_status: str = "nuvem desligada"
     _closers: list[Closer] = field(default_factory=list[Closer])
 
     async def aclose(self) -> None:
@@ -152,6 +185,7 @@ async def build_app(
     data_dir: Path | None = None,
     desktop: Desktop | None = None,
     local_llm: LLMProvider | None = None,
+    cloud_llm: LLMProvider | None = None,
     http: httpx.AsyncClient | None = None,
     probe: SystemProbe | None = None,
 ) -> App:
@@ -171,6 +205,13 @@ async def build_app(
     bus.subscribe(TurnFinished, SqliteConversationStore(database).on_turn_finished)
 
     llm = local_llm or build_local_llm(settings)
+    providers: dict[Tier, LLMProvider] = {Tier.T1: llm}
+    if cloud_llm is not None:
+        cloud_status = f"nuvem: {cloud_llm.name}/{cloud_llm.model}"
+    else:
+        cloud_llm, cloud_status = build_cloud_llm(settings, SqliteUsageLedger(database))
+    if cloud_llm is not None:
+        providers[Tier.T2] = cloud_llm
     registry = build_registry(
         settings,
         desktop=desktop,
@@ -183,7 +224,7 @@ async def build_app(
         router=IntentRouter(
             apps=app_aliases(settings), cloud_triggers=settings.router.cloud_triggers
         ),
-        providers={Tier.T1: llm},
+        providers=providers,
         tools=registry,
         policy=PolicyEngine(
             PolicyConfig(
@@ -210,5 +251,7 @@ async def build_app(
         database=database,
         audit=audit,
         local_llm=llm,
+        cloud_llm=cloud_llm,
+        cloud_status=cloud_status,
         _closers=closers,
     )

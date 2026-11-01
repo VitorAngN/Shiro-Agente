@@ -65,6 +65,7 @@ _REPLY_TOO_MANY_STEPS = "Não consegui concluir em poucos passos. Quer que eu te
 _REPLY_INVALID = "Não entendi bem o que fazer. Pode explicar de outro jeito?"
 _REPLY_CLAIM_BLOCKED = "Não consegui executar isso, e nenhuma ação foi feita."
 _REPLY_DECLINED = "Tudo bem, não fiz nada."
+_REPLY_EMPTY = "Não tenho uma resposta para isso agora."
 
 
 class AgentLimits(BaseModel):
@@ -89,6 +90,7 @@ class _TurnState:
         self.tainted = False
         self.local_only = False
         self.escalated = False
+        self.fell_back = False
         self.invalid = 0
         self.claim_retries = 0
         self.claim_detected = False
@@ -145,6 +147,10 @@ class AgentLoop:
     @property
     def history(self) -> Sequence[Message]:
         return tuple(self._history)
+
+    def reset(self) -> None:
+        """Começa uma conversa nova: esquece o histórico de curto prazo."""
+        self._history.clear()
 
     async def warm_up(self) -> None:
         """Carrega o modelo local e o prefixo do pedido no cache (ADR-0011)."""
@@ -226,7 +232,7 @@ class AgentLoop:
 
             response = await self._complete(state, definitions)
             if response is None:
-                if self._escalate(state):
+                if self._escalate(state) or self._fall_back_local(state):
                     continue
                 return state.result(_REPLY_LLM_DOWN, step)
 
@@ -253,7 +259,7 @@ class AgentLoop:
                 if self._escalate(state):
                     continue
                 return state.result(_REPLY_CLAIM_BLOCKED, step)
-            return state.result(final or "Pronto.", step)
+            return state.result(final or _REPLY_EMPTY, step)
 
         return state.result(_REPLY_TOO_MANY_STEPS, limits.max_steps)
 
@@ -304,6 +310,13 @@ class AgentLoop:
         if cloud is None:
             return False
         state.tier, state.provider, state.escalated = Tier.T2, cloud, True
+        return True
+
+    def _fall_back_local(self, state: _TurnState) -> bool:
+        """Volta para o modelo local quando a nuvem falha ou passa do limite."""
+        if state.tier is not Tier.T2 or state.fell_back:
+            return False
+        state.tier, state.provider, state.fell_back = Tier.T1, self._providers[Tier.T1], True
         return True
 
     # ------------------------------------------------------------------ execução
