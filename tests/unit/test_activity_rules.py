@@ -26,6 +26,13 @@ rules = ActivityRules(lambda: WEDNESDAY)
             ("create_activity", {"title": "reunião com o grupo", "due_text": "amanhã à tarde"}),
         ),
         (
+            "preciso entregar o relatório de estágio sexta às 18h",
+            (
+                "create_activity",
+                {"title": "entregar o relatório de estágio", "due_text": "sexta às 18h"},
+            ),
+        ),
+        (
             "tenho que entregar o relatório sexta",
             ("create_activity", {"title": "entregar o relatório", "due_text": "sexta"}),
         ),
@@ -78,7 +85,7 @@ def test_common_phrases_become_tool_calls(
         "me lembra de pagar a conta",  # lembrete sem quando
         "anota amanhã prova de química",  # prazo no meio: o modelo decide
         "tenho prova sexta e trabalho segunda",  # dois prazos
-        "preciso entregar o relatório sexta",  # "preciso" sozinho fica com o modelo
+        "preciso dormir cedo hoje",  # "preciso" sem verbo de tarefa fica com o modelo
         "me lembra amanhã de manhã de ligar pro dentista",
     ],
 )

@@ -19,7 +19,7 @@
 {"id": "atv-09", "fala": "anota que eu preciso comprar café", "tier_esperado": "T0", "chamadas": [{"tool": "create_activity", "args": {"title": "comprar café"}}]}
 {"id": "rem-02", "fala": "me lembra de tirar a roupa do varal daqui a pouco, às seis", "tier_esperado": "T0", "chamadas": [{"tool": "create_reminder", "args": {"text": "tirar a roupa do varal", "when_text": "às seis"}}]}
 {"id": "clm-01", "fala": "já dei conta daquele relatório, pode tirar da lista", "tier_esperado": "T0", "chamadas": [{"tool": "complete_activity", "args": {"query": "relatório"}}]}
-{"id": "atv-10", "fala": "preciso entregar o relatório de estágio sexta às 18h", "tier_esperado": "T1", "chamadas": [{"tool": "create_activity", "args": {"title": "relatório de estágio", "due_text": "sexta às 18h"}}]}
+{"id": "atv-10", "fala": "preciso entregar o relatório de estágio sexta às 18h", "tier_esperado": "T0", "chamadas": [{"tool": "create_activity", "args": {"title": "entregar o relatório de estágio", "due_text": "sexta às 18h"}}]}
 {"id": "atv-11", "fala": "amanhã tenho prova de química às 10, anota aí", "tier_esperado": "T1", "chamadas": [{"tool": "create_activity", "args": {"title": "prova de química", "due_text": "amanhã às 10h"}}]}
 {"id": "atv-12", "fala": "tenho reunião com o grupo amanhã à tarde", "tier_esperado": "T0", "chamadas": [{"tool": "create_activity", "args": {"title": "reunião com o grupo", "due_text": "amanhã à tarde"}}]}
 {"id": "rem-03", "fala": "me lembra amanhã de manhã de ligar pro dentista", "tier_esperado": "T1", "chamadas": [{"tool": "create_reminder", "args": {"text": "ligar pro dentista", "when_text": "amanhã de manhã"}}]}
@@ -27,3 +27,6 @@
 {"id": "clm-02", "fala": "aquela prova de física já era, pode considerar feita", "tier_esperado": "T0", "chamadas": [{"tool": "complete_activity", "args": {"query": "prova de física"}}]}
 {"id": "clm-03", "fala": "pode riscar a prova de física, já fiz", "tier_esperado": "T0", "chamadas": [{"tool": "complete_activity", "args": {"query": "prova de física"}}]}
 {"id": "clm-04", "fala": "pode tirar a prova de física das pendentes, essa eu já entreguei", "tier_esperado": "T1", "chamadas": [{"tool": "complete_activity", "args": {"query": "prova de física"}}]}
+{"id": "atv-13", "fala": "o trabalho de química vence quinta, anota pra mim", "tier_esperado": "T1", "chamadas": [{"tool": "create_activity", "args": {"title": "trabalho de química", "due_text": "quinta"}}]}
+{"id": "mem-01", "fala": "lembra que eu prefiro reuniões de manhã", "tier_esperado": "T0", "chamadas": [{"tool": "remember_fact", "args": {"text": "eu prefiro reuniões de manhã"}}]}
+{"id": "mem-02", "fala": "guarda na memória que meu notebook é um Acer Nitro", "tier_esperado": "T1", "chamadas": [{"tool": "remember_fact", "args": {"text": "notebook é um Acer Nitro"}}]}

@@ -55,6 +55,12 @@ _HAVE = re.compile(
     rf"(?P<rest>(?:(?:uma?|umas|uns)\s+)?(?:{_NOUNS})\b.*)$"
 )
 _MUST = re.compile(r"^(?:eu\s+)?(?:tenho que|tenho de)\s+(?P<rest>.+)$")
+# "preciso" sozinho é vago ("preciso dormir cedo hoje"); com verbo de tarefa, é atividade.
+_TASK_VERBS = (
+    "entregar|fazer|terminar|estudar|pagar|enviar|mandar|apresentar|revisar|ler|resolver"
+    "|imprimir|renovar|devolver|comprar|levar|buscar|marcar|agendar|responder|preencher"
+)
+_NEED = re.compile(rf"^(?:eu\s+)?preciso\s+(?P<rest>(?:{_TASK_VERBS})\b.+)$")
 
 # (padrão, ferramenta, exige prazo)
 _RULES: tuple[tuple[re.Pattern[str], str, bool], ...] = (
@@ -62,6 +68,7 @@ _RULES: tuple[tuple[re.Pattern[str], str, bool], ...] = (
     (_NOTE, "create_activity", False),
     (_HAVE, "create_activity", True),
     (_MUST, "create_activity", True),
+    (_NEED, "create_activity", True),
 )
 
 

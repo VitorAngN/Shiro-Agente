@@ -77,7 +77,7 @@ class ContextBuilder:
                     content=(
                         "Fatos que o usuário pediu para você lembrar, nas palavras dele "
                         '("eu" e "meu" são o usuário, não você). Use só se ajudarem a '
-                        "responder e fale com ele na segunda pessoa (\"seu time\"):\n"
+                        'responder e fale com ele na segunda pessoa ("seu time"):\n'
                         f"{listed}"
                     ),
                 )
