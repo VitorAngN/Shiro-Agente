@@ -5,6 +5,14 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (Fase 4 · painel)
+- Painel local em `127.0.0.1` (ADR-0019), aberto pela bandeja ("Abrir painel") ou por `shiro dashboard`:
+  - turnos com camada, tempo, ferramentas e a decisão da política, p50/p95 por camada e ações barradas;
+  - atividades pendentes, memórias (com "Esquecer"), rotinas, auditoria com verificação da cadeia e custos da nuvem;
+  - eventos ao vivo por WebSocket quando roda junto da bandeja.
+- Segurança do serviço local: link de entrada de uso único, cookie `HttpOnly`/`SameSite=Strict`, `Host` e `Origin` conferidos, `X-Shiro` para apagar, CSP sem nada inline nem externo, porta exclusiva no Windows.
+- Fontes da identidade (Chakra Petch, JetBrains Mono, Noto Sans JP só para 白シロ) embutidas em subconjuntos, com a licença OFL.
+
 ### Adicionado (Fase 3 · rotinas, arquivos e web)
 - Rotinas nomeadas ("modo estudo") no `shiro.toml`, validadas na partida, executadas no Tier 0 com cada passo pela política (ADR-0018).
 - Arquivos nas pastas permitidas (padrão: Downloads): listar, procurar, mover, renomear, mandar para a lixeira da SHIRO, restaurar e organizar por tipo, com o plano na confirmação.

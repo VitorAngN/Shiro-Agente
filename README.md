@@ -86,6 +86,14 @@ uv run shiro autostart on    # inicia sozinha na bandeja depois do logon (shiro-
 uv run shiro autostart off
 ```
 
+Painel (Fase 4):
+
+```powershell
+uv run shiro dashboard       # abre o painel no navegador, só neste PC (127.0.0.1:8765)
+```
+
+Na bandeja, "Abrir painel" faz o mesmo e mostra os turnos ao vivo: camada, tempo, ferramentas e o que a política decidiu ([ADR-0019](docs/adr/0019-painel-local.md)).
+
 "Ei, Shiro" fica desligado por padrão. Ligue pelo menu da bandeja ou com `voice.activation = "both"` no `shiro.toml` ([ADR-0016](docs/adr/0016-sempre-ligado.md)).
 
 Exemplo de sessão:

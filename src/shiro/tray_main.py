@@ -14,7 +14,7 @@ import contextlib
 import logging
 import os
 import sys
-from typing import Any, TextIO, cast
+from typing import TYPE_CHECKING, Any, TextIO, cast
 
 from shiro import autostart, paths
 from shiro.activities.service import ActivityService
@@ -24,6 +24,9 @@ from shiro.interfaces.tray import LogStream, TrayController
 from shiro.interfaces.voice import Trigger
 from shiro.settings import ConfigError, Settings, load_settings
 from shiro.voice_app import VoiceRuntime, build_voice_runtime
+
+if TYPE_CHECKING:
+    from shiro.dashboard import Dashboard
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +47,7 @@ class RuntimeActions:
     def __init__(self, runtime: VoiceRuntime, tray: TrayController) -> None:
         self._runtime = runtime
         self._tray = tray
+        self._dashboard: Dashboard | None = None
 
     def talk(self) -> None:
         self._runtime.triggers.put(Trigger("talk"))
@@ -81,6 +85,30 @@ class RuntimeActions:
             how = await asyncio.to_thread(autostart.enable)
             await self._tray.notify("SHIRO", f"Vou iniciar com o Windows ({how}).")
 
+    async def start_dashboard(self) -> str | None:
+        """Liga o painel (dentro deste processo, para ver os eventos ao vivo); devolve o link."""
+        if self._dashboard is None:
+            from shiro.dashboard import Dashboard
+
+            self._dashboard = Dashboard(self._runtime.app)
+        try:
+            return await self._dashboard.open()
+        except OSError:
+            port = self._runtime.app.settings.api.port
+            await self._tray.notify("SHIRO", f"A porta {port} do painel está ocupada.")
+            return None
+
+    async def open_dashboard(self) -> None:
+        import webbrowser
+
+        url = await self.start_dashboard()
+        if url is not None:
+            await asyncio.to_thread(webbrowser.open, url)
+
+    async def close(self) -> None:
+        if self._dashboard is not None:
+            await self._dashboard.close()
+
     def open_logs(self) -> None:
         folder = paths.log_dir()
         folder.mkdir(parents=True, exist_ok=True)
@@ -108,7 +136,8 @@ async def run_tray(settings: Settings) -> int:
         log.exception("a bandeja não iniciou")
         _alert(f"A SHIRO não conseguiu iniciar:\n\n{exc}")
         return 1
-    tray.start(RuntimeActions(runtime, tray))
+    actions = RuntimeActions(runtime, tray)
+    tray.start(actions)
     problems: list[str] = []
 
     def report(ok: bool, text: str) -> None:
@@ -120,6 +149,8 @@ async def run_tray(settings: Settings) -> int:
         await runtime.start(report)
         tray.paused = not runtime.wake_active
         tray.refresh()
+        if runtime.app.settings.api.enabled:
+            await actions.start_dashboard()  # sem abrir o navegador; o menu gera o link
         if problems:
             await tray.notify("SHIRO com limitações", " · ".join(problems)[:250])
         if runtime.app.activities is not None:
@@ -128,6 +159,7 @@ async def run_tray(settings: Settings) -> int:
         await runtime.session.run(runtime.triggers)
     finally:
         tray.stop()
+        await actions.close()
         await runtime.aclose()
     return 0
 

@@ -1,0 +1,581 @@
+/* Painel da SHIRO, na identidade do docs/08-identidade.md (ADR-0012).
+   Ciano: sistema ok. Âmbar: só o que pede ou pediu a sua confirmação, e o que foi barrado.
+   Vermelho: identidade (o nome dela). Os estados também mudam de forma, não só de cor. */
+
+@font-face {
+  font-family: "Chakra Petch";
+  src: url("fonts/chakra-petch-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Chakra Petch";
+  src: url("fonts/chakra-petch-500.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Chakra Petch";
+  src: url("fonts/chakra-petch-600.woff2") format("woff2");
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("fonts/jetbrains-mono.woff2") format("woff2");
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Noto Sans JP Shiro";
+  src: url("fonts/noto-sans-jp-shiro.woff2") format("woff2");
+  font-weight: 100 900;
+}
+
+:root {
+  color-scheme: dark;
+  --graphite: #0B0D12;
+  --panel: #11141B;
+  --line: #262C38;
+  --white: #EEF1F6;
+  --gray: #9AA3B2;
+  --red: #FF2E4D;
+  --cyan: #34E4F0;
+  --amber: #FFD23F;
+
+  --font-ui: "Chakra Petch", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  --font-jp: "Noto Sans JP Shiro", "Yu Gothic UI", "Meiryo", sans-serif;
+
+  --s-2: 12px;
+  --s-1: 13px;
+  --s0: 15px;
+  --s1: 19px;
+  --s3: 30px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; }
+
+body {
+  background: var(--graphite);
+  color: var(--white);
+  font: 400 var(--s0)/1.55 var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* O conteúdo recebe foco ao trocar de seção (leitores de tela), mas não é clicável. */
+#view:focus { outline: none; }
+
+/* Estrutura */
+
+.shell {
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.rail {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  padding: 28px 18px 24px;
+  border-right: 1px solid var(--line);
+}
+
+.mark {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.glyph {
+  font: 300 84px/1 var(--font-jp);
+  color: var(--white);
+}
+
+.word {
+  font: 600 var(--s-1)/1 var(--font-ui);
+  letter-spacing: 0.32em;
+  color: var(--red);
+}
+
+.rail ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rail ul a {
+  display: block;
+  padding: 7px 10px;
+  border-left: 2px solid transparent;
+  color: var(--gray);
+  font: 500 var(--s0)/1.3 var(--font-ui);
+  text-decoration: none;
+}
+
+.rail ul a:hover { color: var(--white); }
+
+.rail ul a[aria-current="page"] {
+  border-left-color: var(--white);
+  background: var(--panel);
+  color: var(--white);
+}
+
+.live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: auto 0 0;
+  color: var(--gray);
+  font-size: var(--s-1);
+}
+
+/* Desconectada: anel vazio. Ao vivo: ponto ciano. Pensando: anel ciano tracejado. */
+.dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--gray);
+  border-radius: 50%;
+}
+
+.live[data-state="on"] .dot { border-color: var(--cyan); background: var(--cyan); }
+
+.live[data-state="busy"] .dot {
+  border: 2px dashed var(--cyan);
+  animation: spin 2.4s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.main {
+  width: 100%;
+  max-width: 1080px;
+  padding: 26px clamp(16px, 4vw, 52px) 72px;
+}
+
+/* Barra de estado */
+
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  min-height: 21px;
+  margin-bottom: 30px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+  color: var(--gray);
+  font-size: var(--s-1);
+}
+
+.status b { color: var(--white); font-weight: 600; }
+.status .flag, .status .warn { color: var(--amber); }
+.status .version { margin-left: auto; font-family: var(--font-data); font-size: var(--s-2); }
+
+/* Conteúdo */
+
+h1 {
+  margin: 0 0 6px;
+  font: 600 var(--s3)/1.15 var(--font-ui);
+}
+
+h2 {
+  margin: 0;
+  font: 600 var(--s1)/1.3 var(--font-ui);
+}
+
+.lede {
+  max-width: 68ch;
+  margin: 0 0 26px;
+  color: var(--gray);
+}
+
+.sub {
+  margin: 2px 0 0;
+  color: var(--gray);
+  font-size: var(--s-1);
+}
+
+.tool {
+  font: 500 var(--s-1)/1.4 var(--font-data);
+  color: var(--white);
+}
+
+.args {
+  color: var(--gray);
+  font: var(--s-2)/1.5 var(--font-data);
+  overflow-wrap: anywhere;
+}
+
+.chip {
+  display: inline-block;
+  padding: 0 7px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  font: 500 var(--s-2)/18px var(--font-ui);
+  white-space: nowrap;
+}
+
+/* Camadas: regras (branco), modelo local (ciano), nuvem (cinza tracejado: saiu do PC). */
+.t-T0 { --tier: var(--white); --tier-line: solid; }
+.t-T1 { --tier: var(--cyan); --tier-line: solid; }
+.t-T2 { --tier: var(--gray); --tier-line: dashed; }
+.t-x { --tier: var(--gray); --tier-line: solid; }
+
+/* Decisões: liberada (cinza), confirmada (âmbar), negada ou bloqueada (âmbar tracejado). */
+.d-allow { color: var(--gray); }
+.d-confirmed { color: var(--amber); }
+.d-denied, .d-blocked, .d-error { color: var(--amber); border-style: dashed; }
+
+.empty {
+  max-width: 60ch;
+  padding: 28px 0;
+  color: var(--gray);
+}
+
+.empty p { margin: 0 0 6px; }
+.empty .hint { color: var(--white); }
+
+.error {
+  padding: 12px 16px;
+  border: 1px dashed var(--amber);
+  background: var(--panel);
+}
+
+/* Turnos */
+
+.tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 40px;
+  margin: 0 0 28px;
+}
+
+.tiers div { display: grid; gap: 2px; }
+
+.tiers dt {
+  color: var(--tier, var(--gray));
+  font: 500 var(--s-1)/1.3 var(--font-ui);
+}
+
+.tiers dd {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: 0;
+  color: var(--gray);
+  font-size: var(--s-1);
+}
+
+.tiers dd b {
+  color: var(--white);
+  font: 500 var(--s1)/1.2 var(--font-data);
+}
+
+.tiers .barred dt, .tiers .barred dd b { color: var(--amber); }
+
+.turns {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.turn {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  gap: 4px 18px;
+  padding: 16px 0 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.when {
+  padding-top: 2px;
+  color: var(--gray);
+  font: var(--s-1)/1.5 var(--font-data);
+}
+
+.ask {
+  max-width: 72ch;
+  margin: 0;
+  font-weight: 600;
+}
+
+.reply {
+  max-width: 72ch;
+  margin: 6px 0 0;
+  color: var(--gray);
+  white-space: pre-line;
+}
+
+.calls {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--line);
+  list-style: none;
+}
+
+.calls li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.bar {
+  height: 3px;
+  margin-top: 12px;
+  background: var(--line);
+}
+
+.bar span {
+  display: block;
+  width: calc(var(--w, 0) * 100%);
+  min-width: 3px;
+  height: 0;
+  border-top: 3px var(--tier-line) var(--tier);
+}
+
+.meta {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 4px;
+  color: var(--gray);
+  font-size: var(--s-1);
+}
+
+.meta .chip { color: var(--tier); border-style: var(--tier-line); }
+
+.meta .lat {
+  color: var(--white);
+  font: 500 var(--s0)/1.3 var(--font-data);
+}
+
+.turn.pending .ask { color: var(--cyan); }
+.turn.pending .reply { font-style: italic; }
+
+/* Tabelas (atividades e custos) */
+
+.table-wrap { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th {
+  padding: 0 14px 8px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--gray);
+  font: 500 var(--s-1)/1.3 var(--font-ui);
+  text-align: left;
+  white-space: nowrap;
+}
+
+td {
+  padding: 11px 14px 11px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+th.num, td.num { text-align: right; }
+td.num, td.due { font: var(--s-1)/1.6 var(--font-data); }
+td.muted { color: var(--gray); }
+tr.late td.due { color: var(--amber); }
+
+.totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  margin: 0 0 22px;
+  color: var(--gray);
+  font-size: var(--s-1);
+}
+
+.totals b {
+  display: block;
+  color: var(--white);
+  font: 500 var(--s1)/1.3 var(--font-data);
+}
+
+/* Memória */
+
+.facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.facts li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.facts p { margin: 0; max-width: 70ch; }
+
+button {
+  flex: none;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--white);
+  font: 500 var(--s-1)/1.3 var(--font-ui);
+  cursor: pointer;
+}
+
+button:hover { border-color: var(--gray); }
+button[data-armed] { border-color: var(--amber); color: var(--amber); }
+button:disabled { opacity: 0.5; cursor: progress; }
+
+/* Rotinas */
+
+.routines { display: grid; gap: 14px; }
+
+.routine {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.aliases { margin: 8px 0 0; color: var(--gray); font-size: var(--s-1); }
+.aliases q { color: var(--white); }
+
+.steps {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding-left: 22px;
+}
+
+.steps li::marker {
+  color: var(--gray);
+  font: var(--s-2) var(--font-data);
+}
+
+/* Auditoria */
+
+.integrity {
+  max-width: 72ch;
+  margin: 0 0 22px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--cyan);
+  background: var(--panel);
+}
+
+.integrity.broken {
+  border: 1px dashed var(--amber);
+  border-left-width: 3px;
+}
+
+.events {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+  font-size: var(--s-1);
+}
+
+.events li { border-bottom: 1px solid var(--line); }
+
+.events summary {
+  display: grid;
+  grid-template-columns: 56px 110px 130px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.events summary::-webkit-details-marker { display: none; }
+.events .seq, .events time { color: var(--gray); font-family: var(--font-data); }
+.events .kind { font-weight: 500; }
+.events .what { color: var(--gray); overflow-wrap: anywhere; }
+.events .barred { color: var(--amber); }
+
+.events pre {
+  margin: 0 0 12px 68px;
+  padding: 12px;
+  overflow-x: auto;
+  background: var(--panel);
+  color: var(--gray);
+  font: var(--s-2)/1.6 var(--font-data);
+}
+
+/* Fora de sessão */
+
+.locked { max-width: 60ch; padding-top: 6vh; }
+
+/* Telas estreitas */
+
+@media (max-width: 760px) {
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+
+  .rail {
+    position: static;
+    height: auto;
+    flex-flow: row wrap;
+    align-items: center;
+    gap: 12px 16px;
+    padding: 14px 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mark { flex-direction: row; align-items: center; gap: 10px; }
+  .glyph { font-size: 38px; }
+
+  .rail ul {
+    order: 3;
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .rail ul a { border-left: 0; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .rail ul a[aria-current="page"] { border-bottom-color: var(--white); background: none; }
+  .live { margin: 0 0 0 auto; }
+
+  .main { padding: 20px 16px 56px; }
+  .status .version { margin-left: 0; }
+
+  .turn { grid-template-columns: 1fr; }
+  .meta { grid-auto-flow: column; justify-content: start; justify-items: start; align-items: baseline; gap: 12px; }
+
+  .events summary { grid-template-columns: 44px 96px minmax(0, 1fr); }
+  .events summary time { display: none; }
+  .events summary .what { grid-column: 2 / -1; }
+  .events pre { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live[data-state="busy"] .dot { animation: none; }
+}

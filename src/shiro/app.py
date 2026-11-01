@@ -44,7 +44,7 @@ from shiro.persistence.database import Database
 from shiro.persistence.memory import SqliteMemoryStore
 from shiro.persistence.usage import SqliteUsageLedger
 from shiro.policy.engine import PolicyConfig, PolicyEngine
-from shiro.routines import ListRoutinesTool, RoutineRules, load_routines
+from shiro.routines import ListRoutinesTool, Routine, RoutineRules, load_routines
 from shiro.scheduler.runner import Scheduler
 from shiro.secrets import get_api_key
 from shiro.settings import Settings
@@ -232,6 +232,8 @@ class App:
     scheduler: Scheduler | None = None
     memory: MemoryService | None = None
     trash: Trash | None = None
+    bus: EventBus | None = None
+    routines: dict[str, Routine] = field(default_factory=dict[str, Routine])
     problems: list[str] = field(default_factory=list[str])
     """Avisos da montagem (rotina inválida etc.), para a CLI e a bandeja mostrarem."""
     _closers: list[Closer] = field(default_factory=list[Closer])
@@ -391,6 +393,8 @@ async def build_app(
         scheduler=scheduler,
         memory=memory,
         trash=trash,
+        bus=bus,
+        routines=routines,
         problems=problems,
         _closers=closers,
     )

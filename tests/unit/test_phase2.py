@@ -277,6 +277,9 @@ class FakeActions:
     def autostart_enabled(self) -> bool:
         return False
 
+    async def open_dashboard(self) -> None:
+        self.calls.append("dashboard")
+
     def open_logs(self) -> None:
         self.calls.append("logs")
 

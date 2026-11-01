@@ -15,6 +15,7 @@ from pathlib import Path
 
 from shiro import __version__, paths
 from shiro.cli_voice import add_voice_parser, run_voice
+from shiro.core.models import DecisionKind
 from shiro.settings import ConfigError, Settings, load_settings
 
 
@@ -52,6 +53,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     commands.add_parser(
         "tray", help="a SHIRO na bandeja, com console (o modo sem console é shiro-tray)"
+    )
+    dashboard = commands.add_parser(
+        "dashboard", help="abre o painel no navegador (só neste PC, em 127.0.0.1)"
+    )
+    dashboard.add_argument(
+        "--no-browser", action="store_true", help="só mostra o link, sem abrir o navegador"
     )
     commands.add_parser("setup", help="baixa e prepara os modelos (ouvido, voz e memória)")
     start = commands.add_parser("autostart", help="iniciar com o Windows (na bandeja)")
@@ -117,6 +124,48 @@ async def _chat(settings: Settings, args: argparse.Namespace) -> int:
     finally:
         await app.aclose()
     return 0
+
+
+async def _dashboard(settings: Settings, args: argparse.Namespace) -> int:
+    import webbrowser
+
+    from shiro.app import build_app
+    from shiro.dashboard import Dashboard
+    from shiro.interfaces.text import use_safe_output
+    from shiro.observability.logging import configure_logging
+
+    use_safe_output()
+    configure_logging(settings.logging, paths.log_dir(), console=False)
+    app = await build_app(settings, confirmation=_NoConfirmation())
+    panel = Dashboard(app)
+    try:
+        try:
+            url = await panel.open()
+        except OSError:
+            print(
+                f"✗ A porta {settings.api.port} já está em uso. Se a SHIRO está na bandeja,"
+                " use o menu dela: Abrir painel."
+            )
+            return 1
+        print(f"Painel em {panel.base_url}")
+        print("Link de entrada (uso único, vale só nesta execução):")
+        print(f"  {url}")
+        print("Os eventos ao vivo aparecem quando o painel roda junto da SHIRO (bandeja).")
+        print("Ctrl+C para fechar.")
+        if not args.no_browser:
+            webbrowser.open(url)
+        await asyncio.Event().wait()
+    finally:
+        await panel.close()
+        await app.aclose()
+    return 0
+
+
+class _NoConfirmation:
+    """O painel sozinho não roda turnos; se algo pedir confirmação, a resposta é não."""
+
+    async def ask(self, prompt: str, kind: DecisionKind) -> bool:
+        return False
 
 
 def _config_path() -> int:
@@ -214,7 +263,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         from shiro.tray_main import main as tray_main
 
         return tray_main()
-    if args.command in ("chat", "voice", "setup"):
+    if args.command in ("chat", "voice", "setup", "dashboard"):
         try:
             settings = load_settings()
         except ConfigError as exc:
@@ -226,6 +275,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "voice":
             return run_voice(settings, args)
         try:
+            if args.command == "dashboard":
+                return asyncio.run(_dashboard(settings, args))
             return asyncio.run(_chat(settings, args))
         except KeyboardInterrupt:
             return 130

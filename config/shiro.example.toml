@@ -140,9 +140,9 @@ messages_days = 90
 trash_days = 7
 audit_days = 365
 
-[api]                      # Fase 4
-enabled = false
-host = "127.0.0.1"
+[api]                      # painel local (Fase 4, ADR-0019): "Abrir painel" na bandeja ou "shiro dashboard"
+enabled = false            # true: liga o painel junto com a bandeja (sem abrir o navegador)
+host = "127.0.0.1"         # só loopback: 127.0.0.1, ::1 ou localhost
 port = 8765
 
 [logging]

@@ -57,7 +57,7 @@ flowchart TB
     cloud["APIs de LLM na nuvem"]
     mcp["Servidores MCP<br/>Home Assistant e outros"]
     win["APIs do Windows"]
-    dash["Painel local<br/>React · Fase 4"]
+    dash["Painel local<br/>127.0.0.1 · Fase 4"]
 
     user --> io
     io <--> core

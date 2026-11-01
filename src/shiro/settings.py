@@ -284,6 +284,9 @@ class RetentionSettings(_Section):
 
 
 class ApiSettings(_Section):
+    """API local e painel (Fase 4, ADR-0019). ``enabled`` liga o painel junto com a bandeja;
+    "Abrir painel" e ``shiro dashboard`` funcionam de qualquer jeito."""
+
     enabled: bool = False
     host: str = "127.0.0.1"
     port: int = Field(default=8765, ge=1024, le=65535)

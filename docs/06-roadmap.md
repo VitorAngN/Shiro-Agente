@@ -111,8 +111,10 @@ Decisões no [ADR-0016](adr/0016-sempre-ligado.md).
 
 | Entrega | Detalhe |
 |---|---|
-| API | FastAPI em `127.0.0.1` com token, WebSocket de eventos |
-| Painel | React: conversas, atividades, auditoria, custos, latência por estágio, memórias, rotinas |
+| API | ✅ FastAPI no loopback, no processo da SHIRO: link de entrada de uso único, cookie `HttpOnly`, `Host` e `Origin` conferidos, CSP estrita ([ADR-0019](adr/0019-painel-local.md)) |
+| Ao vivo | ✅ WebSocket com os eventos do turno (início, cada ferramenta, fim) |
+| Painel | ✅ Página sem build (sem React): turnos com camada, tempo e decisão da política, p50/p95 por camada, atividades, memórias com "Esquecer", rotinas, auditoria com verificação da cadeia e custos |
+| Acesso | ✅ "Abrir painel" na bandeja e `shiro dashboard` |
 
 **Pronto quando:** dá para diagnosticar um turno lento ou uma ação negada só pelo painel.
 

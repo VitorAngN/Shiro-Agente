@@ -22,6 +22,7 @@ Cada decisão importante fica registrada aqui, com o contexto e as alternativas 
 | [0016](0016-sempre-ligado.md) | Sempre ligado: bandeja, "Ei, Shiro" e início com o Windows | Aceito |
 | [0017](0017-memoria-local.md) | Memória de longo prazo local | Aceito |
 | [0018](0018-rotinas-arquivos-web.md) | Rotinas, arquivos, pesquisa na web e ferramentas por assunto | Aceito |
+| [0019](0019-painel-local.md) | Painel local: API no loopback e página sem build | Aceito |
 
 ## Modelo
 

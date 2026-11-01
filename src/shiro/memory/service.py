@@ -111,6 +111,10 @@ class MemoryService:
         await self._store.delete([best.id])
         return ToolResult.success(f"Esqueci: {best.content}.", say="Pronto, esqueci.")
 
+    async def delete(self, fact_id: str) -> int:
+        """Apaga uma memória pelo id (painel)."""
+        return await self._store.delete([fact_id])
+
     async def forget_all(self) -> ToolResult:
         removed = await self._store.delete([f.id for f in await self._store.all()])
         word = "memória" if removed == 1 else "memórias"

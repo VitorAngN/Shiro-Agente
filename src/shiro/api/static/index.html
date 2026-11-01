@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Painel da SHIRO</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script type="module" src="/static/app.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <nav class="rail" aria-label="Seções do painel">
+      <a class="mark" href="#turnos" aria-label="SHIRO, início">
+        <span class="glyph" aria-hidden="true">白</span>
+        <span class="word">SHIRO</span>
+      </a>
+      <ul>
+        <li><a href="#turnos">Turnos</a></li>
+        <li><a href="#atividades">Atividades</a></li>
+        <li><a href="#memoria">Memória</a></li>
+        <li><a href="#rotinas">Rotinas</a></li>
+        <li><a href="#auditoria">Auditoria</a></li>
+        <li><a href="#custos">Custos</a></li>
+      </ul>
+      <p class="live" id="live" data-state="off" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="live-text">Conectando…</span>
+      </p>
+    </nav>
+    <div class="main">
+      <header class="status" id="status"></header>
+      <main id="view" tabindex="-1"></main>
+    </div>
+  </div>
+</body>
+</html>
