@@ -248,9 +248,7 @@ async def test_full_agent_tier0_completes_and_lists(tmp_path: Path) -> None:
         probe=FakeProbe(),
     )
     try:
-        created = await app.agent.run_turn(
-            "preciso entregar o trabalho de cálculo pra sexta às 10h"
-        )
+        created = await app.agent.run_turn("o trabalho de cálculo é pra sexta às 10h, anota")
         assert created.tier is Tier.T1
         assert created.calls[0].result.ok
         assert "às 10h" in created.calls[0].result.content

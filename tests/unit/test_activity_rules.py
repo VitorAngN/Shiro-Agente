@@ -87,6 +87,7 @@ def test_common_phrases_become_tool_calls(
         "tenho prova sexta e trabalho segunda",  # dois prazos
         "preciso dormir cedo hoje",  # "preciso" sem verbo de tarefa fica com o modelo
         "me lembra amanhã de manhã de ligar pro dentista",
+        "lembra que eu prefiro reuniões de manhã",  # memória, não lembrete
     ],
 )
 def test_anything_else_goes_to_the_model(spoken: str) -> None:

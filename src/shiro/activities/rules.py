@@ -40,9 +40,11 @@ _NOUNS = (
     "|dentista|medico|exame|teste|simulado|palestra|entrevista|redacao|monitoria"
 )
 
+# "me lembra de/que X às 18h" e "lembra de X daqui a 40 minutos" são lembretes;
+# "lembra que X", sem o "me", é memória (``memory.rules``).
 _REMIND = re.compile(
-    r"^(?:me\s+)?(?:lembra|lembre|lembrar|avisa|avise)(?:\s+me)?\s+(?:de|que|pra|para)\s+"
-    r"(?P<rest>.+)$"
+    r"^(?:(?P<me1>me)\s+)?(?:lembra|lembre|lembrar|avisa|avise)(?:\s+(?P<me2>me))?"
+    r"\s+(?P<link>de|que|pra|para)\s+(?P<rest>.+)$"
 )
 _NOTE = re.compile(
     # "a nota": o Whisper costuma separar "anota" em duas palavras.
@@ -85,6 +87,12 @@ class ActivityRules:
         plain = " ".join(p for _, p in tokens)
         for pattern, tool, needs_date in _RULES:
             if match := pattern.match(plain):
+                if (
+                    pattern is _REMIND
+                    and match["link"] == "que"
+                    and not (match["me1"] or match["me2"])
+                ):
+                    return None
                 start = len(plain[: match.start("rest")].split())
                 return self._build(tool, tokens[start:], needs_date=needs_date)
         return None
