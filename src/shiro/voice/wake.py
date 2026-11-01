@@ -35,7 +35,7 @@ _NAME = r"(?:shiro|xiro|chiro|shiru|xiru|shirou|shirow)"
 _GREETING = r"(?:ei|ai|hei|hey|oi|ok|okay)"
 _WAKE = re.compile(
     r"^(?:(?:hum|hm|ah|eh|ahn)\s*,?\s*)?"
-    rf"(?:(?:{_GREETING}|e|a)(?:{_NAME}|ciro)"  # grudado: "aishiro", "aiciro"
+    rf"(?:(?:{_GREETING}|e|a)(?:{_NAME}|ciro|ciru|chiru)"  # grudado: "aishiro", "aiciru"
     rf"|(?:{_GREETING}\s*,?\s*)?{_NAME}"  # "ei, shiro" ou só "shiro"
     # "e shiro," / "a shiro.": artigo só vale como chamado (vírgula ou fim depois do nome),
     # para "a Shiro é legal" numa conversa não acordá-la.

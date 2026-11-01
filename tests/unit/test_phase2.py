@@ -51,6 +51,7 @@ PHRASES = ("ei shiro", "oi shiro", "ok shiro", "hey shiro", "shiro")
         ("Ok Shiro", ""),
         # como o Whisper escreve o chamado (medido no PC de referência)
         ("Aiciro.", ""),
+        ("Aiciru.", ""),
         ("Aishiro, abre o Spotify.", "abre o spotify"),
         ("Eishiro, abre o Spotify.", "abre o spotify"),
         ("A. Shiro.", ""),

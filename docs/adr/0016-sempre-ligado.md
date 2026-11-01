@@ -70,4 +70,8 @@ Medido antes de decidir (frases sintetizadas, sem microfone):
 - "Ei, Shiro" funciona sem treino, ao custo de CPU quando há conversa por perto. Com um modelo treinado, basta `engine = "openwakeword"` e `model = "caminho/ei_shiro.onnx"`.
 - Os modelos embutidos do openWakeWord (CC BY-NC-SA 4.0) servem só para uso não comercial. O SHIRO é pessoal.
 - A bandeja não tem console: diagnóstico é pelo log ("Abrir registros") ou rodando `shiro tray` num terminal.
-- `shiro voice bench --wake` mede a palavra de ativação com frases sintetizadas, sem tocar nada.
+- `shiro voice bench --wake` mede a palavra de ativação com frases sintetizadas, sem tocar nada. No PC de referência, com o Whisper `base` conferindo:
+  - voz Maria: 6 de 6;
+  - voz Kokoro: 6 de 6, depois de aceitar como o Whisper escreve o chamado ("Aishiro", "Aiciru", "E Shiro,");
+  - nenhum alarme falso nas 3 frases que não chamam (inclusive "Eu falei com a Shiro ontem").
+  - Tempo: ~0,8 s para ignorar uma fala e ~3 s para entender "Ei Shiro, abre o Spotify" (duas transcrições).
