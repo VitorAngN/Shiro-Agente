@@ -120,13 +120,28 @@ class STTSettings(_Section):
     device: Literal["cuda", "cpu"] = "cpu"  # a GPU fica para o LLM (ADR-0010)
     compute_type: str = "int8"
     language: str = "pt"
+    beam_size: int = Field(default=1, ge=1, le=5)  # 1 = mais rápido; 5 = um pouco mais preciso
+    threads: int = Field(default=4, ge=1, le=32)
 
 
 class TTSSettings(_Section):
-    # Voz feminina pt-BR da SHIRO (ADR-0012); o spike do marco 1b confirma a escolha.
-    engine: Literal["kokoro", "piper"] = "kokoro"
+    # Voz feminina pt-BR da SHIRO (ADR-0012). "sapi" usa a voz do Windows (Maria), sem download.
+    engine: Literal["kokoro", "sapi"] = "kokoro"
     voice: str = "pf_dora"
     speed: float = Field(default=1.0, gt=0.5, le=2.0)
+    kokoro_model: Literal["int8", "fp16", "fp32"] = "int8"
+    sapi_voice: str = "Maria"
+    volume: float = Field(default=1.0, gt=0, le=1.0)
+
+
+class ListenSettings(_Section):
+    """Quando começar e parar de ouvir (Silero VAD)."""
+
+    threshold: float = Field(default=0.5, gt=0, lt=1)
+    start_timeout_s: float = Field(default=6.0, gt=0, le=30)
+    end_silence_ms: int = Field(default=700, ge=200, le=3000)
+    max_utterance_s: float = Field(default=15.0, ge=2, le=60)
+    pre_roll_ms: int = Field(default=300, ge=0, le=1000)
 
 
 class WakeWordSettings(_Section):
@@ -140,8 +155,11 @@ class VoiceSettings(_Section):
     enabled: bool = True
     activation: Literal["push_to_talk", "wake_word", "both"] = "push_to_talk"
     push_to_talk_hotkey: str = "ctrl+alt+space"
-    input_device: str = "default"
+    stop_hotkey: str = "ctrl+alt+shift+s"  # para de falar e de ouvir na hora
+    input_device: str = "default"  # nome (ou parte) do microfone; "shiro voice devices" lista
     output_device: str = "default"
+    cue_volume: float = Field(default=0.15, ge=0, le=1)  # bipes de "ouvindo"; 0 desliga
+    listen: ListenSettings = ListenSettings()
     stt: STTSettings = STTSettings()
     tts: TTSSettings = TTSSettings()
     wake_word: WakeWordSettings = WakeWordSettings()

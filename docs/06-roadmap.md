@@ -36,7 +36,7 @@ A fase é entregue em três marcos, cada um testável sozinho:
 | Marco | Entrega |
 |---|---|
 | **1a · Cérebro** | `EventBus`, `AgentLoop`, `ContextBuilder`, `IntentRouter` com Tier 0; adaptadores Ollama e Gemini com rate limiter e fallback; `PolicyEngine` com níveis R0–R4; SQLite com `SESSION`, `MESSAGE`, `TOOL_CALL`, `AUDIT_EVENT`; ferramentas de hora/data, clima, apps, volume, mídia e sistema; aquecimento do modelo e verificação de ação alegada ([ADR-0011](adr/0011-ajustes-do-benchmark-local.md)); modo texto pela CLI |
-| **1b · Voz** | Push-to-talk por atalho global; captura com `sounddevice`; Silero VAD; faster-whisper; Piper como processo separado com streaming por frase; toast do Windows; parada de emergência |
+| **1b · Voz** | Push-to-talk por atalho global; captura com `sounddevice`; Silero VAD; faster-whisper; Kokoro `pf_dora` em processo separado (reserva: voz Maria do Windows) com fala frase a frase; confirmação por voz; lembretes falados; parada de emergência ([ADR-0015](adr/0015-implementacao-da-voz.md)) |
 | **1c · Atividades** | Entidade `ACTIVITY`; ferramentas para criar, listar, concluir, adiar, editar e excluir; interpretação de datas em pt-BR; confirmação falada da data; avisos antes do prazo pelo agendador |
 
 **Andamento do marco 1a:**

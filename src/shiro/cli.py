@@ -1,9 +1,9 @@
 """Linha de comando do SHIRO.
 
 * ``shiro chat``: conversa por texto com o agente (marco 1a);
-* ``shiro config``: ver e validar a configuração.
-
-A voz chega no marco 1b (ver ``docs/06-roadmap.md``).
+* ``shiro voice``: conversa por voz e utilitários de áudio (marco 1b, ``cli_voice``);
+* ``shiro config``: ver e validar a configuração;
+* ``shiro secrets``: chaves de API no cofre do sistema.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from shiro import __version__, paths
+from shiro.cli_voice import add_voice_parser, run_voice
 from shiro.settings import ConfigError, Settings, load_settings
 
 
@@ -47,6 +48,7 @@ def _build_parser() -> argparse.ArgumentParser:
     chat.add_argument(
         "--no-warmup", action="store_true", help="não pré-carrega o modelo local ao iniciar"
     )
+    add_voice_parser(commands)
     return parser
 
 
@@ -178,16 +180,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.config_command == "path":
             return _config_path()
         return _config_check(args.file)
-    if args.command == "chat":
+    if args.command in ("chat", "voice"):
         try:
             settings = load_settings()
         except ConfigError as exc:
             print(f"✗ {exc}")
             return 1
+        if args.command == "voice":
+            return run_voice(settings, args)
         try:
             return asyncio.run(_chat(settings, args))
         except KeyboardInterrupt:
             return 130
-    print(f"shiro {__version__}: Fase 1 (MVP de voz), marco 1a: agente por texto.")
-    print("Use 'shiro chat' para conversar, 'shiro config check' ou 'shiro --help'.")
+    print(f"shiro {__version__}: Fase 1 (MVP de voz).")
+    print("Use 'shiro chat' (texto), 'shiro voice' (voz), 'shiro config check' ou 'shiro --help'.")
     return 0

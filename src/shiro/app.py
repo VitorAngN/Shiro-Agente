@@ -27,7 +27,7 @@ from shiro.core.agent import AgentLimits, AgentLoop
 from shiro.core.bus import EventBus
 from shiro.core.context import ContextBuilder
 from shiro.core.events import TurnFinished
-from shiro.core.models import Tier
+from shiro.core.models import Channel, Tier
 from shiro.core.ports import Clock, ConfirmationChannel, LLMProvider, Notifier
 from shiro.core.router import IntentRouter
 from shiro.llm.gemini import GeminiProvider
@@ -215,6 +215,7 @@ async def build_app(
     probe: SystemProbe | None = None,
     notifier: Notifier | None = None,
     clock: Clock | None = None,
+    channel: Channel = "text",
 ) -> App:
     closers: list[Closer] = []
 
@@ -286,6 +287,7 @@ async def build_app(
         audit=audit,
         bus=bus,
         clock=clock,
+        channel=channel,
         context=ContextBuilder(assistant_name=settings.general.assistant_name),
         limits=AgentLimits(
             max_steps=agent_settings.max_steps,

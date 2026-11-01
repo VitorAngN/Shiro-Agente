@@ -18,6 +18,7 @@ Cada decisão importante fica registrada aqui, com o contexto e as alternativas 
 | [0012](0012-identidade-da-shiro.md) | Identidade da SHIRO: persona, voz e visual | Aceito |
 | [0013](0013-localizacao-automatica.md) | Localização automática para o clima | Aceito |
 | [0014](0014-prazos-ancorados-na-fala.md) | Prazos ancorados na fala e atividades no Tier 0 | Aceito |
+| [0015](0015-implementacao-da-voz.md) | Implementação da voz (marco 1b) | Aceito |
 
 ## Modelo
 

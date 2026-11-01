@@ -1,6 +1,6 @@
 # ADR-0004 · Pipeline de voz 100% local
 
-- **Status:** Aceito · local de execução do STT definido pelo [ADR-0010](0010-hardware-gpu-4gb.md) (CPU) · voz substituída pelo [ADR-0012](0012-identidade-da-shiro.md) (feminina)
+- **Status:** Aceito · local de execução do STT definido pelo [ADR-0010](0010-hardware-gpu-4gb.md) (CPU) · voz substituída pelo [ADR-0012](0012-identidade-da-shiro.md) (feminina) · implementação no [ADR-0015](0015-implementacao-da-voz.md)
 - **Data:** 2026-10-30
 
 ## Contexto

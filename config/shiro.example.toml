@@ -43,8 +43,16 @@ price_output_per_mtok = 0.0
 enabled = true
 activation = "push_to_talk"            # push_to_talk | wake_word | both
 push_to_talk_hotkey = "ctrl+alt+space"
-input_device = "default"
+stop_hotkey = "ctrl+alt+shift+s"      # para de falar e de ouvir na hora
+input_device = "default"               # nome ou parte do nome; "shiro voice devices" lista
 output_device = "default"
+cue_volume = 0.15                      # bipe de "ouvindo"; 0 desliga
+
+[voice.listen]
+threshold = 0.5            # sensibilidade do detector de fala (Silero VAD)
+start_timeout_s = 6        # desiste se ninguém falar
+end_silence_ms = 700       # silêncio que encerra a frase
+max_utterance_s = 15
 
 [voice.stt]
 engine = "faster-whisper"
@@ -52,11 +60,14 @@ model = "small"            # spike do marco 1b compara base e small na CPU
 device = "cpu"             # cpu | cuda (GPU fica para o LLM, ver ADR-0010)
 compute_type = "int8"
 language = "pt"
+beam_size = 1              # 1 = mais rápido
 
 [voice.tts]
-engine = "kokoro"          # voz feminina da SHIRO (ADR-0012); "piper" como alternativa
+engine = "kokoro"          # voz da SHIRO (ADR-0012); "sapi" = voz Maria do Windows, sem download
 voice = "pf_dora"
 speed = 1.0                # <1 fala mais devagar
+kokoro_model = "int8"      # int8 (88 MB) | fp16 | fp32 (310 MB)
+sapi_voice = "Maria"
 
 [voice.wake_word]          # Fase 2
 engine = "openwakeword"

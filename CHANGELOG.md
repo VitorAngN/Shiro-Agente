@@ -5,6 +5,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (marco 1b · voz)
+- `shiro voice`: conversa por voz com atalho global (`ctrl+alt+space`) ou Enter, atalho de parar (`ctrl+alt+shift+s`) e texto digitado no mesmo terminal (ADR-0015).
+- Detecção de fala com o Silero VAD v6 do faster-whisper, quadro a quadro, com histerese e pré-escuta. Um segundo toque no atalho encerra a frase.
+- Transcrição com faster-whisper na CPU (int8), com prompt de vocabulário ("Shiro", apps) e descarte de alucinações conhecidas.
+- Voz Kokoro `pf_dora` num processo separado, sintetizada frase a frase enquanto a anterior toca. Reserva: voz Maria do Windows (SAPI). Antes da síntese o texto é ajustado ("23h59" → "23 e 59").
+- Confirmação por voz ("sim"/"não"; sem resposta = não). A confirmação física continua no teclado.
+- Lembretes e avisos de prazo falados.
+- `shiro voice setup | devices | say | listen | bench`. O `bench` mede voz e transcrição sem tocar áudio.
+
 ### Adicionado (marco 1c · atividades)
 - Resolução determinística de prazos em pt-BR (`shiro.activities.dates`): dias da semana, "que vem", "dia 12 às 19h", "12/11", "daqui a 3 dias", "às oito da noite", meio-dia e meia-noite. Expressões vagas viram pergunta, nunca chute.
 - Atividades: criar, listar por período, concluir, adiar (mantendo o horário), renomear e excluir; a SHIRO repete a data absoluta entendida. Lembretes com horário.

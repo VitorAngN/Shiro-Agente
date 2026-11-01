@@ -68,6 +68,16 @@ uv run shiro config path     # mostra onde fica o shiro.toml
 uv run shiro config check    # valida a configuração
 ```
 
+Voz (marco 1b):
+
+```powershell
+uv run shiro voice setup     # baixa o Whisper e a voz Kokoro (uma vez, ~600 MB)
+uv run shiro voice devices   # lista microfones e saídas
+uv run shiro voice listen    # testa o microfone: ouve uma frase e mostra o texto
+uv run shiro voice -v        # conversa por voz: Ctrl+Alt+Espaço fala, Ctrl+Alt+Shift+S para
+uv run shiro voice bench     # mede voz e transcrição sem tocar áudio
+```
+
 Exemplo de sessão:
 
 ```text
@@ -93,7 +103,7 @@ Para personalizar, copie [`config/shiro.example.toml`](config/shiro.example.toml
 | LLM local | Ollama, modelo de 3–4B escolhido por benchmark próprio (provisório: `qwen3:4b-instruct`) |
 | LLM nuvem | Gemini, Claude, OpenAI (adaptadores próprios) |
 | Fala → texto | faster-whisper na CPU + Silero VAD |
-| Texto → fala | Voz feminina pt-BR: Kokoro `pf_dora` (candidata) ou Piper, em processo separado |
+| Texto → fala | Voz feminina pt-BR: Kokoro `pf_dora` em processo separado; reserva: voz Maria do Windows (SAPI) |
 | Palavra de ativação | openWakeWord ("Ei, Shiro") |
 | Persistência | SQLite (WAL) + sqlite-vec |
 | Casa (futuro) | Home Assistant via MCP |
@@ -122,4 +132,4 @@ Encontrou uma vulnerabilidade? Veja [SECURITY.md](SECURITY.md).
 
 ## Licença
 
-[MIT](LICENSE). Componentes com licença GPL (como o Piper) são usados como processos separados, sem serem importados ([ADR-0004](docs/adr/0004-pipeline-de-voz-local.md)).
+[MIT](LICENSE). Componentes com licença GPL (espeak-ng e phonemizer, usados pela voz Kokoro) rodam num processo separado e nunca são importados pelo SHIRO ([ADR-0015](docs/adr/0015-implementacao-da-voz.md)).
