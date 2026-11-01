@@ -37,10 +37,22 @@ KOKORO_MODELS = {
     "fp32": "kokoro-v1.0.onnx",
 }
 KOKORO_VOICES = "voices-v1.0.bin"
+OPENWAKEWORD_RELEASE = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/"
+OPENWAKEWORD_BASE = ("melspectrogram.onnx", "embedding_model.onnx")
+OPENWAKEWORD_BUILTIN = {
+    "hey_jarvis": "hey_jarvis_v0.1.onnx",
+    "alexa": "alexa_v0.1.onnx",
+    "hey_mycroft": "hey_mycroft_v0.1.onnx",
+}
 # Conferidos em 2026-11-01. Variantes sem hash aqui são aceitas como vierem.
 KNOWN_SHA256 = {
     "kokoro-v1.0.int8.onnx": "6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb",
     "voices-v1.0.bin": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d",
+    "melspectrogram.onnx": "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
+    "embedding_model.onnx": "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
+    "hey_jarvis_v0.1.onnx": "94a13cfe60075b132f6a472e7e462e8123ee70861bc3fb58434a73712ee0d2cb",
+    "alexa_v0.1.onnx": "6ff566a01d12670e8d9e3c59da32651db1575d17272a601b7f8a39283dfbae3e",
+    "hey_mycroft_v0.1.onnx": "c2a311e8fa1338de89c31b3b46dc4dffd4af2f9a8d6ddead48893c2d301b1f18",
 }
 
 type Progress = Callable[[str, int, int | None], None]
@@ -170,3 +182,30 @@ async def ensure_whisper(
         )
     (folder / _COMPLETE).write_text(repo, encoding="utf-8")
     return folder
+
+
+@dataclass(frozen=True)
+class WakeWordFiles:
+    melspectrogram: Path
+    embedding: Path
+    wakeword: Path
+
+
+async def ensure_openwakeword(
+    client: httpx.AsyncClient, data_dir: Path, model: str, progress: Progress | None = None
+) -> WakeWordFiles:
+    """Modelos de base do openWakeWord e o da palavra (embutido pelo nome, ou um .onnx próprio)."""
+    folder = data_dir / "models" / "openwakeword"
+    for name in OPENWAKEWORD_BASE:
+        if not (folder / name).is_file():
+            await download(client, OPENWAKEWORD_RELEASE + name, folder / name, progress)
+    if model in OPENWAKEWORD_BUILTIN:
+        wakeword = folder / OPENWAKEWORD_BUILTIN[model]
+        if not wakeword.is_file():
+            await download(client, OPENWAKEWORD_RELEASE + wakeword.name, wakeword, progress)
+    else:
+        wakeword = Path(model).expanduser()  # noqa: ASYNC240 - só monta o caminho
+        if not wakeword.is_file():
+            msg = f'modelo de palavra de ativação "{model}" não encontrado'
+            raise DownloadError(msg)
+    return WakeWordFiles(folder / OPENWAKEWORD_BASE[0], folder / OPENWAKEWORD_BASE[1], wakeword)

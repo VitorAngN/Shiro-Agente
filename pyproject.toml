@@ -24,11 +24,13 @@ dependencies = [
     "httpx>=0.27",
     "keyring>=25",
     "numpy>=1.26",
+    "pillow>=10",
     "ollama>=0.5",
     "psutil>=6.0",
     "pycaw>=20240316 ; sys_platform == 'win32'",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
+    "pystray>=0.19 ; sys_platform == 'win32'",
     "sounddevice>=0.5",
     "structlog>=24.4",
     "tzdata>=2024.1; sys_platform == 'win32'",
@@ -36,6 +38,10 @@ dependencies = [
 
 [project.scripts]
 shiro = "shiro.cli:main"
+
+[project.gui-scripts]
+# Sem janela de console: é o que o início com o Windows chama (ADR-0008).
+shiro-tray = "shiro.tray_main:main"
 
 [project.urls]
 Repository = "https://github.com/VitorAngN/Shiro-Agente"
@@ -139,6 +145,8 @@ omit = [
     "src/shiro/voice/windows/*",
     "src/shiro/voice/devices.py",
     "src/shiro/voice/kokoro_worker.py",
+    "src/shiro/autostart.py",
+    "src/shiro/interfaces/dialogs.py",
 ]
 
 [tool.coverage.report]

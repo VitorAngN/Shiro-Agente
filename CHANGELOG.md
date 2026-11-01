@@ -5,6 +5,20 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (Fase 2 · sempre ligado)
+- Bandeja do Windows (`shiro tray` / `shiro-tray` sem console):
+  - ícone por estado na paleta da SHIRO;
+  - menu para falar, parar, "Ei, Shiro", liberar a GPU, iniciar com o Windows, registros e sair;
+  - lembretes e resumo do dia como notificação (ADR-0016).
+- "Ei, Shiro":
+  - motor `whisper`: VAD e um Whisper rápido conferem o nome, sem treino; entende "Ei Shiro, abre o Spotify" de uma vez;
+  - motor `openwakeword`: em ONNX puro, com modelos fixados por SHA-256 e guia de treino.
+- Janela de continuação: depois de responder, ela ouve por mais 5 s sem precisar chamar de novo.
+- Instância única (mutex `Local\SHIRO-Agente`) para voz e bandeja.
+- `shiro autostart on|off|status`: tarefa no Agendador (logon + 30 s, sem admin, reinício em falha), com reserva na chave `Run`.
+- Confirmação física na bandeja por janela "Sim/Não" (padrão "Não").
+- `shiro voice bench --wake`: mede a palavra de ativação sem tocar áudio.
+
 ### Adicionado (marco 1b · voz)
 - `shiro voice`: conversa por voz com atalho global (`ctrl+alt+space`) ou Enter, atalho de parar (`ctrl+alt+shift+s`) e texto digitado no mesmo terminal (ADR-0015).
 - Detecção de fala com o Silero VAD v6 do faster-whisper, quadro a quadro, com histerese e pré-escuta. Um segundo toque no atalho encerra a frase.

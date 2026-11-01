@@ -49,6 +49,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-warmup", action="store_true", help="não pré-carrega o modelo local ao iniciar"
     )
     add_voice_parser(commands)
+
+    commands.add_parser(
+        "tray", help="a SHIRO na bandeja, com console (o modo sem console é shiro-tray)"
+    )
+    start = commands.add_parser("autostart", help="iniciar com o Windows (na bandeja)")
+    start.add_argument("action", choices=("on", "off", "status"))
     return parser
 
 
@@ -149,6 +155,27 @@ def _secrets(args: argparse.Namespace, prompt: Callable[[str], str] | None = Non
     return 0
 
 
+def _autostart(action: str) -> int:
+    from shiro import autostart
+
+    try:
+        if action == "on":
+            how = autostart.enable()
+            detail = "Agendador de Tarefas" if how == "tarefa" else "registro do usuário (Run)"
+            print(f"✓ a SHIRO vai iniciar na bandeja depois do logon ({detail})")
+        elif action == "off":
+            removed = autostart.disable()
+            print("✓ início automático desligado" if removed else "já estava desligado")
+        else:
+            how = autostart.status()
+            print(f"início com o Windows: {how or 'desligado'}")
+            print(f"comando: {autostart.launcher().command_line}")
+    except autostart.AutostartError as exc:
+        print(f"✗ {exc}")
+        return 1
+    return 0
+
+
 def _config_check(file: Path | None) -> int:
     try:
         settings = load_settings(file)
@@ -180,6 +207,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.config_command == "path":
             return _config_path()
         return _config_check(args.file)
+    if args.command == "autostart":
+        return _autostart(args.action)
+    if args.command == "tray":
+        from shiro.tray_main import main as tray_main
+
+        return tray_main()
     if args.command in ("chat", "voice"):
         try:
             settings = load_settings()

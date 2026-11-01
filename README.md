@@ -78,6 +78,16 @@ uv run shiro voice -v        # conversa por voz: Ctrl+Alt+Espaço fala, Ctrl+Alt
 uv run shiro voice bench     # mede voz e transcrição sem tocar áudio
 ```
 
+Sempre ligado (Fase 2):
+
+```powershell
+uv run shiro tray            # a SHIRO na bandeja (com console, para acompanhar)
+uv run shiro autostart on    # inicia sozinha na bandeja depois do logon (shiro-tray, sem console)
+uv run shiro autostart off
+```
+
+"Ei, Shiro" fica desligado por padrão. Ligue pelo menu da bandeja ou com `voice.activation = "both"` no `shiro.toml` ([ADR-0016](docs/adr/0016-sempre-ligado.md)).
+
 Exemplo de sessão:
 
 ```text

@@ -83,12 +83,14 @@ A fase é entregue em três marcos, cada um testável sozinho:
 
 | Entrega | Detalhe |
 |---|---|
-| Wake word | Modelo "Ei, Shiro" treinado e avaliado |
-| Bandeja | Ícone com estados, menu (pausar, modo somente leitura, sair) |
-| Conversa | Janela de continuação e barge-in |
-| Sistema | Início no logon, instância única, supervisor com reinício automático |
-| Desempenho | Modo Desempenho (RF-26) |
-| Atividades | Resumo do dia ao iniciar o PC (RF-39) |
+| Wake word | ✅ "Ei, Shiro" pelo motor Whisper, sem treino; openWakeWord em ONNX para modelo treinado ([guia](guias/treinar-ei-shiro.md)) |
+| Bandeja | ✅ Ícone com estados, menu (falar, parar, "Ei, Shiro", liberar GPU, iniciar com o Windows, registros, sair), notificações |
+| Conversa | ✅ Janela de continuação e barge-in (o atalho interrompe a fala) |
+| Sistema | ✅ Início no logon (Agendador, reserva no registro), instância única, reinício da escuta se o microfone cair |
+| Desempenho | ✅ Primeira versão: liberar a GPU pela bandeja (RF-26) |
+| Atividades | ✅ Resumo do dia numa notificação ao iniciar (RF-39) |
+
+Decisões no [ADR-0016](adr/0016-sempre-ligado.md).
 
 **Pronto quando:** uma semana de uso real dentro das metas do RNF-04 e sem travamentos que exijam reiniciar o processo.
 

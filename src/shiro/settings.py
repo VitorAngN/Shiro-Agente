@@ -145,10 +145,18 @@ class ListenSettings(_Section):
 
 
 class WakeWordSettings(_Section):
-    engine: Literal["openwakeword"] = "openwakeword"
-    model_path: str = ""
+    """ "Ei, Shiro" (ADR-0016). Só escuta o tempo todo com ``voice.activation`` = wake_word/both."""
+
+    # "whisper": confere com o Whisper se a frase começa com o nome; funciona sem treino.
+    # "openwakeword": detector leve; precisa de um modelo treinado (ou um embutido).
+    engine: Literal["whisper", "openwakeword"] = "whisper"
+    phrases: tuple[str, ...] = ("ei shiro", "oi shiro", "ok shiro", "hey shiro", "shiro")
+    check_model: str = "base"  # Whisper rápido só para conferir o nome
+    max_phrase_s: float = Field(default=8.0, ge=1, le=20)
+    model: str = "hey_jarvis"  # openwakeword: nome embutido ou caminho de um .onnx próprio
+    model_path: str = ""  # compatibilidade: caminho de um .onnx próprio
     threshold: float = Field(default=0.5, gt=0, lt=1)
-    follow_up_window_s: float = Field(default=5.0, ge=0)
+    follow_up_window_s: float = Field(default=5.0, ge=0)  # segue ouvindo depois da resposta
 
 
 class VoiceSettings(_Section):

@@ -73,6 +73,16 @@ class OllamaProvider:
     async def warm_up(self, request: CompletionRequest) -> None:
         await self._chat(request, {**self._options, "num_predict": 1})
 
+    async def release(self) -> None:
+        """Tira o modelo da GPU agora (Modo Desempenho, RF-26); volta no próximo pedido."""
+        try:
+            await self._client.generate(  # pyright: ignore[reportUnknownMemberType]
+                model=self._model, prompt="", keep_alive=0
+            )
+        except _ERRORS as exc:
+            msg = f"Ollama ({self._host}): {exc}"
+            raise LLMError(msg) from exc
+
     async def _chat(self, request: CompletionRequest, options: Mapping[str, Any]) -> ChatResponse:
         try:
             response = await self._client.chat(  # pyright: ignore[reportUnknownMemberType]

@@ -69,11 +69,13 @@ speed = 1.0                # <1 fala mais devagar
 kokoro_model = "int8"      # int8 (88 MB) | fp16 | fp32 (310 MB)
 sapi_voice = "Maria"
 
-[voice.wake_word]          # Fase 2
-engine = "openwakeword"
-model_path = ""
+[voice.wake_word]          # "Ei, Shiro" (Fase 2, ADR-0016): vale com activation = "wake_word" ou "both"
+engine = "whisper"         # whisper: confere o nome com o Whisper, sem treino | openwakeword: leve, precisa de modelo
+phrases = ["ei shiro", "oi shiro", "ok shiro", "hey shiro", "shiro"]
+check_model = "base"       # Whisper rápido usado só para conferir o nome
+model = "hey_jarvis"       # openwakeword: modelo embutido ou caminho de um .onnx treinado ("Ei, Shiro")
 threshold = 0.5
-follow_up_window_s = 5
+follow_up_window_s = 5     # depois de responder, continua ouvindo por alguns segundos
 
 [policy]
 read_only_mode = true      # primeiras semanas: tudo R1+ pede confirmação por voz

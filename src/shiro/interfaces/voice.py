@@ -18,7 +18,7 @@ import asyncio
 import contextlib
 import sys
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import TextIO
 
@@ -37,7 +37,7 @@ _STOP = {"p", "parar", "para", "stop"}
 
 @dataclass(frozen=True)
 class Trigger:
-    kind: str  # "talk" | "stop" | "quit" | "text"
+    kind: str  # "talk" | "stop" | "quit" | "text" (digitado) | "voice" (falado com "Ei, Shiro")
     text: str = ""
 
 
@@ -84,6 +84,14 @@ class TriggerSource:
     async def next(self) -> Trigger:
         return await self._queue.get()
 
+    def wake(self) -> None:
+        """Palavra de ativação ouvida: começar a ouvir o pedido (``WakeEvents``)."""
+        self.put(Trigger("talk"))
+
+    def command(self, text: str) -> None:
+        """Palavra de ativação com o pedido junto (``WakeEvents``)."""
+        self.put(Trigger("voice", text))
+
     async def aclose(self) -> None:
         for task in self._tasks:
             task.cancel()
@@ -116,7 +124,15 @@ class VoiceSession:
         verbose: bool = False,
         theme: Theme | None = None,
         out: TextIO | None = None,
+        follow_up_s: float = 0.0,
+        on_phase: Callable[[Phase], None] | None = None,
     ) -> None:
+        """``follow_up_s``: depois de responder, continua ouvindo por esse tempo sem
+        precisar do atalho ("janela de continuação"); 0 desliga.
+        ``on_phase``: avisado a cada mudança de fase (ícone da bandeja)."""
+        self._on_phase = on_phase
+        self._phase = Phase.IDLE
+        self._follow_up_s = follow_up_s
         self._run_turn = run_turn
         self._stt = stt
         self._tts = tts
@@ -130,11 +146,25 @@ class VoiceSession:
         self._verbose = verbose
         self.theme = theme or Theme(color=False)
         self._out = out or sys.stdout
-        self.phase = Phase.IDLE
         self._control: ListenControl | None = None
         self._muted = False
         self._current: asyncio.Task[None] | None = None
         self._notices: list[str] = []
+
+    @property
+    def phase(self) -> Phase:
+        return self._phase
+
+    @phase.setter
+    def phase(self, value: Phase) -> None:
+        if value is not self._phase:
+            self._phase = value
+            if self._on_phase is not None:
+                self._on_phase(value)
+
+    @property
+    def idle(self) -> bool:
+        return self._phase is Phase.IDLE and (self._current is None or self._current.done())
 
     # ------------------------------------------------------------------ laço
 
@@ -151,6 +181,8 @@ class VoiceSession:
                 await self._on_talk()
             elif trigger.kind == "text":
                 await self._start(self.interaction(trigger.text))
+            elif trigger.kind == "voice":
+                await self._start(self.interaction(trigger.text, spoken=True))
 
     async def _on_talk(self) -> None:
         if self.phase is Phase.LISTENING and self._control is not None:
@@ -193,29 +225,44 @@ class VoiceSession:
 
     # ------------------------------------------------------------------ interação
 
-    async def interaction(self, typed: str | None = None) -> None:
+    async def interaction(self, typed: str | None = None, *, spoken: bool = False) -> None:
+        """Um pedido completo. ``typed``: texto já pronto (digitado, ou falado com "Ei, Shiro")."""
         text = typed if typed is not None else await self.listen()
-        if not text:
-            return
-        if typed is None:
-            self.print(f"{self.theme.user_prompt()}{text}")
-        self.phase = Phase.THINKING
-        result = await self._run_turn(text)
-        self.print(self.theme.assistant(self._name, result.text))
-        if self._verbose:
-            self.print(self.theme.meta(describe_result(result)))
-        await self.say(result.text)
+        rounds = 0
+        while text:
+            if typed is None or spoken:
+                self.print(f"{self.theme.user_prompt()}{text}")
+            if spoken and rounds == 0:
+                await self._player.play(self._cues.done)  # "entendi", antes de pensar
+            self.phase = Phase.THINKING
+            result = await self._run_turn(text)
+            self.print(self.theme.assistant(self._name, result.text))
+            if self._verbose:
+                self.print(self.theme.meta(describe_result(result)))
+            finished = await self.say(result.text)
+            rounds += 1
+            if not finished or self._follow_up_s <= 0 or rounds >= 5:
+                return
+            # Janela de continuação: ouve mais um pedido sem precisar chamar de novo.
+            text = await self.listen(start_timeout_s=self._follow_up_s, quiet=True)
+            typed, spoken = None, False
 
-    async def listen(self) -> str | None:
-        """Bipe, escuta uma frase e transcreve. ``None`` se não houve fala útil."""
+    async def listen(
+        self, *, start_timeout_s: float | None = None, quiet: bool = False
+    ) -> str | None:
+        """Bipe, escuta uma frase e transcreve. ``None`` se não houve fala útil.
+
+        ``quiet``: sem bipe de erro quando ninguém fala (janela de continuação).
+        """
         self._muted = False
         self.phase = Phase.LISTENING
         self._control = ListenControl()
+        config = self._listen
+        if start_timeout_s is not None:
+            config = replace(config, start_timeout_s=start_timeout_s)
         try:
             await self._player.play(self._cues.listening)
-            audio = await record_utterance(
-                self._microphone, self._detector, self._listen, self._control
-            )
+            audio = await record_utterance(self._microphone, self._detector, config, self._control)
             cancelled = self._control.cancel.is_set()
         finally:
             self._control = None
@@ -223,8 +270,9 @@ class VoiceSession:
         if cancelled:
             return None
         if audio is None:
-            self.print(self.theme.meta("(não ouvi nada)"))
-            await self._player.play(self._cues.error)
+            if not quiet:
+                self.print(self.theme.meta("(não ouvi nada)"))
+                await self._player.play(self._cues.error)
             return None
         await self._player.play(self._cues.done)
         transcript = await self._stt.transcribe(audio)
@@ -268,7 +316,7 @@ class VoiceSession:
         line = self.theme.paint(f"aviso ▸ {message}", (255, 210, 63), bold=True)
         self.print(f"\n{line}")
         self._notices.append(message)
-        if self.phase is Phase.IDLE and (self._current is None or self._current.done()):
+        if self.idle:
             self._current = asyncio.create_task(self._flush_notices())
 
     async def _flush_notices(self) -> None:

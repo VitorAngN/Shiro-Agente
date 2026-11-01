@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 
 from shiro import __version__, paths
 from shiro.settings import Settings
+from shiro.voice_app import endpoint_for, print_progress, tts_for, whisper_for
 
 
 def add_voice_parser(commands: Any) -> None:
@@ -41,6 +42,9 @@ def add_voice_parser(commands: Any) -> None:
     bench.add_argument("--engine", nargs="*", choices=("kokoro", "sapi"), help="motores de voz")
     bench.add_argument("--stt", nargs="*", help="modelos do Whisper (ex.: base small)")
     bench.add_argument("--out", type=Path, help="salva o relatório em JSON")
+    bench.add_argument(
+        "--wake", action="store_true", help='mede a palavra de ativação ("Ei, Shiro")'
+    )
 
 
 def run_voice(settings: Settings, args: argparse.Namespace) -> int:
@@ -63,68 +67,11 @@ def run_voice(settings: Settings, args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------- utilidades
 
 
-def _tts(settings: Settings, engine: str | None = None) -> Any:
-    from shiro.voice.tts import build_tts
-
-    tts_settings = settings.voice.tts
-    if engine is not None:
-        tts_settings = tts_settings.model_copy(update={"engine": engine})
-    return build_tts(tts_settings, paths.data_dir())
-
-
-def _app_labels(settings: Settings) -> list[str]:
-    return [entry.label for entry in settings.policy.allowed_apps.values()]
-
-
-_last_step: dict[str, int] = {}
-
-
-def _progress(name: str, done: int, total: int | None) -> None:
-    if not sys.stdout.isatty():  # redirecionado: uma linha a cada 25%, sem "\r"
-        if total and (step := 100 * done // total // 25) != _last_step.get(name):
-            _last_step[name] = step
-            print(f"  {name}: {25 * step}%", flush=True)
-        return
-    share = f"{100 * done / total:5.1f}%" if total else f"{done / 2**20:.0f} MB"
-    print(f"\r  {name}: {share}", end="", flush=True)
-
-
-async def _ready_stt(settings: Settings, model: str | None = None) -> Any:
-    """Whisper com o modelo baixado (pelo próprio SHIRO, com verificação de hash)."""
-    import httpx
-
-    from shiro.voice.models import ensure_whisper, whisper_ready
-    from shiro.voice.stt import FasterWhisperSTT, vocabulary_prompt
-
-    stt_settings = settings.voice.stt
-    if model is not None:
-        stt_settings = stt_settings.model_copy(update={"model": model})
-    data_dir = paths.data_dir()
-    ready = whisper_ready(data_dir, stt_settings.model)
-    if not ready:
-        print(f"baixando o Whisper {stt_settings.model} (só na primeira vez)…")
-    timeout = httpx.Timeout(30.0, read=60.0)
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-        folder = await ensure_whisper(
-            client, data_dir, stt_settings.model, None if ready else _progress
-        )
-    if not ready:
-        print()
-    prompt = vocabulary_prompt(settings.general.assistant_name, _app_labels(settings))
-    return FasterWhisperSTT(stt_settings, source=str(folder), prompt=prompt)
-
-
-def _endpoint(settings: Settings) -> Any:
-    from shiro.voice.vad import EndpointConfig
-
-    listen = settings.voice.listen
-    return EndpointConfig(
-        threshold=listen.threshold,
-        start_timeout_s=listen.start_timeout_s,
-        end_silence_ms=listen.end_silence_ms,
-        max_utterance_s=listen.max_utterance_s,
-        pre_roll_ms=listen.pre_roll_ms,
-    )
+# Reexportados para os testes poderem trocar por dublês.
+_tts = tts_for
+_ready_stt = whisper_for
+_endpoint = endpoint_for
+_progress = print_progress
 
 
 def _seconds(value: float) -> str:
@@ -135,111 +82,50 @@ def _seconds(value: float) -> str:
 
 
 async def _session(settings: Settings, args: argparse.Namespace) -> int:
-    from shiro.app import build_app
-    from shiro.core.ports import LLMError
-    from shiro.interfaces.text import CliConfirmation, llm_down_message, use_safe_output
+    from shiro.interfaces.text import CliConfirmation, use_safe_output
     from shiro.interfaces.theme import Theme
-    from shiro.interfaces.voice import (
-        TriggerSource,
-        VoiceConfirmation,
-        VoiceNotifier,
-        VoiceSession,
-    )
     from shiro.observability.logging import configure_logging
-    from shiro.voice.audio import Cues
-    from shiro.voice.devices import AudioDeviceError, SoundDeviceMicrophone, SoundDevicePlayer
+    from shiro.singleton import AlreadyRunningError, single_instance
+    from shiro.voice.devices import AudioDeviceError
+    from shiro.voice.models import DownloadError
     from shiro.voice.tts import TTSError
-    from shiro.voice.vad import SileroVAD
+    from shiro.voice_app import build_voice_runtime
 
     use_safe_output()
     configure_logging(settings.logging, paths.log_dir(), console=False)
     theme = Theme.for_stream(sys.stdout)
-    voice = settings.voice
     try:
-        tts, tts_status = _tts(settings)
-    except TTSError as exc:
+        lock = single_instance()
+    except AlreadyRunningError as exc:
         print(theme.status(False, str(exc)))
         return 1
-    from shiro.voice.models import DownloadError
-
     try:
-        stt = await _ready_stt(settings)
-    except (DownloadError, OSError) as exc:
-        print(theme.status(False, f"modelo do Whisper: {exc}"))
+        runtime = await build_voice_runtime(
+            settings, keyboard=CliConfirmation(theme=theme), verbose=args.verbose, theme=theme
+        )
+    except (TTSError, DownloadError, AudioDeviceError, OSError) as exc:
+        print(theme.status(False, str(exc)))
+        lock.release()
         return 1
-    confirmation = VoiceConfirmation(keyboard=CliConfirmation(theme=theme))
-    notifier = VoiceNotifier()
-    app = await build_app(settings, confirmation=confirmation, notifier=notifier, channel="voice")
-    session = VoiceSession(
-        run_turn=app.agent.run_turn,
-        stt=stt,
-        tts=tts,
-        player=SoundDevicePlayer(voice.output_device),
-        microphone=SoundDeviceMicrophone(voice.input_device),
-        detector=SileroVAD(),
-        listen=_endpoint(settings),
-        cues=Cues.generate(voice.cue_volume),
-        name=settings.general.assistant_name,
-        volume=voice.tts.volume,
-        verbose=args.verbose,
-        theme=theme,
-    )
-    confirmation.attach(session)
-    notifier.attach(session)
-    triggers = TriggerSource()
-    hotkeys: Any = None
+    session = runtime.session
     try:
         session.print(theme.banner(__version__))
-        if not args.no_warmup:
-            try:
-                await app.agent.warm_up()
-                session.print(theme.status(True, f"{settings.llm.local.model} carregado"))
-            except LLMError as exc:
-                session.print(
-                    theme.status(False, llm_down_message(settings.llm.local.base_url, exc))
-                )
-        await stt.load()
-        session.print(theme.status(True, f"ouvido: {stt.name}"))
-        start = getattr(tts, "start", None)
-        if start is not None:
-            await start()
-        session.print(theme.status(True, tts_status))
-        talk_hint = "Enter"
-        if sys.platform == "win32":
-            from shiro.voice.hotkeys import HotkeyError
-            from shiro.voice.windows.hotkeys import WindowsHotkeys
-
-            try:
-                hotkeys = WindowsHotkeys(
-                    {"talk": voice.push_to_talk_hotkey, "stop": voice.stop_hotkey}
-                )
-                hotkeys.start()
-                triggers.add(hotkeys.next)
-                talk_hint = f"{voice.push_to_talk_hotkey} (ou Enter)"
-                session.print(
-                    theme.status(
-                        True,
-                        f"atalhos: falar {voice.push_to_talk_hotkey}, parar {voice.stop_hotkey}",
-                    )
-                )
-            except HotkeyError as exc:
-                session.print(theme.status(False, f"{exc}; use Enter para falar"))
-        app.start_background()
-        session.print("")
-        session.print(
-            theme.meta(f"{talk_hint}: falar · digitar: mandar texto · p: parar · sair: encerrar")
+        await runtime.start(
+            lambda ok, text: session.print(theme.status(ok, text)), warmup=not args.no_warmup
         )
-        triggers.add_terminal(input)
-        await session.run(triggers)
+        session.print("")
+        hint = f"{runtime.talk_hint} (ou Enter)" if runtime.talk_hint != "Enter" else "Enter"
+        session.print(
+            theme.meta(f"{hint}: falar · digitar: mandar texto · p: parar · sair: encerrar")
+        )
+        runtime.triggers.add_terminal(input)
+        await session.run(runtime.triggers)
     except (AudioDeviceError, TTSError) as exc:
         session.print(theme.status(False, str(exc)))
         return 1
     finally:
-        if hotkeys is not None:
-            hotkeys.stop()
-        await triggers.aclose()
-        await tts.aclose()
-        await app.aclose()
+        await runtime.aclose()
+        lock.release()
     return 0
 
 
@@ -514,8 +400,73 @@ async def _bench(settings: Settings, args: argparse.Namespace) -> int:
                 f" · erro de palavras {100 * wer:.0f}% · transcrição mediana {_seconds(latency)}"
             )
             report["stt"].append({"model": model, "engine": engine, "rows": rows})
+    if getattr(args, "wake", False) and clips:
+        report["wake"] = await _bench_wake(settings, next(iter(clips)))
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"\nrelatório salvo em {args.out}")
     return 0
+
+
+class _CollectedWake:
+    def __init__(self) -> None:
+        self.got: list[str] = []
+
+    def wake(self) -> None:
+        self.got.append("wake")
+
+    def command(self, text: str) -> None:
+        self.got.append(f"command:{text}")
+
+
+WAKE_PHRASES = (
+    ("Ei, Shiro.", "wake"),
+    ("Ei Shiro, abre o Spotify.", "command"),
+    ("Oi Shiro, que horas são?", "command"),
+    ("Eu falei com a Shiro ontem à noite.", None),
+    ("Tenho prova de física amanhã cedo.", None),
+    ("Ei, você viu meu fone?", None),
+)
+
+
+async def _bench_wake(settings: Settings, engine: str) -> list[dict[str, Any]]:
+    """Palavra de ativação com o Whisper rápido, sobre frases sintetizadas (sem tocar nada)."""
+    from shiro.voice.replay import ReplayMicrophone
+    from shiro.voice.vad import SileroVAD
+    from shiro.voice.wake import WakeListener
+
+    word = settings.voice.wake_word
+    tts, _ = _tts(settings, engine)
+    check = await _ready_stt(settings, word.check_model)
+    full = await _ready_stt(settings)
+    await check.load()
+    await full.load()
+    print(f"\npalavra de ativação ({check.name} confere, {full.name} transcreve):")
+    rows: list[dict[str, Any]] = []
+    try:
+        for phrase, expected in WAKE_PHRASES:
+            audio = await tts.synthesize(phrase)
+            events = _CollectedWake()
+            got = events.got
+            listener = WakeListener(
+                microphone=ReplayMicrophone([audio]), events=events, is_idle=lambda: True
+            )
+            started = time.perf_counter()
+            await listener.run_whisper(
+                vad=SileroVAD(),
+                check=check,
+                full=full,
+                phrases=word.phrases,
+                listen=_endpoint(settings),
+                max_phrase_s=word.max_phrase_s,
+            )
+            kind = got[0].split(":", 1)[0] if got else None
+            ok = kind == expected
+            rows.append({"phrase": phrase, "expected": expected, "got": got, "ok": ok})
+            mark = "✓" if ok else "✗"
+            took = _seconds(time.perf_counter() - started)
+            print(f"  {mark} {phrase:40} → {', '.join(got) or 'ignorada'} ({took})")
+    finally:
+        await tts.aclose()
+    return rows
