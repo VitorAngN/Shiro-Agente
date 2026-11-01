@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 
 from shiro.downloads import COMPLETE_MARK, Progress, ensure_hf_files
-from shiro.memory.embedding import E5Embedder, Embedder, HashingEmbedder
+from shiro.memory.embedding import Embedder, HashingEmbedder, OnnxEmbedder
 from shiro.settings import MemorySettings
 
 
@@ -25,10 +25,15 @@ def build_embedder(settings: MemorySettings, data_dir: Path) -> Embedder:
     if not embedding_ready(settings, data_dir):
         return HashingEmbedder()
     folder = embedding_dir(data_dir, settings.embedding_model)
-    return E5Embedder(
+    e5 = "e5" in settings.embedding_model.casefold()
+    return OnnxEmbedder(
         model=folder / settings.embedding_file,
         tokenizer=folder / "tokenizer.json",
         label=settings.embedding_model.rsplit("/", 1)[-1],
+        query_prefix="query: " if e5 else "",
+        passage_prefix="passage: " if e5 else "",
+        relevant_score=settings.min_score or (0.88 if e5 else 0.5),
+        match_score=0.9 if e5 else 0.6,
     )
 
 

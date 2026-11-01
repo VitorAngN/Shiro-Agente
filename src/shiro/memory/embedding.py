@@ -1,8 +1,8 @@
 """Vetores de texto para achar memórias por semelhança (RF-42).
 
-* ``E5Embedder``: multilingual-e5-small em ONNX (int8, ~113 MB, MIT), na CPU,
-  com o ``tokenizers`` que o faster-whisper já instala. Entende que "qual é o
-  meu time?" combina com "eu torço pro Coritiba".
+* ``OnnxEmbedder``: modelo de sentenças multilíngue em ONNX int8 (~113 MB), na
+  CPU, com o ``tokenizers`` que o faster-whisper já instala. Entende que "qual
+  é o meu time?" combina com "eu torço pro Coritiba".
 * ``HashingEmbedder``: reserva sem download, por palavras e radicais. Acha
   "café" em "gosto de café", mas não sinônimos.
 
@@ -83,13 +83,32 @@ class HashingEmbedder:
         return (vectors / np.where(norms == 0, 1, norms)).astype(np.float32)
 
 
-class E5Embedder:
-    """multilingual-e5-small: "query: " para perguntas, "passage: " para os fatos guardados."""
+class OnnxEmbedder:
+    """Modelo de sentenças em ONNX (tipo sentence-transformers), com média dos tokens.
 
-    def __init__(self, *, model: Path, tokenizer: Path, label: str, max_tokens: int = 128) -> None:
+    Modelos da família e5 pedem prefixos ("query: " na pergunta, "passage: " nos
+    fatos); os de paráfrase não usam prefixo.
+    """
+
+    def __init__(
+        self,
+        *,
+        model: Path,
+        tokenizer: Path,
+        label: str,
+        query_prefix: str = "",
+        passage_prefix: str = "",
+        relevant_score: float = 0.5,
+        match_score: float = 0.6,
+        max_tokens: int = 128,
+    ) -> None:
         self._model_path = model
         self._tokenizer_path = tokenizer
         self._label = label
+        self._query_prefix = query_prefix
+        self._passage_prefix = passage_prefix
+        self._relevant = relevant_score
+        self._match = match_score
         self._max_tokens = max_tokens
         self._session: Any = None
         self._tokenizer: Any = None
@@ -98,21 +117,21 @@ class E5Embedder:
 
     @property
     def name(self) -> str:
-        return f"e5:{self._label}"
+        return f"onnx:{self._label}"
 
     @property
     def relevant_score(self) -> float:
-        return 0.83
+        return self._relevant
 
     @property
     def match_score(self) -> float:
-        return 0.86
+        return self._match
 
     async def embed(self, texts: Sequence[str], *, query: bool) -> Vectors:
         async with self._lock:
             if self._session is None:
                 await asyncio.to_thread(self._load)
-        prefix = "query: " if query else "passage: "
+        prefix = self._query_prefix if query else self._passage_prefix
         return await asyncio.to_thread(self._run, [prefix + t for t in texts])
 
     def _load(self) -> None:
@@ -121,7 +140,9 @@ class E5Embedder:
 
         tokenizer: Any = Tokenizer.from_file(str(self._tokenizer_path))  # pyright: ignore[reportUnknownMemberType]
         tokenizer.enable_truncation(max_length=self._max_tokens)
-        tokenizer.enable_padding(pad_id=1, pad_token="<pad>")  # noqa: S106 - token de preenchimento, não senha
+        pad_id = tokenizer.token_to_id("<pad>")
+        pad_id = 0 if pad_id is None else pad_id
+        tokenizer.enable_padding(pad_id=pad_id, pad_token="<pad>")  # noqa: S106 - não é senha
         options: Any = onnxruntime.SessionOptions()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         options.intra_op_num_threads = 2
         options.log_severity_level = 4
