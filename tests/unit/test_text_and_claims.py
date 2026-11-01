@@ -49,6 +49,8 @@ def test_normalize_removes_accents_and_punctuation() -> None:
         "Vou marcar a prova como concluída.",
         "Acabei de anotar.",
         "Tô abrindo o Spotify.",
+        "Lembrei que seu notebook é um Acer Nitro.",  # casos reais da avaliação
+        "Tirarei a prova de física das pendentes.",
     ],
 )
 def test_detects_claimed_actions(text: str) -> None:

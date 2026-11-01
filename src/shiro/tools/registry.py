@@ -117,8 +117,14 @@ class ToolRegistry:
         )
         cached = self._by_groups.get(groups)
         if cached is None:
-            cached = tuple(
-                d for d in self.definitions() if self._tools[d.name].spec.group in groups
-            )
+            # Núcleo primeiro, grupos extras depois: o começo do pedido (persona + núcleo)
+            # fica igual em todos os turnos e o cache de prefixo do modelo local continua
+            # valendo; só as ferramentas extras e a fala são lidas de novo.
+            def order(definition: ToolDefinition) -> tuple[bool, str]:
+                group = self._tools[definition.name].spec.group
+                return (group != "core", group)
+
+            chosen = [d for d in self.definitions() if self._tools[d.name].spec.group in groups]
+            cached = tuple(sorted(chosen, key=order))
             self._by_groups[groups] = cached
         return cached

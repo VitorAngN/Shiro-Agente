@@ -379,6 +379,7 @@ def test_tools_are_selected_by_topic() -> None:
         return [d.name for d in registry.definitions_for(text, extra)]
 
     assert names("que horas são?") == ["get_time"]
+    assert names("quanto de memória ram eu tô usando?") == ["get_time"]
     assert names("lembra que eu gosto de café") == ["get_time", "remember_fact"]
     assert names("organiza meus downloads") == ["get_time", "list_files"]
     assert names("pesquisa na internet o resultado do jogo") == ["get_time", "web_search"]
@@ -430,3 +431,22 @@ def test_symlinks_out_of_the_folder_are_ignored(downloads: Path, tmp_path: Path)
     assert "atalho.txt" not in [p.name for p in folders.files(downloads)]
     with pytest.raises(FileAccessError):
         folders.check(downloads / "atalho.txt")
+
+
+def test_extra_groups_go_after_the_core_tools() -> None:
+    """O prefixo (persona + núcleo) não muda entre turnos: o cache de prefixo continua valendo."""
+    registry = ToolRegistry()
+    for name, group in (
+        ("aaa_list_files", "files"),
+        ("get_time", "core"),
+        ("open_app", "core"),
+        ("aaa_remember", "memory"),
+    ):
+        registry.register(FakeTool(name, group=group))
+    registry.gate("files", r"arquivo")
+    registry.gate("memory", r"lembr")
+    core = [d.name for d in registry.definitions_for("oi")]
+    both = [d.name for d in registry.definitions_for("lembra do arquivo")]
+    assert core == ["get_time", "open_app"]
+    assert both[: len(core)] == core
+    assert both[len(core) :] == ["aaa_list_files", "aaa_remember"]

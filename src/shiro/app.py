@@ -147,7 +147,11 @@ def build_registry(
 
 # Palavras que trazem cada grupo de ferramentas para o pedido (texto normalizado, ADR-0018).
 TOOL_GATES = {
-    "memory": r"\b(?:lembr\w*|esquec\w*|memori\w*|guard\w*|grav\w*|sabe (?:sobre|de) mim)",
+    # "memória RAM" é do sistema, não da SHIRO.
+    "memory": (
+        r"\b(?:lembr\w*|esquec\w*|memoria(?!\s+(?:ram|do pc|do computador|livre|usada))\w*"
+        r"|guard\w*|grav\w*|sabe (?:sobre|de) mim)"
+    ),
     "files": (
         r"\b(?:arquivo\w*|pasta\w*|download\w*|baix[ae]\w*|documento\w*|pdf|planilha\w*|foto\w*"
         r"|imagens?|organiz\w*|lixeira|renome\w*|mov[ea]\w*|apag\w*|restaur\w*|exclu\w*)"
