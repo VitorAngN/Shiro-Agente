@@ -7,6 +7,10 @@ aprovadas automaticamente. O banco fica numa pasta temporária.
 
     uv run python -m evals.run_agent              # modelo local
     uv run python -m evals.run_agent --cloud      # libera o Tier 2, se houver chave
+
+O relógio é fixo (quarta-feira, 10h) para os prazos darem sempre o mesmo
+resultado. Prazos são comparados pela data e hora que produzem depois de
+ancorados na fala (ADR-0014): "às 20h" e "às oito da noite" valem o mesmo.
 """
 
 from __future__ import annotations
@@ -15,15 +19,19 @@ import argparse
 import asyncio
 import json
 import statistics
+import sys
 import tempfile
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import httpx
 
 from evals.bench_ollama import args_match
+from shiro.activities import dates
 from shiro.app import App, Desktop, build_app
 from shiro.core.models import AgentResult, DecisionKind
 from shiro.settings import AppEntry, Settings, load_settings
@@ -31,6 +39,9 @@ from shiro.tools.builtin.media import MediaAction
 from shiro.tools.builtin.system import GB, Battery, GpuUsage, Usage
 
 DATASET = Path(__file__).parent / "datasets" / "comandos_ptbr.jsonl"
+# Quarta-feira, 4 de novembro de 2026, 10h, no fuso do shiro.toml.
+EVAL_NOW = (2026, 11, 4, 10, 0)
+DEADLINE_KEYS = {"due_text": "title", "when_text": "text"}
 
 EVAL_APPS = {
     "spotify": AppEntry(launch="spotify:", process="Spotify.exe", name="Spotify"),
@@ -82,6 +93,18 @@ class SimProbe:
         return GpuUsage(3100, 4096, 35)
 
 
+class FixedClock:
+    def __init__(self, now: datetime) -> None:
+        self._now = now
+
+    def now(self) -> datetime:
+        return self._now
+
+
+def eval_now(settings: Settings) -> datetime:
+    return datetime(*EVAL_NOW, tzinfo=ZoneInfo(settings.general.timezone))
+
+
 class AutoConfirm:
     async def ask(self, prompt: str, kind: DecisionKind) -> bool:
         return True
@@ -127,6 +150,7 @@ def eval_settings(base: Settings, *, cloud: bool) -> Settings:
 
 
 async def build_eval_app(settings: Settings, workdir: Path, **overrides: Any) -> App:
+    overrides.setdefault("clock", FixedClock(eval_now(settings)))
     return await build_app(
         settings,
         confirmation=AutoConfirm(),
@@ -139,8 +163,37 @@ async def build_eval_app(settings: Settings, workdir: Path, **overrides: Any) ->
     )
 
 
-def score(case: dict[str, Any], result: AgentResult) -> tuple[bool, bool]:
+def same_deadline(
+    expected: str, got: object, args: Mapping[str, Any], key: str, utterance: str, now: datetime
+) -> bool:
+    """Mesmo prazo efetivo: o que a ferramenta resolveria depois de ancorar na fala."""
+    title = str(args.get(DEADLINE_KEYS[key]) or "")
+    spoken = dates.ground(str(got) if got else None, utterance, now=now, exclude=title)
+    if dates.resolve(spoken, now=now).when is None:
+        return dates.resolve(expected, now=now).when is None and args_match(
+            {key: expected}, {key: spoken}
+        )
+    return dates.resolve(spoken, now=now).when == dates.resolve(expected, now=now).when
+
+
+def call_matches(
+    expected: Mapping[str, Any], got: Mapping[str, Any], utterance: str, now: datetime
+) -> bool:
+    plain = {k: v for k, v in expected.items() if k not in DEADLINE_KEYS}
+    if not args_match(plain, dict(got)):
+        return False
+    return all(
+        same_deadline(expected[key], got.get(key), got, key, utterance, now)
+        for key in DEADLINE_KEYS
+        if key in expected
+    )
+
+
+def score(
+    case: dict[str, Any], result: AgentResult, now: datetime | None = None
+) -> tuple[bool, bool]:
     """(ferramentas certas, ferramentas e argumentos certos)."""
+    now = now or datetime(*EVAL_NOW, tzinfo=ZoneInfo("America/Sao_Paulo"))
     got = [(c.call.name, c.call.arguments) for c in result.calls]
     expected: list[dict[str, Any]] = case["chamadas"]
     if not expected:
@@ -153,7 +206,13 @@ def score(case: dict[str, Any], result: AgentResult) -> tuple[bool, bool]:
     remaining = list(got)
     for call in expected:
         match = next(
-            (g for g in remaining if g[0] == call["tool"] and args_match(call["args"], g[1])), None
+            (
+                g
+                for g in remaining
+                if g[0] == call["tool"]
+                and call_matches(call["args"], g[1], case.get("fala", ""), now)
+            ),
+            None,
         )
         if match is None:
             return True, False
@@ -163,10 +222,11 @@ def score(case: dict[str, Any], result: AgentResult) -> tuple[bool, bool]:
 
 async def evaluate(app: App, cases: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    now = eval_now(app.settings)
     for case in cases:
         app.agent.reset()
         result = await app.agent.run_turn(case["fala"])
-        tools_ok, args_ok = score(case, result)
+        tools_ok, args_ok = score(case, result, now)
         rows.append(
             {
                 "id": case["id"],
@@ -250,6 +310,9 @@ async def main_async(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
+    # No Windows, saída redirecionada usa cp1252 e quebra com "✓".
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # pyright: ignore[reportAttributeAccessIssue]
     parser = argparse.ArgumentParser(description="Avaliação do agente completo da SHIRO.")
     parser.add_argument("--dataset", type=Path, default=DATASET)
     parser.add_argument("--cloud", action="store_true", help="libera o Tier 2 (nuvem)")

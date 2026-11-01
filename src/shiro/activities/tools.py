@@ -59,7 +59,7 @@ class ReminderArgs(_Args):
     )
 
 
-type Action = Callable[[Any], Awaitable[ToolResult]]
+type Action = Callable[[Any, ToolContext], Awaitable[ToolResult]]
 
 
 class ActivityTool:
@@ -92,30 +92,31 @@ class ActivityTool:
         return self._describe(args)
 
     async def run(self, args: BaseModel, ctx: ToolContext) -> ToolResult:
-        return await self._action(args)
+        return await self._action(args, ctx)
 
 
 def activity_tools(service: ActivityService) -> list[ActivityTool]:
-    async def create(a: CreateActivityArgs) -> ToolResult:
-        return await service.create(a.title, a.due_text, a.context)
+    # Prazos são ancorados na fala do usuário (ctx.utterance), ADR-0014.
+    async def create(a: CreateActivityArgs, ctx: ToolContext) -> ToolResult:
+        return await service.create(a.title, a.due_text, a.context, ctx.utterance)
 
-    async def list_(a: ListActivitiesArgs) -> ToolResult:
+    async def list_(a: ListActivitiesArgs, ctx: ToolContext) -> ToolResult:
         return await service.list(a.period)
 
-    async def complete(a: QueryArgs) -> ToolResult:
+    async def complete(a: QueryArgs, ctx: ToolContext) -> ToolResult:
         return await service.complete(a.query)
 
-    async def postpone(a: PostponeArgs) -> ToolResult:
-        return await service.postpone(a.query, a.due_text)
+    async def postpone(a: PostponeArgs, ctx: ToolContext) -> ToolResult:
+        return await service.postpone(a.query, a.due_text, ctx.utterance)
 
-    async def rename(a: RenameArgs) -> ToolResult:
+    async def rename(a: RenameArgs, ctx: ToolContext) -> ToolResult:
         return await service.rename(a.query, a.new_title)
 
-    async def delete(a: QueryArgs) -> ToolResult:
+    async def delete(a: QueryArgs, ctx: ToolContext) -> ToolResult:
         return await service.delete(a.query)
 
-    async def remind(a: ReminderArgs) -> ToolResult:
-        return await service.remind(a.text, a.when_text)
+    async def remind(a: ReminderArgs, ctx: ToolContext) -> ToolResult:
+        return await service.remind(a.text, a.when_text, ctx.utterance)
 
     return [
         ActivityTool(
@@ -164,8 +165,8 @@ def activity_tools(service: ActivityService) -> list[ActivityTool]:
         ActivityTool(
             name="delete_activity",
             description=(
-                "Exclui uma atividade. Só quando o usuário pedir para excluir ou apagar; se ele "
-                "terminou a atividade, use complete_activity."
+                "Exclui uma atividade sem concluir. Só quando o usuário pedir para excluir, apagar "
+                "ou cancelar; se ele fez, entregou ou deu conta, use complete_activity."
             ),
             args_model=QueryArgs,
             risk=RiskLevel.R2,

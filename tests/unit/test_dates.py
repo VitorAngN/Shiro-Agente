@@ -6,7 +6,7 @@ from datetime import datetime, time
 
 import pytest
 
-from shiro.activities.dates import describe, resolve
+from shiro.activities.dates import describe, ground, locate, resolve
 from tests.fakes import SAO_PAULO
 
 # Domingo, 1º de novembro de 2026, 4h da manhã.
@@ -68,6 +68,22 @@ def at(day: int, hour: int = 23, minute: int = 59, month: int = 11, year: int = 
         ("às 3h", SUNDAY, at(2, 3, 0)),  # já passou hoje: amanhã
         ("hoje às 20h", SUNDAY, at(1, 20, 0)),
         ("amanhã às 7 e meia", SUNDAY, at(2, 7, 30)),
+        # hora falada sem período: o próximo daquele número no relógio
+        ("às seis", WEDNESDAY, at(4, 18, 0)),
+        ("às 6", WEDNESDAY, at(4, 18, 0)),
+        ("hoje às seis", WEDNESDAY, at(4, 18, 0)),
+        ("às seis", SUNDAY, at(1, 6, 0)),  # 4h da manhã: ainda vem o das 6h
+        ("às 6h", WEDNESDAY, at(5, 6, 0)),  # escrito com "h": literal
+        ("amanhã às 8", WEDNESDAY, at(5, 8, 0)),  # outro dia: literal
+        # relativo a agora
+        ("daqui a 40 minutos", WEDNESDAY, at(4, 10, 40)),
+        ("em 2 horas", WEDNESDAY, at(4, 12, 0)),
+        ("daqui a meia hora", WEDNESDAY, at(4, 10, 30)),
+        ("daqui a uma hora e meia", WEDNESDAY, at(4, 11, 30)),
+        # partes do dia
+        ("amanhã de manhã", SUNDAY, at(2, 9, 0)),
+        ("sexta à tarde", SUNDAY, at(6, 14, 0)),
+        ("hoje à noite", SUNDAY, at(1, 20, 0)),
     ],
 )
 def test_resolves_spoken_deadlines(spoken: str, now: datetime, expected: datetime) -> None:
@@ -118,3 +134,49 @@ def test_describe_in_portuguese() -> None:
     assert describe(at(5, 9, 0, month=1, year=2027), SUNDAY) == (
         "terça-feira, 5 de janeiro de 2027, às 9h"
     )
+
+
+def test_duration_is_not_a_time() -> None:
+    assert not resolve("2 horas", now=SUNDAY).understood
+    assert resolve("às 2 horas", now=SUNDAY).when == at(1, 14, 0)
+
+
+@pytest.mark.parametrize(
+    ("utterance", "spans"),
+    [
+        ("tenho prova de cálculo amanhã às 8h", ["amanhã às 8h"]),
+        ("me lembra de tirar a roupa do varal daqui a pouco, às seis", ["às seis"]),
+        ("me lembra de tirar o bolo do forno daqui a 40 minutos", ["daqui a 40 minutos"]),
+        ("adia o trabalho de sexta pra segunda", ["de sexta", "pra segunda"]),
+        ("estudar 2 horas amanhã", ["amanhã"]),
+        ("estudar o dia todo", []),
+        ("comprar 5 pães", []),
+    ],
+)
+def test_locate_finds_time_expressions_in_a_sentence(utterance: str, spans: list[str]) -> None:
+    assert [s.text for s in locate(utterance, now=WEDNESDAY)] == spans
+
+
+@pytest.mark.parametrize(
+    ("spoken", "utterance", "exclude", "grounded"),
+    [
+        # cortou o dia: volta a expressão inteira
+        ("às 8h", "tenho prova de cálculo amanhã às 8h", "", "amanhã às 8h"),
+        # parafraseou: valem as palavras do usuário
+        ("às 8h", "me lembra de ligar pra ela às oito da noite", "", "às oito da noite"),
+        # omitiu o prazo: usa o único da frase, se não for parte do título
+        (None, "tenho prova de física dia 12 às 19h", "prova de física", "dia 12 às 19h"),
+        (None, "estudar pra prova de sexta", "estudar pra prova de sexta", None),
+        # duas expressões: fica a que contém o que o modelo disse
+        ("segunda", "adia o trabalho de sexta pra segunda", "", "pra segunda"),
+        # duas expressões e nenhuma bate: fica o do modelo
+        ("amanhã às 10h", "amanhã de manhã liga pro dentista às 10", "", "amanhã às 10h"),
+        # sem expressão na fala: nada a ancorar
+        ("sexta", "anota o trabalho", "", "sexta"),
+        ("sexta", "", "", "sexta"),
+    ],
+)
+def test_ground_prefers_the_users_words(
+    spoken: str | None, utterance: str, exclude: str, grounded: str | None
+) -> None:
+    assert ground(spoken, utterance, now=WEDNESDAY, exclude=exclude) == grounded

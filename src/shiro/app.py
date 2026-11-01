@@ -20,6 +20,7 @@ import httpx
 
 from shiro import paths
 from shiro.activities.models import Job, parse_offset
+from shiro.activities.rules import ActivityRules
 from shiro.activities.service import ActivityService
 from shiro.activities.tools import activity_tools
 from shiro.core.agent import AgentLimits, AgentLoop
@@ -27,7 +28,7 @@ from shiro.core.bus import EventBus
 from shiro.core.context import ContextBuilder
 from shiro.core.events import TurnFinished
 from shiro.core.models import Tier
-from shiro.core.ports import ConfirmationChannel, LLMProvider, Notifier
+from shiro.core.ports import Clock, ConfirmationChannel, LLMProvider, Notifier
 from shiro.core.router import IntentRouter
 from shiro.llm.gemini import GeminiProvider
 from shiro.llm.guard import CloudLimits, FallbackProvider, GuardedProvider
@@ -213,6 +214,7 @@ async def build_app(
     http: httpx.AsyncClient | None = None,
     probe: SystemProbe | None = None,
     notifier: Notifier | None = None,
+    clock: Clock | None = None,
 ) -> App:
     closers: list[Closer] = []
 
@@ -244,7 +246,7 @@ async def build_app(
         probe=probe or PsutilProbe(),
         locator=build_locator(settings, http, data_dir),
     )
-    clock = SystemClock(ZoneInfo(settings.general.timezone))
+    clock = clock or SystemClock(ZoneInfo(settings.general.timezone))
     activity_settings = settings.activities
     jobs = SqliteJobStore(database)
     activities = ActivityService(
@@ -268,7 +270,9 @@ async def build_app(
     agent_settings = settings.agent
     agent = AgentLoop(
         router=IntentRouter(
-            apps=app_aliases(settings), cloud_triggers=settings.router.cloud_triggers
+            apps=app_aliases(settings),
+            cloud_triggers=settings.router.cloud_triggers,
+            rules=(ActivityRules(clock.now),),
         ),
         providers=providers,
         tools=registry,

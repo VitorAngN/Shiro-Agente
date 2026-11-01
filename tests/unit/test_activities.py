@@ -229,11 +229,10 @@ async def test_status_survives_round_trip() -> None:
 
 
 async def test_full_agent_tier0_completes_and_lists(tmp_path: Path) -> None:
+    # O modelo corta o prazo ("sexta"); a ferramenta ancora na fala ("pra sexta às 10h").
     llm = FakeProvider(
         [
-            reply(
-                "", ("create_activity", {"title": "trabalho de cálculo", "due_text": "pra sexta"})
-            ),
+            reply("", ("create_activity", {"title": "trabalho de cálculo", "due_text": "sexta"})),
             reply("Anotado para sexta."),
         ]
     )
@@ -248,9 +247,20 @@ async def test_full_agent_tier0_completes_and_lists(tmp_path: Path) -> None:
         probe=FakeProbe(),
     )
     try:
-        created = await app.agent.run_turn("anota o trabalho de cálculo pra sexta")
+        created = await app.agent.run_turn(
+            "preciso entregar o trabalho de cálculo pra sexta às 10h"
+        )
         assert created.tier is Tier.T1
         assert created.calls[0].result.ok
+        assert "às 10h" in created.calls[0].result.content
+
+        noted = await app.agent.run_turn("tenho prova de física dia 12 às 19h")
+        assert noted.tier is Tier.T0
+        assert noted.calls[0].call.arguments == {
+            "title": "prova de física",
+            "due_text": "dia 12 às 19h",
+        }
+        assert noted.calls[0].result.ok
 
         listed = await app.agent.run_turn("quais são minhas atividades?")
         assert listed.tier is Tier.T0
@@ -259,7 +269,7 @@ async def test_full_agent_tier0_completes_and_lists(tmp_path: Path) -> None:
         done = await app.agent.run_turn("terminei o trabalho de cálculo")
         assert done.tier is Tier.T0
         assert done.text == "Concluída: trabalho de cálculo."
-        assert len(llm.requests) == 2  # só a criação passou pelo modelo
+        assert len(llm.requests) == 2  # só a primeira criação passou pelo modelo
     finally:
         await app.aclose()
 

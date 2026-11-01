@@ -7,8 +7,16 @@ converte em data e hora absolutas, com regras fixas e testadas por tabela:
 * dia da semana: próxima ocorrência futura; com "que vem" ou "próxima", a da
   semana seguinte (semanas começam na segunda);
 * "dia 12": este mês, ou o próximo se já passou;
+* hora falada sem período ("às seis") e sem dia: o próximo seis do relógio
+  (6h ou 18h), como uma pessoa entenderia; com "h" ("às 6h") vale o literal;
+* "daqui a 40 minutos", "em 2 horas": relativo a agora;
+* "de manhã", "à tarde", "à noite": 9h, 14h e 20h;
 * expressão vaga ou não reconhecida: devolve um problema para a SHIRO
   perguntar, em vez de chutar.
+
+``locate`` acha essas expressões dentro de uma frase inteira; ``ground`` usa isso
+para ancorar o prazo nas palavras do usuário, e não na paráfrase do modelo
+(ADR-0014).
 """
 
 from __future__ import annotations
@@ -17,6 +25,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from typing import NamedTuple
 
 from shiro.core.text import parse_number
 
@@ -70,7 +79,7 @@ MONTH_NAMES = (
 END_OF_DAY = time(23, 59)
 _FILLERS = re.compile(r"^(?:pra|para|pro|ate|no|na|nos|em|de|do|da|o|a|lá|la|por volta de)\s+")
 _PERIOD = r"(?:\s+(?P<period>da manha|da tarde|da noite|da madrugada))?"
-_NOT_DURATION = r"(?!\s+(?:dias?|semanas?|mes|meses)\b)"
+_NOT_DURATION = r"(?!\s+(?:dias?|semanas?|mes|meses|minutos?)\b)"
 _SPECIAL_TIME = re.compile(r"(?:\b(?:as|a|ao)\s+)?\b(?P<special>meio dia|meia noite)\b")
 _DIGIT_TIME = re.compile(
     r"(?:\b(?:as|a)\s+)?\b(?P<h>\d{1,2})" + _NOT_DURATION + r"(?:(?::|h)(?P<m>\d{2})|h|\s*horas?)?"
@@ -99,6 +108,18 @@ _NUMERIC_DATE = re.compile(r"^(?P<d>\d{1,2})/(?P<m>\d{1,2})(?:/(?P<y>\d{2}|\d{4}
 _RELATIVE = re.compile(
     r"^(?:(?:daqui a|daqui|em|dentro de)\s+)?(?P<n>[a-z0-9]+)\s+(?P<unit>dias?|semanas?)$"
 )
+_RELATIVE_TIME = re.compile(
+    r"^(?:daqui a|daqui|em|dentro de)\s+"
+    r"(?:(?P<half_hour>meia hora)"
+    r"|(?P<n>\d{1,3}|[a-z]+(?:\s+e\s+[a-z]+)?)\s+(?P<unit>minutos?|min|horas?)"
+    r"(?P<and_half>\s+e\s+meia)?)$"
+)
+_DAY_PERIOD = re.compile(
+    r"(?:\b(?:a|de|pela|na|no)\s+)?\b(?P<part>manha|tarde|noite)\b(?:\s+cedo)?"
+)
+DAY_PERIOD_TIMES = {"manha": time(9, 0), "tarde": time(14, 0), "noite": time(20, 0)}
+_TOKEN = re.compile(r"[0-9A-Za-zÀ-ÖØ-öø-ÿ/:]+")
+_NOT_UNDERSTOOD = "Não entendi"
 _NEXT_WEEK = re.compile(r"^(?:a\s+)?(?:semana que vem|proxima semana)$")
 _NEXT_MONTH = re.compile(r"^(?:o\s+)?(?:mes que vem|proximo mes)$")
 
@@ -112,6 +133,21 @@ class Resolution:
     @property
     def ok(self) -> bool:
         return self.problem is None
+
+    @property
+    def understood(self) -> bool:
+        """É uma expressão de tempo, mesmo que com problema ("já passou")."""
+        return self.when is not None or (
+            self.problem is not None and not self.problem.startswith(_NOT_UNDERSTOOD)
+        )
+
+
+class _TimeHit(NamedTuple):
+    found: time | None
+    rest: str
+    problem: str | None = None
+    ambiguous: bool = False
+    """Hora de 1 a 11 falada sem período nem "h": pode ser manhã ou tarde/noite."""
 
 
 def _clean(text: str) -> str:
@@ -136,22 +172,23 @@ def _apply_period(hour: int, period: str | None) -> int:
     return hour
 
 
-def _extract_time(text: str) -> tuple[time | None, str, str | None]:
-    """(horário, texto sem o horário, problema)."""
+def _extract_time(text: str) -> _TimeHit:
     if match := _SPECIAL_TIME.search(text):
         found = time(12, 0) if match["special"] == "meio dia" else END_OF_DAY
-        return found, (text[: match.start()] + text[match.end() :]).strip(), None
+        return _TimeHit(found, (text[: match.start()] + text[match.end() :]).strip())
     for pattern in (_DIGIT_TIME, _WORD_TIME, _BARE_WORD_TIME):
         for match in pattern.finditer(text):
             groups = match.groupdict()
+            explicit = False  # "6h", "6:30": horário escrito, vale o literal
             if pattern is _DIGIT_TIME:
                 # "dia 12" ou "12/11" não são horário; exige um marcador de hora.
+                suffix = match.group(0)[match.end("h") - match.start() :]
+                explicit = groups["m"] is not None or bool(re.match(r"h\b", suffix))
+                # "2 horas" sozinho é duração ("estudar 2 horas"); "às 2 horas" é horário.
                 marked = (
-                    groups["m"] is not None
-                    or "h" in match.group(0)[len(groups["h"]) :]
+                    explicit
                     or match.group(0).startswith(("as ", "a "))
                     or groups["period"] is not None
-                    or "hora" in match.group(0)
                 )
                 if not marked or re.search(r"\bdia\s+$", text[: match.start()]):
                     continue
@@ -163,12 +200,17 @@ def _extract_time(text: str) -> tuple[time | None, str, str | None]:
             minute = int(groups.get("m") or 0) if pattern is _DIGIT_TIME else 0
             if groups.get("half"):
                 minute = 30
-            hour = _apply_period(hour, groups.get("period"))
-            if not (0 <= hour <= 23 and 0 <= minute <= 59):
-                return None, text, "Esse horário não existe."
+            period = groups.get("period")
+            ambiguous = 1 <= hour <= 11 and period is None and not explicit
+            hour = _apply_period(hour, period)
             rest = (text[: match.start()] + text[match.end() :]).strip()
-            return time(hour, minute), rest, None
-    return None, text, None
+            if not (0 <= hour <= 23 and 0 <= minute <= 59):
+                return _TimeHit(None, rest, "Esse horário não existe.")
+            return _TimeHit(time(hour, minute), rest, ambiguous=ambiguous)
+    if match := _DAY_PERIOD.search(text):
+        rest = (text[: match.start()] + text[match.end() :]).strip()
+        return _TimeHit(DAY_PERIOD_TIMES[match["part"]], rest)
+    return _TimeHit(None, text)
 
 
 def _add_months(day: date, months: int) -> date:
@@ -226,7 +268,7 @@ def _resolve_date(text: str, today: date, base: datetime | None) -> date | str |
         day_number = parse_number(match["day"])
         explicit = match["dia"] or match["month"] or match["next"]
         if day_number is None or not explicit or not 1 <= day_number <= 31:
-            return None if not explicit else "Não entendi o dia."
+            return None if not explicit else f"{_NOT_UNDERSTOOD} o dia."
         if match["month"]:
             month = MONTHS[match["month"]]
             for year in (today.year, today.year + 1):
@@ -236,7 +278,7 @@ def _resolve_date(text: str, today: date, base: datetime | None) -> date | str |
                     return f"{MONTH_NAMES[month - 1].capitalize()} não tem dia {day_number}."
                 if found >= today:
                     return found
-            return f"Não entendi o dia {day_number}."
+            return f"{_NOT_UNDERSTOOD} o dia {day_number}."
         start = 1 if match["next"] else 0
         for offset in range(start, start + 3):
             first = _add_months(today.replace(day=1), offset)
@@ -248,6 +290,30 @@ def _resolve_date(text: str, today: date, base: datetime | None) -> date | str |
                 return found
         return f"Não existe dia {day_number} nos próximos meses."
     return None
+
+
+def _strip_leading(text: str, words: tuple[str, ...]) -> str:
+    head, _, tail = text.partition(" ")
+    return tail if head in words and tail else text
+
+
+def _relative_time(text: str, now: datetime) -> Resolution | None:
+    """ "daqui a 40 minutos", "em 2 horas", "daqui a meia hora"."""
+    match = _RELATIVE_TIME.match(text)
+    if match is None:
+        return None
+    if match["half_hour"]:
+        delta = timedelta(minutes=30)
+    else:
+        amount = parse_number(match["n"]) if not match["n"].isdigit() else int(match["n"])
+        if amount is None or amount <= 0:
+            return None
+        hours = match["unit"].startswith("hora")
+        delta = timedelta(hours=amount) if hours else timedelta(minutes=amount)
+        if match["and_half"] and hours:
+            delta += timedelta(minutes=30)
+    when = (now + delta).replace(second=0, microsecond=0)
+    return Resolution(when=when, has_time=True)
 
 
 def resolve(
@@ -265,14 +331,19 @@ def resolve(
         default_time: horário usado quando só o dia é informado.
         base: prazo atual, para expressões relativas ao adiar ("semana que vem").
     """
-    cleaned = _strip_fillers(_clean(text or ""))
+    raw = _clean(text or "")
+    if relative := _relative_time(_strip_leading(raw, ("pra", "para", "so")), now):
+        return relative
+    cleaned = _strip_fillers(raw)
     if not cleaned:
         return Resolution(when=None)
-    found_time, rest, problem = _extract_time(cleaned)
-    if problem:
-        return Resolution(when=None, problem=problem)
+    found_time, rest, problem, ambiguous = _extract_time(cleaned)
     rest = _strip_fillers(rest)
     today = now.date()
+    if problem:
+        if rest and _resolve_date(rest, today, base) is None:
+            problem = f'{_NOT_UNDERSTOOD} o prazo "{(text or "").strip()}".'
+        return Resolution(when=None, problem=problem)
     found_date = _resolve_date(rest, today, base)
     if isinstance(found_date, str):
         return Resolution(when=None, problem=found_date)
@@ -281,19 +352,23 @@ def resolve(
             return Resolution(
                 when=None,
                 problem=(
-                    f'Não entendi o prazo "{(text or "").strip()}". '
+                    f'{_NOT_UNDERSTOOD} o prazo "{(text or "").strip()}". '
                     'Pode dizer o dia, por exemplo "sexta" ou "dia 12"?'
                 ),
             )
         if found_time is None:
             return Resolution(when=None)
         when = datetime.combine(today, found_time, tzinfo=now.tzinfo)
+        if when <= now and ambiguous:
+            when += timedelta(hours=12)
         if when <= now:
-            when += timedelta(days=1)
+            when = datetime.combine(today + timedelta(days=1), found_time, tzinfo=now.tzinfo)
         return Resolution(when=when, has_time=True)
     # Ao adiar sem dizer horário, mantém o horário do prazo atual.
     fallback = base.astimezone(now.tzinfo).time() if base is not None else default_time
     when = datetime.combine(found_date, found_time or fallback, tzinfo=now.tzinfo)
+    if when <= now and ambiguous and found_date == today:
+        when += timedelta(hours=12)  # "hoje às seis", já de tarde: 18h
     if when <= now:
         if _WEEKDAY.match(rest) and found_date == today:
             return Resolution(when=when + timedelta(days=7), has_time=found_time is not None)
@@ -315,3 +390,90 @@ def describe(when: datetime, now: datetime) -> str:
         if day.year != today.year:
             prefix += f" de {day.year}"
     return f"{prefix}, às {hour}"
+
+
+@dataclass(frozen=True)
+class Span:
+    """Expressão de tempo dentro de uma frase, em posições de palavra."""
+
+    start: int
+    end: int
+    text: str
+    """As palavras como o usuário falou ("amanhã às 8h")."""
+    plain: str
+    """Normalizada, sem acentos ("amanha as 8h")."""
+
+
+def words(text: str) -> list[tuple[str, str]]:
+    """Palavras da frase: (como foi escrita, normalizada)."""
+    return [(token, _clean(token)) for token in _TOKEN.findall(text) if _clean(token)]
+
+
+def locate(
+    text: str, *, now: datetime, base: datetime | None = None, max_words: int = 8
+) -> list[Span]:
+    """Expressões de tempo da frase, as maiores possíveis, em ordem."""
+    tokens = words(text)
+    plain = [p for _, p in tokens]
+    found: list[tuple[int, int]] = []
+    for start in range(len(plain)):
+        for end in range(start + 1, min(len(plain), start + max_words) + 1):
+            if resolve(" ".join(plain[start:end]), now=now, base=base).understood:
+                found.append((start, end))
+    maximal = [
+        (s, e)
+        for s, e in found
+        if not any(a <= s and e <= b and (a, b) != (s, e) for a, b in found)
+    ]
+    return [
+        Span(
+            start=s,
+            end=e,
+            text=" ".join(t for t, _ in tokens[s:e]),
+            plain=" ".join(plain[s:e]),
+        )
+        for s, e in maximal
+    ]
+
+
+def _contains(haystack: str, needle: str) -> bool:
+    return bool(needle) and f" {needle} " in f" {haystack} "
+
+
+def ground(
+    spoken: str | None,
+    utterance: str,
+    *,
+    now: datetime,
+    base: datetime | None = None,
+    exclude: str = "",
+) -> str | None:
+    """Prazo ancorado no que o usuário disse, não na paráfrase do modelo (ADR-0014).
+
+    * o modelo copiou só um pedaço ("às 8h" de "amanhã às 8h"): usa a expressão inteira;
+    * o modelo parafraseou ("às 20h" para "às oito da noite") e a frase só tem uma
+      expressão de tempo: usa a do usuário;
+    * o modelo omitiu o prazo e a frase tem exatamente um, fora do título
+      (``exclude``): usa esse;
+    * em qualquer dúvida, fica com o que o modelo mandou.
+    """
+    if not utterance.strip():
+        return spoken
+    spans = locate(utterance, now=now, base=base)
+    if not spans:
+        return spoken
+    target = _clean(spoken or "")
+    if not target:
+        title = _clean(exclude)
+        outside = [s for s in spans if not _contains(title, s.plain)]
+        return outside[0].text if len(spans) == 1 and outside else spoken
+    for span in spans:
+        if _contains(span.plain, target):
+            return span.text
+    if len(spans) == 1:
+        return spans[0].text
+    wanted = resolve(spoken, now=now, base=base).when
+    for span in spans:
+        if wanted is not None and resolve(span.plain, now=now, base=base).when == wanted:
+            return span.text
+    return spoken

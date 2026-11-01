@@ -64,6 +64,8 @@ class ToolContext(BaseModel):
 
     trace_id: str
     now: datetime
+    utterance: str = ""
+    """O pedido do usuário neste turno, para ancorar argumentos (ADR-0014)."""
 
 
 class Tool(Protocol):

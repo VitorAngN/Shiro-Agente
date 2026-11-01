@@ -49,6 +49,30 @@ def test_score_rules() -> None:
     assert score(math, result_with(text="É 50.")) == (False, False)
 
 
+def test_deadlines_score_by_the_moment_they_mean() -> None:
+    """ "às 20h" e "às oito da noite" são o mesmo prazo; "às 8h" não é."""
+    case = {
+        "fala": "me lembra de ligar pra ela às oito da noite",
+        "chamadas": [
+            {"tool": "create_reminder", "args": {"text": "ligar", "when_text": "oito da noite"}}
+        ],
+    }
+    same = result_with(("create_reminder", {"text": "ligar pra ela", "when_text": "às 20h"}))
+    assert score(case, same) == (True, True)
+    # A ferramenta ancora na fala, então "às 8h" do modelo vira "às oito da noite".
+    grounded = result_with(("create_reminder", {"text": "ligar pra ela", "when_text": "às 8h"}))
+    assert score(case, grounded) == (True, True)
+
+    two = {
+        "fala": "amanhã de manhã liga pro dentista às 10",
+        "chamadas": [
+            {"tool": "create_reminder", "args": {"text": "dentista", "when_text": "amanhã às 10h"}}
+        ],
+    }
+    wrong = result_with(("create_reminder", {"text": "ligar pro dentista", "when_text": "às 10"}))
+    assert score(two, wrong) == (True, False)
+
+
 def test_dataset_is_well_formed() -> None:
     cases = load_cases(DATASET)
     ids = [c["id"] for c in cases]

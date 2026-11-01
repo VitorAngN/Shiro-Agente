@@ -7,7 +7,7 @@ deliberadamente estrita: na dúvida, o pedido vai para o modelo.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 from shiro.core.models import ToolCall
 from shiro.core.text import normalize, parse_number
@@ -65,8 +65,12 @@ _WEATHER = re.compile(
 
 # "terminei o trabalho de cálculo" (ADR-0011: ação garantida pela regra, não pelo modelo).
 # "acabei de ..." fica de fora: quer dizer "acabei de fazer agora", não "concluí".
+_OFF_THE_LIST = r"(?:\s+(?:pode\s+)?(?:tirar|tira|remover|remove|riscar|risca)\s+da lista)?"
 _COMPLETE = re.compile(
-    r"^(?:terminei|conclui|finalizei|entreguei|acabei(?! de\b))\s+(?P<q>.+)$"
+    r"^(?:ja\s+)?(?:terminei|conclui|finalizei|entreguei|acabei(?! de\b)"
+    r"|dei conta d(?:e|o|a|os|as|aquele|aquela|aqueles|aquelas|esse|essa))"
+    r"\s+(?P<q>.+?)" + _OFF_THE_LIST + r"$"
+    r"|^ja fiz\s+(?P<q3>.+?)" + _OFF_THE_LIST + r"$"
     r"|^(?:marca|marque|pode marcar)\s+(?P<q2>.+?)\s+como\s+"
     r"(?:concluid[oa]|feit[oa]|pronto|pronta)$"
 )
@@ -96,6 +100,10 @@ _LIST = re.compile(
     r"|^(?:o que|oque) (?:esta|ta) (?P<p4>atrasado|atrasada|atrasados|atrasadas)$"
 )
 
+type Tier0Calls = Sequence[tuple[str, Mapping[str, object]]]
+type Tier0Rule = Callable[[str], Tier0Calls | None]
+"""Regra extra do Tier 0, plugada pela composição; recebe o texto original."""
+
 _TIME = re.compile(
     r"^(?:que horas sao|que hora e|que horas e|que dia e hoje|qual a data de hoje|que dia e)$"
 )
@@ -107,9 +115,17 @@ class IntentRouter:
     Args:
         apps: chave do app → apelidos falados (ex.: ``{"vscode": ["vs code", "code"]}``).
         cloud_triggers: expressões que pedem a nuvem explicitamente ("pensa bem").
+        rules: regras extras, testadas depois das embutidas (ex.: criar atividade, ADR-0014).
     """
 
-    def __init__(self, *, apps: Mapping[str, Sequence[str]], cloud_triggers: Sequence[str]) -> None:
+    def __init__(
+        self,
+        *,
+        apps: Mapping[str, Sequence[str]],
+        cloud_triggers: Sequence[str],
+        rules: Sequence[Tier0Rule] = (),
+    ) -> None:
+        self._rules = tuple(rules)
         self._aliases: dict[str, str] = {}
         for key, aliases in apps.items():
             for alias in (key, *aliases):
@@ -121,11 +137,15 @@ class IntentRouter:
         command = self._clean(text)
         if not command:
             return None
-        calls = self._match(command)
+        calls: Tier0Calls | None = self._match(command)
+        for rule in self._rules:
+            if calls is not None:
+                break
+            calls = rule(text)
         if calls is None:
             return None
         return tuple(
-            ToolCall(id=f"t0_{i}", name=name, arguments=args)
+            ToolCall(id=f"t0_{i}", name=name, arguments=dict(args))
             for i, (name, args) in enumerate(calls)
         )
 
@@ -153,7 +173,7 @@ class IntentRouter:
             if pattern.match(command):
                 return [("media_control", {"action": action})]
         if match := _COMPLETE.match(command):
-            query = (match["q"] or match["q2"] or "").strip()
+            query = (match["q"] or match["q2"] or match["q3"] or "").strip()
             return [("complete_activity", {"query": query})] if query else None
         if match := _LIST.match(command):
             spoken = match["p1"] or match["p2"] or match["p3"] or match["p4"]

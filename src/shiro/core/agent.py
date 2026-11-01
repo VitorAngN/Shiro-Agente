@@ -142,6 +142,7 @@ class AgentLoop:
         self._limits = limits or AgentLimits()
         self._channel: Channel = channel
         self._history: list[Message] = []
+        self._utterances: dict[str, str] = {}
         self.session_id = uuid7()
 
     @property
@@ -169,11 +170,15 @@ class AgentLoop:
             )
         )
 
-        calls = self._router.match_tier0(text)
-        if calls is not None:
-            result = await self._run_tier0(calls, trace_id)
-        else:
-            result = await self._run_llm(text, trace_id)
+        self._utterances[trace_id] = text
+        try:
+            calls = self._router.match_tier0(text)
+            if calls is not None:
+                result = await self._run_tier0(calls, trace_id)
+            else:
+                result = await self._run_llm(text, trace_id)
+        finally:
+            del self._utterances[trace_id]
 
         result = result.model_copy(
             update={"latency_ms": round((time.perf_counter() - started) * 1000)}
@@ -419,7 +424,11 @@ class AgentLoop:
 
     async def _run_tool(self, tool: Tool, args: BaseModel, trace_id: str) -> ToolResult:
         name = tool.spec.name
-        ctx = ToolContext(trace_id=trace_id, now=self._clock.now())
+        ctx = ToolContext(
+            trace_id=trace_id,
+            now=self._clock.now(),
+            utterance=self._utterances.get(trace_id, ""),
+        )
         try:
             async with asyncio.timeout(tool.spec.timeout_s):
                 return await tool.run(args, ctx)

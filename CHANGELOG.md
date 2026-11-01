@@ -11,6 +11,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 - Migração 0002 com `activity` e `scheduled_job`; agendador que dispara avisos antes do prazo (padrão: 1 dia e 2 horas) e lembretes, inclusive os que venceram com o PC desligado.
 - Tier 0: "terminei X", "marca X como feita", "o que eu tenho essa semana/amanhã/hoje?", "o que tá atrasado?".
 - Avisos no terminal do `shiro chat`.
+- Prazos ancorados na fala do usuário (ADR-0014): se o modelo corta ou parafraseia o prazo ("às 8h" para "amanhã às 8h"), vale o que o usuário disse.
+- Tier 0 para criar atividades e lembretes nas frases comuns: "tenho prova de física dia 12 às 19h", "tenho que entregar o relatório sexta", "anota que eu preciso comprar café", "me lembra de X às seis". Também "já dei conta de X" e "já fiz X" para concluir.
+- Prazos: "às seis" vira o próximo seis do relógio (6h ou 18h); "daqui a 40 minutos", "em 2 horas"; "de manhã", "à tarde", "à noite".
+- Avaliação: relógio fixo, prazos comparados pelo momento que produzem e tokens do pedido por caso.
+
+### Corrigido (marco 1c)
+- O schema compacto das ferramentas apagava o campo `title` (confundido com o metadado `title` do JSON Schema); o modelo recebia o campo como obrigatório sem definição e omitia o título.
+- "estudar 2 horas" não é mais lido como horário.
+- `evals/run_agent.py` não quebra mais com saída redirecionada no Windows (cp1252).
 
 ### Adicionado (marco 1a concluído)
 - Tier 2 com Gemini pelo SDK oficial (`google-genai`): conversão de mensagens e ferramentas, assinaturas de pensamento preservadas entre passos, chamada automática de funções desligada.

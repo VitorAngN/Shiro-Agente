@@ -17,6 +17,7 @@ Cada decisão importante fica registrada aqui, com o contexto e as alternativas 
 | [0011](0011-ajustes-do-benchmark-local.md) | Ajustes do agente a partir do benchmark local | Aceito |
 | [0012](0012-identidade-da-shiro.md) | Identidade da SHIRO: persona, voz e visual | Aceito |
 | [0013](0013-localizacao-automatica.md) | Localização automática para o clima | Aceito |
+| [0014](0014-prazos-ancorados-na-fala.md) | Prazos ancorados na fala e atividades no Tier 0 | Aceito |
 
 ## Modelo
 

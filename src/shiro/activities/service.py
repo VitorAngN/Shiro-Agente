@@ -56,8 +56,11 @@ class ActivityService:
 
     # ------------------------------------------------------------ atividades
 
-    async def create(self, title: str, due_text: str | None, context: str | None) -> ToolResult:
+    async def create(
+        self, title: str, due_text: str | None, context: str | None, utterance: str = ""
+    ) -> ToolResult:
         now = self._clock.now()
+        due_text = dates.ground(due_text, utterance, now=now, exclude=title)
         resolution = dates.resolve(due_text, now=now, default_time=self._default_due_time)
         if not resolution.ok:
             return ToolResult.failure(f"{resolution.problem} Nada foi anotado ainda.")
@@ -111,12 +114,13 @@ class ActivityService:
         await self._jobs.cancel_for(found.id, "activity_alert")
         return ToolResult.success(f"Concluída: {found.title}.", say=f"Concluída: {found.title}.")
 
-    async def postpone(self, query: str, due_text: str) -> ToolResult:
+    async def postpone(self, query: str, due_text: str, utterance: str = "") -> ToolResult:
         found = await self._one(query)
         if isinstance(found, ToolResult):
             return found
         now = self._clock.now()
         base = found.due_at.astimezone(now.tzinfo) if found.due_at else None
+        due_text = dates.ground(due_text, utterance, now=now, base=base) or due_text
         resolution = dates.resolve(
             due_text, now=now, default_time=self._default_due_time, base=base
         )
@@ -159,8 +163,9 @@ class ActivityService:
 
     # ------------------------------------------------------------ lembretes
 
-    async def remind(self, text: str, when_text: str) -> ToolResult:
+    async def remind(self, text: str, when_text: str, utterance: str = "") -> ToolResult:
         now = self._clock.now()
+        when_text = dates.ground(when_text, utterance, now=now, exclude=text) or when_text
         resolution = dates.resolve(when_text, now=now, default_time=self._reminder_time)
         if not resolution.ok or resolution.when is None:
             problem = resolution.problem or "Quando devo te lembrar?"
