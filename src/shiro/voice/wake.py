@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import re
 import time
+import unicodedata
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from typing import Protocol
@@ -29,9 +30,28 @@ from shiro.voice.oww import CHUNK, OpenWakeWord
 from shiro.voice.ports import Microphone, SpeechDetector, SpeechToText
 from shiro.voice.vad import EndpointConfig, Endpointer, Status
 
-# Grafias que o Whisper usa para "Shiro".
-_NAME_VARIANTS = ("shiro", "xiro", "chiro", "shirou", "shiru", "xiru", "shiro's")
-_LEADING_FILLER = re.compile(r"^(?:e|ah|eh|hum|hm|ã|ahn)\s+")
+# Como o Whisper escreve o chamado: "Ei, Shiro", "Aishiro", "Aiciro", "Eishiro", "A. Shiro".
+_NAME = r"(?:shiro|xiro|chiro|shiru|xiru|shirou|shirow)"
+_GREETING = r"(?:ei|ai|hei|hey|oi|ok|okay)"
+_WAKE = re.compile(
+    r"^(?:(?:hum|hm|ah|eh|ahn)\s*,?\s*)?"
+    rf"(?:(?:{_GREETING}|e|a)(?:{_NAME}|ciro)"  # grudado: "aishiro", "aiciro"
+    rf"|(?:{_GREETING}\s*,?\s*)?{_NAME}"  # "ei, shiro" ou só "shiro"
+    # "e shiro," / "a shiro.": artigo só vale como chamado (vírgula ou fim depois do nome),
+    # para "a Shiro é legal" numa conversa não acordá-la.
+    rf"|(?:e|a)\s*,?\s*{_NAME}(?=\s*(?:,|$)))"
+    r"\b\s*,?\s*(?P<rest>.*)$"
+)
+
+
+def _plain(text: str) -> str:
+    """Minúsculas sem acento; pontuação de fim vira vírgula, para marcar o vocativo."""
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    plain = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    plain = re.sub(r"[.!?;:…]+", ",", plain)
+    plain = re.sub(r"[^a-z0-9, ]", " ", plain)
+    plain = re.sub(r"\s*,\s*", ", ", plain)
+    return re.sub(r"\s+", " ", plain).strip(" ,")
 
 
 def wake_match(text: str, phrases: Sequence[str]) -> str | None:
@@ -40,15 +60,16 @@ def wake_match(text: str, phrases: Sequence[str]) -> str | None:
     >>> wake_match("Ei, Shiro, abre o Spotify.", ["ei shiro", "shiro"])
     'abre o spotify'
     """
-    plain = _LEADING_FILLER.sub("", normalize(text).replace(",", " ").replace(".", " "))
-    plain = re.sub(r"\s+", " ", plain).strip()
-    for variant in _NAME_VARIANTS:
-        plain = re.sub(rf"\b{re.escape(variant)}\b", "shiro", plain)
+    plain = _plain(text)
+    if match := _WAKE.match(plain):
+        return normalize(match["rest"].replace(",", " ")).strip()
+    # Frases configuradas pelo usuário (outro nome, outra saudação).
+    flat = normalize(plain.replace(",", " "))
     for phrase in sorted((normalize(p) for p in phrases), key=len, reverse=True):
-        if plain == phrase:
+        if flat == phrase:
             return ""
-        if plain.startswith(phrase + " "):
-            return plain[len(phrase) + 1 :].strip()
+        if flat.startswith(phrase + " "):
+            return flat[len(phrase) + 1 :].strip()
     return None
 
 
