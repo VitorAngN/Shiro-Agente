@@ -76,14 +76,34 @@ def _app_labels(settings: Settings) -> list[str]:
     return [entry.label for entry in settings.policy.allowed_apps.values()]
 
 
-def _stt(settings: Settings, model: str | None = None) -> Any:
+def _progress(name: str, done: int, total: int | None) -> None:
+    share = f"{100 * done / total:5.1f}%" if total else f"{done / 2**20:.0f} MB"
+    print(f"\r  {name}: {share}", end="", flush=True)
+
+
+async def _ready_stt(settings: Settings, model: str | None = None) -> Any:
+    """Whisper com o modelo baixado (pelo próprio SHIRO, com verificação de hash)."""
+    import httpx
+
+    from shiro.voice.models import ensure_whisper, whisper_ready
     from shiro.voice.stt import FasterWhisperSTT, vocabulary_prompt
 
     stt_settings = settings.voice.stt
     if model is not None:
         stt_settings = stt_settings.model_copy(update={"model": model})
+    data_dir = paths.data_dir()
+    ready = whisper_ready(data_dir, stt_settings.model)
+    if not ready:
+        print(f"baixando o Whisper {stt_settings.model} (só na primeira vez)…")
+    timeout = httpx.Timeout(30.0, read=60.0)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        folder = await ensure_whisper(
+            client, data_dir, stt_settings.model, None if ready else _progress
+        )
+    if not ready:
+        print()
     prompt = vocabulary_prompt(settings.general.assistant_name, _app_labels(settings))
-    return FasterWhisperSTT(stt_settings, prompt=prompt)
+    return FasterWhisperSTT(stt_settings, source=str(folder), prompt=prompt)
 
 
 def _endpoint(settings: Settings) -> Any:
@@ -132,7 +152,13 @@ async def _session(settings: Settings, args: argparse.Namespace) -> int:
     except TTSError as exc:
         print(theme.status(False, str(exc)))
         return 1
-    stt = _stt(settings)
+    from shiro.voice.models import DownloadError
+
+    try:
+        stt = await _ready_stt(settings)
+    except (DownloadError, OSError) as exc:
+        print(theme.status(False, f"modelo do Whisper: {exc}"))
+        return 1
     confirmation = VoiceConfirmation(keyboard=CliConfirmation(theme=theme))
     notifier = VoiceNotifier()
     app = await build_app(settings, confirmation=confirmation, notifier=notifier, channel="voice")
@@ -164,7 +190,6 @@ async def _session(settings: Settings, args: argparse.Namespace) -> int:
                 session.print(
                     theme.status(False, llm_down_message(settings.llm.local.base_url, exc))
                 )
-        session.print(theme.meta(f"carregando {stt.name} (na primeira vez, baixa o modelo)…"))
         await stt.load()
         session.print(theme.status(True, f"ouvido: {stt.name}"))
         start = getattr(tts, "start", None)
@@ -274,8 +299,7 @@ async def _listen(settings: Settings, args: argparse.Namespace) -> int:
     from shiro.voice.devices import SoundDeviceMicrophone, SoundDevicePlayer
     from shiro.voice.vad import SileroVAD, record_utterance
 
-    stt = _stt(settings)
-    print(f"carregando {stt.name}…")
+    stt = await _ready_stt(settings)
     await stt.load()
     player = SoundDevicePlayer(settings.voice.output_device)
     cues = Cues.generate(settings.voice.cue_volume)
@@ -303,11 +327,14 @@ async def _setup(settings: Settings, args: argparse.Namespace) -> int:
 
     SileroVAD()
     print("✓ detector de fala (Silero VAD)")
-    stt = _stt(settings)
-    print(f"… {stt.name}: baixando e carregando (só demora na primeira vez)")
+    try:
+        stt = await _ready_stt(settings)
+    except (DownloadError, httpx.HTTPError) as exc:
+        print(f"\n✗ {exc}")
+        return 1
     started = time.perf_counter()
     await stt.load()
-    print(f"✓ {stt.name} pronto em {_seconds(time.perf_counter() - started)}")
+    print(f"✓ {stt.name} pronto (carregou em {_seconds(time.perf_counter() - started)})")
     tts_settings = settings.voice.tts
     if tts_settings.engine != "kokoro":
         print(f"✓ voz: {tts_settings.sapi_voice} do Windows (nada a baixar)")
@@ -316,14 +343,10 @@ async def _setup(settings: Settings, args: argparse.Namespace) -> int:
         print("✗ pacote kokoro-onnx ausente: rode 'uv sync' na pasta do projeto")
         return 1
 
-    def progress(name: str, done: int, total: int | None) -> None:
-        share = f"{100 * done / total:5.1f}%" if total else f"{done / 2**20:.0f} MB"
-        print(f"\r  {name}: {share}", end="", flush=True)
-
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
             files = await ensure_kokoro(
-                client, paths.data_dir(), tts_settings.kokoro_model, progress
+                client, paths.data_dir(), tts_settings.kokoro_model, _progress
             )
     except (DownloadError, httpx.HTTPError) as exc:
         print(f"\n✗ {exc}")
@@ -423,7 +446,7 @@ async def _bench(settings: Settings, args: argparse.Namespace) -> int:
         report["tts"][engine] = {"median_s": statistics.median(times), "rtf": rtf}
 
     for model in models:
-        stt = _stt(settings, model)
+        stt = await _ready_stt(settings, model)
         started = time.perf_counter()
         await stt.load()
         print(f"\n{stt.name} carregado em {_seconds(time.perf_counter() - started)}")

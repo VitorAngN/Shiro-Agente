@@ -39,12 +39,12 @@ async def test_bench_scores_transcripts_by_command(
     heard: list[str] = list(cli_voice.BENCH_PHRASES)
     heard[0] = "abaixa o volume pra trinta"  # comando diferente: conta como erro
 
-    def fake_stt(settings: Settings, model: str | None = None) -> FakeSTT:
+    async def fake_stt(settings: Settings, model: str | None = None) -> FakeSTT:
         stt = FakeSTT(list(heard))
         stt.name = f"dublê/{model}"  # type: ignore[attr-defined]
         return stt
 
-    monkeypatch.setattr(cli_voice, "_stt", fake_stt)
+    monkeypatch.setattr(cli_voice, "_ready_stt", fake_stt)
     out = tmp_path / "bench.json"
     args = argparse.Namespace(engine=["kokoro"], stt=["base"], out=out)
 

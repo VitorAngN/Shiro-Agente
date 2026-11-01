@@ -52,6 +52,7 @@ O que foi verificado antes de decidir:
 
 - A voz funciona sem internet depois do `shiro voice setup`, e nenhum áudio sai do PC.
 - A primeira execução baixa cerca de 500 MB (Whisper `small`, mais 120 MB do Kokoro).
+- **O SHIRO baixa o Whisper por conta própria** (httpx), em `<dados>/models/whisper`, e não pelo cliente do Hugging Face. No PC de referência, o `huggingface_hub` 2.4 travou com 0 bytes no `model.bin`, com e sem Xet, enquanto um download direto pelo mesmo Python fazia 8 MB/s. Cada arquivo é conferido com o hash publicado pela API do Hugging Face: SHA-256 nos arquivos grandes (LFS), SHA-1 de blob do git nos pequenos.
 - No Linux do CI não há PortAudio: o `sounddevice` só é importado quando o áudio é usado. Os testes da sessão usam dublês de microfone, detector, Whisper, voz e player. O protocolo do Kokoro é testado com um processo dublê de verdade.
 - Ainda não há cancelamento de eco: a SHIRO não ouve enquanto fala, a menos que o usuário a interrompa com o atalho.
 - Pendências que dependem do PC de referência:

@@ -28,14 +28,14 @@ class _Segment(Protocol):
     avg_logprob: float
 
 
-type ModelFactory = Callable[[STTSettings], Any]
+type ModelFactory = Callable[[STTSettings, str], Any]
 
 
-def _whisper(settings: STTSettings) -> Any:
+def _whisper(settings: STTSettings, source: str) -> Any:
     from faster_whisper import WhisperModel  # pyright: ignore[reportMissingTypeStubs]
 
     return WhisperModel(
-        settings.model,
+        source,
         device=settings.device,
         compute_type=settings.compute_type,
         cpu_threads=settings.threads,
@@ -55,10 +55,13 @@ class FasterWhisperSTT:
         self,
         settings: STTSettings,
         *,
+        source: str | None = None,
         prompt: str = "",
         factory: ModelFactory = _whisper,
     ) -> None:
+        """``source``: pasta do modelo já baixado; sem ela, usa o nome em ``settings.model``."""
         self._settings = settings
+        self._source = source or settings.model
         self._prompt = prompt or None
         self._factory = factory
         self._model: Any = None
@@ -71,7 +74,7 @@ class FasterWhisperSTT:
     async def load(self) -> None:
         async with self._lock:
             if self._model is None:
-                self._model = await asyncio.to_thread(self._factory, self._settings)
+                self._model = await asyncio.to_thread(self._factory, self._settings, self._source)
 
     async def transcribe(self, audio: Audio) -> Transcript:
         await self.load()

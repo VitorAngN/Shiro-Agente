@@ -284,26 +284,30 @@ def segment(text: str, no_speech: float = 0.1, logprob: float = -0.3) -> SimpleN
 
 async def test_whisper_filters_noise_and_loads_once() -> None:
     model = FakeWhisper([segment(" Abre o"), segment(" Spotify."), segment(" la", 0.9, -1.5)])
-    created: list[STTSettings] = []
+    created: list[str] = []
 
-    def factory(settings: STTSettings) -> FakeWhisper:
-        created.append(settings)
+    def factory(settings: STTSettings, source: str) -> FakeWhisper:
+        created.append(source)
         return model
 
-    stt = FasterWhisperSTT(STTSettings(model="base"), prompt="Shiro.", factory=factory)
+    stt = FasterWhisperSTT(
+        STTSettings(model="base"), source="/modelos/base", prompt="Shiro.", factory=factory
+    )
     clip = tone(300, 1000, rate=24_000)
     first = await stt.transcribe(clip)
     await stt.transcribe(clip)
 
     assert first.text == "Abre o Spotify."
     assert first.audio_s == pytest.approx(1.0)
-    assert len(created) == 1
+    assert created == ["/modelos/base"]
     call = model.calls[0]
     assert call["samples"] == 16_000  # reamostrado para 16 kHz
     assert (call["language"], call["beam_size"], call["initial_prompt"]) == ("pt", 1, "Shiro.")
     assert stt.name == "faster-whisper/base"
 
-    silent = FasterWhisperSTT(STTSettings(), factory=lambda _: FakeWhisper([segment("Obrigado.")]))
+    silent = FasterWhisperSTT(
+        STTSettings(), factory=lambda _, __: FakeWhisper([segment("Obrigado.")])
+    )
     assert (await silent.transcribe(clip)).text == ""
 
 
@@ -404,3 +408,57 @@ async def test_download_checks_known_hashes(
         await models.download(missing, "https://x/d.onnx", tmp_path / "d.onnx")
     await client.aclose()
     await missing.aclose()
+
+
+async def test_whisper_download_verifies_every_file(tmp_path: Path) -> None:
+    import hashlib
+
+    files = {"config.json": b'{"a": 1}', "vocabulary.txt": b"oi\n", "model.bin": b"\x00" * 4096}
+
+    def blob(content: bytes) -> str:
+        header = f"blob {len(content)}\0".encode()
+        return hashlib.sha1(header + content, usedforsecurity=False).hexdigest()
+
+    tree = [
+        {"type": "file", "path": ".gitattributes", "size": 1, "oid": "x"},
+        {"type": "file", "path": "config.json", "size": 8, "oid": blob(files["config.json"])},
+        {"type": "file", "path": "vocabulary.txt", "size": 3, "oid": blob(files["vocabulary.txt"])},
+        {
+            "type": "file",
+            "path": "model.bin",
+            "size": 4096,
+            "lfs": {"oid": hashlib.sha256(files["model.bin"]).hexdigest()},
+        },
+    ]
+    requests: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request.url.path)
+        if "/api/models/" in request.url.path:
+            return httpx.Response(200, json=tree)
+        return httpx.Response(200, content=files[request.url.path.rsplit("/", 1)[-1]])
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    folder = await models.ensure_whisper(client, tmp_path, "small")
+
+    assert folder.name == "Systran--faster-whisper-small"
+    assert (folder / "model.bin").read_bytes() == files["model.bin"]
+    assert not (folder / ".gitattributes").exists()
+    assert models.whisper_ready(tmp_path, "small")
+    count = len(requests)
+    assert await models.ensure_whisper(client, tmp_path, "small") == folder
+    assert len(requests) == count  # pronto: não consulta de novo
+
+    files["vocabulary.txt"] = b"adulterado"
+    with pytest.raises(models.DownloadError, match="hash"):
+        await models.ensure_whisper(client, tmp_path / "outro", "base")
+    assert models.whisper_repo("org/modelo") == "org/modelo"
+
+    missing = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(404)))
+    with pytest.raises(models.DownloadError, match="404"):
+        await models.ensure_whisper(missing, tmp_path / "x", "nada")
+    empty = httpx.AsyncClient(transport=httpx.MockTransport(lambda _: httpx.Response(200, json=[])))
+    with pytest.raises(models.DownloadError, match="faster-whisper"):
+        await models.ensure_whisper(empty, tmp_path / "y", "outra")
+    for c in (client, missing, empty):
+        await c.aclose()
