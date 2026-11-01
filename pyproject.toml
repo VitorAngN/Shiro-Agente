@@ -61,7 +61,7 @@ kokoro = ["kokoro-onnx>=0.4"]
 default-groups = ["dev", "kokoro"]
 
 [build-system]
-requires = ["hatchling>=1.27"]
+requires = ["hatchling>=1.33.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
