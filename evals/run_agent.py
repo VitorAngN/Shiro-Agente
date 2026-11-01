@@ -31,6 +31,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from evals.bench_ollama import args_match
+from shiro import paths
 from shiro.activities import dates
 from shiro.app import App, Desktop, build_app
 from shiro.core.models import AgentResult, DecisionKind
@@ -150,12 +151,13 @@ def eval_settings(base: Settings, *, cloud: bool) -> Settings:
 
 
 async def build_eval_app(settings: Settings, workdir: Path, **overrides: Any) -> App:
+    """App com banco temporário em ``workdir``. ``data_dir`` (modelos) pode vir de fora."""
     overrides.setdefault("clock", FixedClock(eval_now(settings)))
+    overrides.setdefault("data_dir", workdir)
     return await build_app(
         settings,
         confirmation=AutoConfirm(),
         database_path=workdir / "eval.db",
-        data_dir=workdir,
         desktop=Desktop(volume=SimVolume(), media=SimMedia(), launcher=SimLauncher()),
         http=fixed_weather(),
         probe=SimProbe(),
@@ -273,7 +275,8 @@ async def main_async(args: argparse.Namespace) -> int:
         cases = [c for c in cases if c["id"].startswith(tuple(args.only))]
     settings = eval_settings(load_settings(), cloud=args.cloud)
     with tempfile.TemporaryDirectory(prefix="shiro-eval-") as tmp:
-        app = await build_eval_app(settings, Path(tmp))
+        # Banco temporário, mas os modelos (memória) da pasta de dados real.
+        app = await build_eval_app(settings, Path(tmp), data_dir=paths.data_dir())
         try:
             await app.agent.warm_up()
             print(f"Modelo local: {settings.llm.local.model} | {app.cloud_status}")
