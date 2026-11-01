@@ -177,6 +177,8 @@ async def evaluate(app: App, cases: Sequence[dict[str, Any]]) -> list[dict[str, 
                 "args_ok": args_ok,
                 "claim_blocked": result.claim_blocked,
                 "latency_ms": result.latency_ms,
+                # Tokens lidos do pedido: baixo quando o prefixo veio do cache (ADR-0011).
+                "prompt_tokens": result.usage.prompt_tokens,
                 "calls": [{"tool": c.call.name, "args": c.call.arguments} for c in result.calls],
                 "resposta": result.text,
             }
@@ -224,7 +226,11 @@ async def main_async(args: argparse.Namespace) -> int:
             f"{c['tool']}({json.dumps(c['args'], ensure_ascii=False)})" for c in row["calls"]
         )
         shown = calls or "sem ferramenta: " + row["resposta"][:60].replace("\n", " ")
-        print(f"{mark} {row['id']:<8} {row['tier']} {row['latency_ms'] / 1000:5.2f} s  {shown}")
+        tokens = f"{row['prompt_tokens']:>5}t" if row["prompt_tokens"] else "      "
+        print(
+            f"{mark} {row['id']:<8} {row['tier']} {row['latency_ms'] / 1000:5.2f} s"
+            f" {tokens}  {shown}"
+        )
     summary = summarize(rows)
     print()
     print(f"Ferramenta certa: {summary['ferramenta_certa']:.0%}")

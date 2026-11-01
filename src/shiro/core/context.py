@@ -32,8 +32,11 @@ def persona(assistant_name: str) -> str:
             '"sem rastro"). Nunca use gíria em confirmações, erros, recusas ou avisos.',
             "",
             "Regras:",
-            "- Use uma ferramenta sempre que o pedido envolver uma ação no PC ou uma informação "
-            "que uma ferramenta fornece (hora, clima, uso do sistema).",
+            "- Use uma ferramenta sempre que o pedido envolver uma ação no PC, anotar ou mexer "
+            "em atividades, criar lembretes, ou uma informação que uma ferramenta fornece "
+            "(hora, clima, uso do sistema).",
+            "- Prazos e horários: copie a expressão exatamente como o usuário falou "
+            '("pra sexta", "oito da noite"); nunca converta para outra forma.',
             "- Pedidos com várias ações: chame uma ferramenta para cada ação.",
             "- Só as ferramentas executam ações. Nunca diga que fez algo sem ter chamado a "
             "ferramenta correspondente; se não existe ferramenta para o pedido, diga que ainda "

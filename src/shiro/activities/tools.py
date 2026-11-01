@@ -21,7 +21,11 @@ class _Args(BaseModel):
 
 
 class CreateActivityArgs(_Args):
-    title: str = Field(min_length=1, max_length=200, description="Título curto, sem o prazo")
+    title: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Título curto da atividade, sem o prazo (ex.: 'trabalho de cálculo')",
+    )
     due_text: str | None = Field(
         default=None,
         description="Prazo exatamente como o usuário falou ('pra sexta', 'dia 12 às 19h'); "
@@ -132,7 +136,10 @@ def activity_tools(service: ActivityService) -> list[ActivityTool]:
         ),
         ActivityTool(
             name="complete_activity",
-            description="Marca uma atividade como concluída.",
+            description=(
+                "Marca uma atividade como concluída. Use quando o usuário disser que terminou, "
+                "entregou ou já fez."
+            ),
             args_model=QueryArgs,
             risk=RiskLevel.R1,
             describe=lambda a: f"marcar {a.query} como concluída",
@@ -156,7 +163,10 @@ def activity_tools(service: ActivityService) -> list[ActivityTool]:
         ),
         ActivityTool(
             name="delete_activity",
-            description="Exclui uma atividade.",
+            description=(
+                "Exclui uma atividade. Só quando o usuário pedir para excluir ou apagar; se ele "
+                "terminou a atividade, use complete_activity."
+            ),
             args_model=QueryArgs,
             risk=RiskLevel.R2,
             describe=lambda a: f"excluir a atividade {a.query}",

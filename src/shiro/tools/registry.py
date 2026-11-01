@@ -8,14 +8,34 @@ from shiro.core.models import ToolDefinition
 from shiro.core.ports import Tool, ToolSpec
 
 
-def compact_schema(schema: dict[str, Any]) -> dict[str, Any]:
-    """Remove ``title`` e chaves vazias: menos tokens no pedido do modelo local."""
+def _without_null(node: dict[str, Any]) -> dict[str, Any]:
+    """``anyOf: [X, null]`` com ``default: null`` vira só ``X``: modelos pequenos erram menos.
 
-    def clean(node: Any) -> Any:
+    O campo continua opcional porque fica fora de ``required``.
+    """
+    options = node.get("anyOf")
+    if not isinstance(options, list) or node.get("default", ...) is not None:
+        return node
+    real = [o for o in options if o != {"type": "null"}]  # pyright: ignore[reportUnknownVariableType]
+    if len(real) != 1 or len(real) == len(options):  # pyright: ignore[reportUnknownArgumentType]
+        return node
+    simplified = {k: v for k, v in node.items() if k not in ("anyOf", "default")}
+    simplified.update(real[0])  # pyright: ignore[reportUnknownArgumentType]
+    return simplified
+
+
+def compact_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Remove ``title``, nulos opcionais e chaves vazias: menos tokens e menos confusão."""
+
+    def clean(node: Any, *, is_properties: bool = False) -> Any:
         if isinstance(node, dict):
+            if is_properties:
+                # Aqui as chaves são nomes de campos: um campo pode se chamar "title".
+                return {key: clean(value) for key, value in node.items()}  # pyright: ignore[reportUnknownVariableType]
+            node = _without_null(node)  # pyright: ignore[reportUnknownArgumentType]
             return {
-                key: clean(value)
-                for key, value in node.items()  # pyright: ignore[reportUnknownVariableType]
+                key: clean(value, is_properties=key == "properties")
+                for key, value in node.items()
                 if key != "title"
             }
         if isinstance(node, list):
