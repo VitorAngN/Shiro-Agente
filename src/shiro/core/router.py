@@ -63,6 +63,39 @@ _WEATHER = re.compile(
     r"|vai chover(?: hoje)?|ta (?:frio|calor)(?: la fora)?|clima)$"
 )
 
+# "terminei o trabalho de cálculo" (ADR-0011: ação garantida pela regra, não pelo modelo).
+# "acabei de ..." fica de fora: quer dizer "acabei de fazer agora", não "concluí".
+_COMPLETE = re.compile(
+    r"^(?:terminei|conclui|finalizei|entreguei|acabei(?! de\b))\s+(?P<q>.+)$"
+    r"|^(?:marca|marque|pode marcar)\s+(?P<q2>.+?)\s+como\s+"
+    r"(?:concluid[oa]|feit[oa]|pronto|pronta)$"
+)
+_PERIODS = {
+    "hoje": "today",
+    "amanha": "tomorrow",
+    "essa semana": "this_week",
+    "esta semana": "this_week",
+    "nessa semana": "this_week",
+    "nesta semana": "this_week",
+    "semana que vem": "next_week",
+    "na semana que vem": "next_week",
+    "pra semana que vem": "next_week",
+    "atrasado": "overdue",
+    "atrasada": "overdue",
+    "atrasados": "overdue",
+    "atrasadas": "overdue",
+}
+_PERIOD_WORDS = "|".join(sorted(_PERIODS, key=len, reverse=True))
+_LIST = re.compile(
+    r"^(?:o que|oque) (?:eu )?tenho(?: (?:pra fazer|de atividade|de atividades))?"
+    rf"(?: (?P<p1>{_PERIOD_WORDS}))?$"
+    r"|^(?:quais (?:sao )?)?(?:as )?minhas atividades"
+    rf"(?: (?:de |pra |para )?(?P<p2>{_PERIOD_WORDS}))?$"
+    r"|^tenho (?:alguma coisa|algo|alguma atividade|atividade)(?: pra fazer)?"
+    rf" (?P<p3>{_PERIOD_WORDS})$"
+    r"|^(?:o que|oque) (?:esta|ta) (?P<p4>atrasado|atrasada|atrasados|atrasadas)$"
+)
+
 _TIME = re.compile(
     r"^(?:que horas sao|que hora e|que horas e|que dia e hoje|qual a data de hoje|que dia e)$"
 )
@@ -119,6 +152,12 @@ class IntentRouter:
         for action, pattern in _MEDIA:
             if pattern.match(command):
                 return [("media_control", {"action": action})]
+        if match := _COMPLETE.match(command):
+            query = (match["q"] or match["q2"] or "").strip()
+            return [("complete_activity", {"query": query})] if query else None
+        if match := _LIST.match(command):
+            spoken = match["p1"] or match["p2"] or match["p3"] or match["p4"]
+            return [("list_activities", {"period": _PERIODS.get(spoken or "", "all")})]
         if _WEATHER.match(command):
             return [("get_weather", {})]
         if _TIME.match(command):

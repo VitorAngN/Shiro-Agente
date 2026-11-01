@@ -203,6 +203,7 @@ class PolicySettings(_Section):
 
 class ActivitiesSettings(_Section):
     default_due_time: time = time(23, 59)
+    reminder_default_time: time = time(9, 0)  # lembrete com dia mas sem horário
     alert_offsets: tuple[str, ...] = ("1d", "2h")
     local_only: bool = True
 

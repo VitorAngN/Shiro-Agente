@@ -85,11 +85,8 @@ erDiagram
         text due_at "UTC, nulo se sem prazo"
         text due_text "expressão original, ex. sexta"
         text status "pending | done | cancelled"
-        text priority "low | normal | high"
-        text notes
-        text created_via "voice | text | api"
-        text created_by_tool_call FK
         text created_at
+        text updated_at
         text completed_at
     }
     ROUTINE {
@@ -100,13 +97,12 @@ erDiagram
     }
     SCHEDULED_JOB {
         text id PK
-        text routine_id FK "nulo se não for rotina"
-        text activity_id FK "nulo se não for aviso de atividade"
-        text kind "reminder | timer | routine | activity_alert"
+        text kind "activity_alert | reminder (rotinas e timers: Fase 3)"
+        text ref_id "atividade avisada, nulo em lembretes"
         text payload_json
-        text trigger "date | cron"
-        text next_run_at
+        text run_at "UTC"
         text status "active | done | cancelled"
+        text created_at
     }
     AUDIT_EVENT {
         int seq PK

@@ -103,6 +103,18 @@ class TextSession:
             await self.send(text)
 
 
+class CliNotifier:
+    """Avisos de prazo e lembretes no terminal, em âmbar."""
+
+    def __init__(self, theme: Theme | None = None, out: TextIO | None = None) -> None:
+        self._theme = theme or Theme(color=False)
+        self._out = out or sys.stdout
+
+    async def notify(self, title: str, message: str) -> None:
+        line = self._theme.paint(f"aviso ▸ {message}", (255, 210, 63), bold=True)
+        print(f"\n{line}", file=self._out, flush=True)
+
+
 def llm_down_message(host: str, error: LLMError) -> str:
     return (
         f"modelo local offline: o Ollama não respondeu em {host}. Ele está aberto?\n"

@@ -5,6 +5,13 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (marco 1c · atividades)
+- Resolução determinística de prazos em pt-BR (`shiro.activities.dates`): dias da semana, "que vem", "dia 12 às 19h", "12/11", "daqui a 3 dias", "às oito da noite", meio-dia e meia-noite. Expressões vagas viram pergunta, nunca chute.
+- Atividades: criar, listar por período, concluir, adiar (mantendo o horário), renomear e excluir; a SHIRO repete a data absoluta entendida. Lembretes com horário.
+- Migração 0002 com `activity` e `scheduled_job`; agendador que dispara avisos antes do prazo (padrão: 1 dia e 2 horas) e lembretes, inclusive os que venceram com o PC desligado.
+- Tier 0: "terminei X", "marca X como feita", "o que eu tenho essa semana/amanhã/hoje?", "o que tá atrasado?".
+- Avisos no terminal do `shiro chat`.
+
 ### Adicionado (marco 1a concluído)
 - Tier 2 com Gemini pelo SDK oficial (`google-genai`): conversão de mensagens e ferramentas, assinaturas de pensamento preservadas entre passos, chamada automática de funções desligada.
 - Proteções da nuvem: limite por minuto, limite diário de pedidos, orçamento diário estimado (`provider_usage`) e cadeia de fallback. Se a nuvem falha ou passa do limite, a SHIRO volta para o modelo local.

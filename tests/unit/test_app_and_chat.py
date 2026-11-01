@@ -78,16 +78,20 @@ async def test_full_app_tier0_and_llm_turns_are_persisted(
         probe=FakeProbe(),
     )
     try:
-        assert app.registry.names() == (
+        assert set(app.registry.names()) >= {
             "change_volume",
             "close_app",
+            "complete_activity",
+            "create_activity",
+            "create_reminder",
             "get_time",
             "get_weather",
+            "list_activities",
             "media_control",
             "open_app",
             "set_volume",
             "system_info",
-        )
+        }
 
         first = await app.agent.run_turn("Shiro, abre o Spotify")
         assert first.tier is Tier.T0
@@ -123,7 +127,9 @@ async def test_without_desktop_only_portable_tools_are_registered(
         probe=FakeProbe(),
     )
     try:
-        assert app.registry.names() == ("get_time", "get_weather", "system_info")
+        names = set(app.registry.names())
+        assert {"get_time", "get_weather", "system_info", "create_activity"} <= names
+        assert not names & {"set_volume", "media_control", "open_app", "close_app"}
         result = await app.agent.run_turn("volume em 20")  # Tier 0 sem a ferramenta
         assert "não existe ou está desativada" in result.text
     finally:

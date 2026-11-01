@@ -122,7 +122,7 @@ async def test_claimed_action_without_tool_is_retried() -> None:
         ]
     )
 
-    result = await h.agent.run_turn("terminei o trabalho de cálculo")
+    result = await h.agent.run_turn("já dei conta do trabalho de cálculo")
 
     assert result.text == "Ainda não consigo marcar atividades como concluídas."
     assert result.claim_blocked
@@ -135,7 +135,7 @@ async def test_claimed_action_without_tool_is_retried() -> None:
 async def test_repeated_claim_never_reaches_the_user() -> None:
     h = Harness([reply("Pronto, marquei."), reply("Feito! Marquei.")])
 
-    result = await h.agent.run_turn("terminei o trabalho de cálculo")
+    result = await h.agent.run_turn("já dei conta do trabalho de cálculo")
 
     assert "nenhuma ação foi feita" in result.text
     assert "marquei" not in result.text.casefold()
@@ -157,7 +157,7 @@ async def test_claim_escalates_to_cloud_when_local_keeps_claiming() -> None:
         cloud=[reply("Não tenho uma ferramenta para isso ainda.")],
     )
 
-    result = await h.agent.run_turn("terminei o trabalho")
+    result = await h.agent.run_turn("já dei conta do trabalho")
 
     assert result.tier is Tier.T2
     assert result.text == "Não tenho uma ferramenta para isso ainda."
@@ -263,7 +263,7 @@ async def test_local_only_result_blocks_escalation() -> None:
         tools=[private],
     )
 
-    result = await h.agent.run_turn("o que eu tenho essa semana?")
+    result = await h.agent.run_turn("tem alguma entrega importante chegando?")
 
     assert h.cloud is not None and h.cloud.requests == []
     assert result.text.startswith("Não consegui falar com o modelo")

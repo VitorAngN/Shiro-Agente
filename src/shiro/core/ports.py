@@ -118,6 +118,12 @@ class UsageLedger(Protocol):
     ) -> None: ...
 
 
+class Notifier(Protocol):
+    """Avisos que a SHIRO dá por iniciativa própria (prazos, lembretes)."""
+
+    async def notify(self, title: str, message: str) -> None: ...
+
+
 class Clock(Protocol):
     def now(self) -> datetime:
         """Data e hora atuais, sempre com fuso."""

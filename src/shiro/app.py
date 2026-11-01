@@ -8,6 +8,7 @@ sem GPU e sem internet.
 
 from __future__ import annotations
 
+import logging
 import sys
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -18,21 +19,26 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from shiro import paths
+from shiro.activities.models import Job, parse_offset
+from shiro.activities.service import ActivityService
+from shiro.activities.tools import activity_tools
 from shiro.core.agent import AgentLimits, AgentLoop
 from shiro.core.bus import EventBus
 from shiro.core.context import ContextBuilder
 from shiro.core.events import TurnFinished
 from shiro.core.models import Tier
-from shiro.core.ports import ConfirmationChannel, LLMProvider
+from shiro.core.ports import ConfirmationChannel, LLMProvider, Notifier
 from shiro.core.router import IntentRouter
 from shiro.llm.gemini import GeminiProvider
 from shiro.llm.guard import CloudLimits, FallbackProvider, GuardedProvider
 from shiro.llm.ollama import OllamaProvider
+from shiro.persistence.activities import SqliteActivityStore, SqliteJobStore
 from shiro.persistence.audit import SqliteAuditLog
 from shiro.persistence.conversation import SqliteConversationStore
 from shiro.persistence.database import Database
 from shiro.persistence.usage import SqliteUsageLedger
 from shiro.policy.engine import PolicyConfig, PolicyEngine
+from shiro.scheduler.runner import Scheduler
 from shiro.secrets import get_api_key
 from shiro.settings import Settings
 from shiro.tools.builtin.apps import AppLauncher, AppTarget, CloseAppTool, OpenAppTool
@@ -43,6 +49,8 @@ from shiro.tools.builtin.media import MediaControlTool, MediaKeys
 from shiro.tools.builtin.system import PsutilProbe, SystemInfoTool, SystemProbe
 from shiro.tools.builtin.weather import WeatherTool
 from shiro.tools.registry import ToolRegistry
+
+log = logging.getLogger(__name__)
 
 DATABASE_FILE = "shiro.db"
 LOCATION_CACHE_FILE = "location.json"
@@ -56,6 +64,13 @@ class SystemClock:
 
     def now(self) -> datetime:
         return datetime.now(self._tz)
+
+
+class LogNotifier:
+    """Avisos só no log; as interfaces (texto, voz, bandeja) trazem o seu."""
+
+    async def notify(self, title: str, message: str) -> None:
+        log.info("aviso: %s", message)
 
 
 @dataclass
@@ -169,9 +184,18 @@ class App:
     local_llm: LLMProvider
     cloud_llm: LLMProvider | None = None
     cloud_status: str = "nuvem desligada"
+    activities: ActivityService | None = None
+    scheduler: Scheduler | None = None
     _closers: list[Closer] = field(default_factory=list[Closer])
 
+    def start_background(self) -> None:
+        """Liga o agendador de avisos e lembretes."""
+        if self.scheduler is not None:
+            self.scheduler.start()
+
     async def aclose(self) -> None:
+        if self.scheduler is not None:
+            await self.scheduler.stop()
         for closer in reversed(self._closers):
             await closer()
         self._closers.clear()
@@ -188,6 +212,7 @@ async def build_app(
     cloud_llm: LLMProvider | None = None,
     http: httpx.AsyncClient | None = None,
     probe: SystemProbe | None = None,
+    notifier: Notifier | None = None,
 ) -> App:
     closers: list[Closer] = []
 
@@ -219,6 +244,27 @@ async def build_app(
         probe=probe or PsutilProbe(),
         locator=build_locator(settings, http, data_dir),
     )
+    clock = SystemClock(ZoneInfo(settings.general.timezone))
+    activity_settings = settings.activities
+    jobs = SqliteJobStore(database)
+    activities = ActivityService(
+        store=SqliteActivityStore(database),
+        jobs=jobs,
+        clock=clock,
+        default_due_time=activity_settings.default_due_time,
+        alert_offsets=[parse_offset(o) for o in activity_settings.alert_offsets],
+        reminder_time=activity_settings.reminder_default_time,
+    )
+    for tool in activity_tools(activities):
+        registry.register(tool)
+    notify_with = notifier or LogNotifier()
+
+    async def on_job(job: Job) -> None:
+        await activities.handle_job(job, notify_with)
+
+    scheduler = Scheduler(
+        jobs=jobs, handlers={"activity_alert": on_job, "reminder": on_job}, clock=clock.now
+    )
     agent_settings = settings.agent
     agent = AgentLoop(
         router=IntentRouter(
@@ -235,7 +281,7 @@ async def build_app(
         confirmation=confirmation,
         audit=audit,
         bus=bus,
-        clock=SystemClock(ZoneInfo(settings.general.timezone)),
+        clock=clock,
         context=ContextBuilder(assistant_name=settings.general.assistant_name),
         limits=AgentLimits(
             max_steps=agent_settings.max_steps,
@@ -253,5 +299,7 @@ async def build_app(
         local_llm=llm,
         cloud_llm=cloud_llm,
         cloud_status=cloud_status,
+        activities=activities,
+        scheduler=scheduler,
         _closers=closers,
     )

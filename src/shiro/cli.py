@@ -58,6 +58,7 @@ async def _chat(settings: Settings, args: argparse.Namespace) -> int:
     from shiro.core.ports import LLMError
     from shiro.interfaces.text import (
         CliConfirmation,
+        CliNotifier,
         TextSession,
         llm_down_message,
         use_safe_output,
@@ -68,7 +69,9 @@ async def _chat(settings: Settings, args: argparse.Namespace) -> int:
     use_safe_output()
     configure_logging(settings.logging, paths.log_dir(), console=False)
     theme = Theme.for_stream(sys.stdout)
-    app = await build_app(settings, confirmation=CliConfirmation(theme=theme))
+    app = await build_app(
+        settings, confirmation=CliConfirmation(theme=theme), notifier=CliNotifier(theme)
+    )
     session = TextSession(
         app.agent.run_turn,
         name=settings.general.assistant_name,
@@ -97,6 +100,7 @@ async def _chat(settings: Settings, args: argparse.Namespace) -> int:
         if settings.policy.read_only_mode:
             session.print(theme.status(False, "modo somente leitura: ações pedem confirmação"))
         session.print("")
+        app.start_background()
         if args.message:
             await session.send(args.message)
         else:

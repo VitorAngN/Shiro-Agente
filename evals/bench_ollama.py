@@ -99,10 +99,10 @@ TOOLS = [
     _tool("get_weather", "Informa o clima atual.", {"city": _str("Cidade")}),
     _tool(
         "create_reminder",
-        "Cria um lembrete para hoje em um horário.",
+        "Cria um lembrete para um horário.",
         {
             "text": _str("O que lembrar, sem o horário"),
-            "at_local": _str("Horário no formato HH:MM, 24h"),
+            "when_text": _str("Quando, exatamente como o usuário falou ('às 20h')"),
         },
     ),
     _tool(

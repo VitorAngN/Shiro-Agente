@@ -45,6 +45,19 @@ def calls(text: str) -> list[tuple[str, dict[str, Any]]] | None:
         ("como tá o tempo?", [("get_weather", {})]),
         ("Shiro, vai chover hoje?", [("get_weather", {})]),
         ("qual a previsão do tempo pra hoje", [("get_weather", {})]),
+        (
+            "terminei o trabalho de cálculo",
+            [("complete_activity", {"query": "o trabalho de calculo"})],
+        ),
+        (
+            "marca a prova de física como feita",
+            [("complete_activity", {"query": "a prova de fisica"})],
+        ),
+        ("o que eu tenho essa semana?", [("list_activities", {"period": "this_week"})]),
+        ("o que eu tenho amanhã", [("list_activities", {"period": "tomorrow"})]),
+        ("quais são minhas atividades", [("list_activities", {"period": "all"})]),
+        ("tenho alguma coisa hoje?", [("list_activities", {"period": "today"})]),
+        ("o que tá atrasado?", [("list_activities", {"period": "overdue"})]),
     ],
 )
 def test_tier0_matches(text: str, expected: list[tuple[str, dict[str, Any]]]) -> None:
@@ -59,7 +72,7 @@ def test_tier0_matches(text: str, expected: list[tuple[str, dict[str, Any]]]) ->
         "abre o spotify e o photoshop",  # uma parte desconhecida invalida tudo
         "tá muito alto, diminui um pouco",
         "quanto de memória ram eu tô usando?",
-        "terminei o trabalho de cálculo",
+        "acabei de chegar em casa",  # "acabei de" não é concluir atividade
         "como tá o tempo em Curitiba?",  # cidade explícita: o modelo extrai o argumento
         "",
     ],

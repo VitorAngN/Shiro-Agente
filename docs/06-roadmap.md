@@ -53,6 +53,17 @@ A fase é entregue em três marcos, cada um testável sozinho:
 | Adaptador Gemini (Tier 2), rate limiter, orçamento diário e fallback | ✅ (falta só a chave: `shiro secrets set gemini`) |
 | Avaliação do agente completo (não só do modelo) com o conjunto em pt-BR | ✅ `evals/run_agent.py` |
 
+**Andamento do marco 1c:**
+
+| Item | Estado |
+|---|---|
+| Resolução de prazos em pt-BR, determinística (51 casos na tabela de testes) | ✅ |
+| `ACTIVITY` e `SCHEDULED_JOB` (migração 0002) | ✅ |
+| Criar, listar, concluir, adiar, renomear e excluir atividades; lembretes | ✅ |
+| Data absoluta repetida em toda criação e adiamento (RF-35) | ✅ |
+| Avisos antes do prazo e lembretes pelo agendador (RF-38) | ✅ no modo texto; na voz e na bandeja, com o 1b e a Fase 2 |
+| "Terminei X" e "o que eu tenho essa semana?" no Tier 0 | ✅ |
+
 **Spikes desta fase:**
 
 - benchmark dos modelos locais candidatos → escolha do modelo padrão ([ADR-0003](adr/0003-roteamento-hibrido-de-llm.md));

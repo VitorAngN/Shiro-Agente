@@ -100,6 +100,7 @@ hotkey = "ctrl+alt+shift+s"
 
 [activities]
 default_due_time = "23:59"     # usado quando só o dia é informado
+reminder_default_time = "09:00" # lembrete com dia mas sem horário
 alert_offsets = ["1d", "2h"]   # avisos antes do prazo
 local_only = true              # atividades nunca vão para a nuvem
 
