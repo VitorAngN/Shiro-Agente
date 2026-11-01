@@ -204,12 +204,14 @@ class EndlessSpeech(FakeMic):
 
     def __init__(self) -> None:
         super().__init__([])
+        self.delivered = 0
 
     @contextlib.asynccontextmanager
     async def open(self) -> AsyncIterator[AsyncIterator[np.ndarray]]:
         async def generate() -> AsyncIterator[np.ndarray]:
             while True:
                 await asyncio.sleep(0.001)
+                self.delivered += 1
                 yield np.full(512, 0.9, dtype=np.float32)
 
         yield generate()
@@ -217,12 +219,13 @@ class EndlessSpeech(FakeMic):
 
 async def test_second_talk_while_listening_finishes_the_phrase() -> None:
     session, _, _, _, asked, _ = make_session(heard=["pula essa música"])
-    session._microphone = EndlessSpeech()  # pyright: ignore[reportPrivateUsage]
+    microphone = EndlessSpeech()
+    session._microphone = microphone  # pyright: ignore[reportPrivateUsage]
     triggers = TriggerSource()
     runner = asyncio.create_task(session.run(triggers))
     triggers.put(Trigger("talk"))
-    await until(lambda: session.phase is Phase.LISTENING)
-    await asyncio.sleep(0.01)
+    # A fala só "começa" depois de 3 quadros; no Windows o relógio anda de 15 em 15 ms.
+    await until(lambda: microphone.delivered >= 8)
     triggers.put(Trigger("talk"))  # "terminei de falar"
     await until(lambda: bool(asked))
     triggers.put(Trigger("quit"))
