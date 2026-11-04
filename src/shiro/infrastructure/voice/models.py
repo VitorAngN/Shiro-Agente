@@ -42,6 +42,7 @@ WHISPER_FILES = {
     "model.bin",
     "tokenizer.json",
     "vocabulary.txt",
+    "vocabulary.json",  # os large-v3 trazem o vocabulário em JSON
     "preprocessor_config.json",
 }
 

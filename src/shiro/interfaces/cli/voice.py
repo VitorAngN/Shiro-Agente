@@ -42,6 +42,9 @@ def add_voice_parser(commands: Any) -> None:
         "record", help="grava você dizendo comandos, para medir o Whisper (fica só no PC)"
     )
     record.add_argument("--count", type=int, help="quantas frases gravar (padrão: todas)")
+    record.add_argument(
+        "--mic", help="parte do nome do microfone ('shiro voice devices'); padrão: o configurado"
+    )
     actions.add_parser("setup", help="baixa e prepara os modelos de voz")
     bench = actions.add_parser("bench", help="mede fala e transcrição sem tocar áudio")
     bench.add_argument("--engine", nargs="*", choices=("kokoro", "sapi"), help="motores de voz")
@@ -265,6 +268,7 @@ async def _record(settings: Settings, args: argparse.Namespace) -> int:
     from shiro.infrastructure.voice.silero import SileroVAD
 
     phrases = record_phrases(settings)[: args.count or None]
+    mic: str = args.mic or settings.voice.input_device
     stamp = datetime.now(ZoneInfo(settings.general.timezone)).strftime("%Y%m%d-%H%M%S")
     folder = paths.data_dir() / SAMPLES_DIR / stamp
     folder.mkdir(parents=True)
@@ -276,9 +280,7 @@ async def _record(settings: Settings, args: argparse.Namespace) -> int:
     for number, phrase in enumerate(phrases, start=1):
         print(f"[{number}/{len(phrases)}] diga: {phrase}")
         await player.play(cues.listening)
-        audio = await record_utterance(
-            SoundDeviceMicrophone(settings.voice.input_device), SileroVAD(), _endpoint(settings)
-        )
+        audio = await record_utterance(SoundDeviceMicrophone(mic), SileroVAD(), _endpoint(settings))
         if audio is None:
             print("  não ouvi nada; pulando esta")
             continue
