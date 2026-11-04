@@ -45,6 +45,7 @@ activation = "push_to_talk"            # push_to_talk | wake_word | both
 push_to_talk_hotkey = "ctrl+alt+space"
 stop_hotkey = "ctrl+alt+shift+s"      # para de falar e de ouvir na hora
 input_device = "default"               # nome ou parte do nome; "shiro voice devices" lista
+capture = "mme"                        # mme | wasapi | raw | exclusive; "shiro voice mic-test" compara
 output_device = "default"
 cue_volume = 0.15                      # bipe de "ouvindo"; 0 desliga
 
@@ -61,6 +62,8 @@ device = "cpu"             # cpu | cuda (GPU fica para o LLM, ver ADR-0010)
 compute_type = "int8"
 language = "pt"
 beam_size = 1              # 1 = mais rápido
+hotwords = true            # puxa o Whisper para "Shiro" e os nomes dos apps
+commands = true            # corrige comando curto mal transcrito ("Ausa música." → "Pausa a música.")
 
 [voice.tts]
 engine = "kokoro"          # voz da SHIRO (ADR-0012); "sapi" = voz Maria do Windows, sem download

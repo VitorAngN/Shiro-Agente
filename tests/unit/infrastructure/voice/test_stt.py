@@ -45,3 +45,29 @@ def test_vocabulary_prompt_names_the_assistant_and_apps() -> None:
     assert "Abra o Spotify." in prompt and "Abra o VS Code." in prompt  # comandos de exemplo
     assert vocabulary_prompt("Shiro", []).startswith("Shiro,")
     assert vocabulary_hotwords("Shiro", ["Steam", "Chrome"]) == "Shiro Steam Chrome"
+
+
+@pytest.fixture(scope="module")
+def tiny_model(tmp_path_factory: pytest.TempPathFactory) -> str:
+    pytest.importorskip("ctranslate2")
+    from tests.fakes.tiny_whisper import build_tiny_whisper
+
+    return str(build_tiny_whisper(tmp_path_factory.mktemp("whisper") / "tiny"))
+
+
+async def test_phrases_are_scored_by_the_real_decoder_in_batches(tiny_model: str) -> None:
+    stt = FasterWhisperSTT(
+        STTSettings(), source=tiny_model, prompt="Shiro, que horas são?", hotwords="Shiro Steam"
+    )
+    clip = tone(300, 1500, rate=24_000)
+    phrases = ["Abra o Steam.", "Feche o Chrome.", "Pausa a música."] * 7  # 21: dois lotes
+    scores = await stt.score(clip, phrases)
+
+    assert len(scores) == len(phrases)
+    assert all(-30 < s < 0 for s in scores)
+    assert scores[0] == pytest.approx(scores[3]) == pytest.approx(scores[18])  # mesma frase
+    assert len({round(s, 6) for s in scores[:3]}) == 3  # frases diferentes, notas diferentes
+    assert await stt.score(clip, []) == []
+
+    plain = FasterWhisperSTT(STTSettings(), source=tiny_model)
+    assert len(await plain.score(clip, ["Que horas são?"])) == 1  # sem prompt também funciona

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from typing import Protocol
@@ -15,6 +15,8 @@ class Transcript:
     text: str
     audio_s: float
     latency_ms: int
+    heard: str = ""
+    """O que a transcrição livre deu, quando ``text`` foi corrigido para um comando conhecido."""
 
 
 class SpeechToText(Protocol):
@@ -23,6 +25,12 @@ class SpeechToText(Protocol):
         ...
 
     async def transcribe(self, audio: Audio) -> Transcript: ...
+
+
+class PhraseScorer(Protocol):
+    async def score(self, audio: Audio, phrases: Sequence[str]) -> list[float]:
+        """Quanto cada frase explica o áudio: média do log da probabilidade por token."""
+        ...
 
 
 class TextToSpeech(Protocol):

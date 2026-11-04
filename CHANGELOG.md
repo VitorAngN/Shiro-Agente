@@ -5,6 +5,12 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (reconhecimento de comandos, ADR-0021)
+- Comando curto mal transcrito ("Ausa música.", "Abra, Einstein.") é comparado com os comandos que o roteador conhece. O próprio Whisper mede quanto cada um explica o áudio (`align` do CTranslate2, codificador uma vez só), e o texto é trocado quando um comando ganha com folga. Liga em `[voice.stt] commands`.
+- `[voice] capture`: `mme` (padrão), `wasapi`, `raw` (sem os efeitos de áudio do Windows) ou `exclusive`. Se o modo não abrir, a SHIRO volta para o MME.
+- `shiro voice mic-test`: grava a mesma frase em cada modo, diz qual não corta o começo da fala e guarda as gravações para o bench.
+- `shiro voice bench --commands on|off|both`, com as notas de cada correção para calibrar os limiares; `listen` e `record` aceitam `--capture`.
+
 ### Mudado (arquitetura em camadas, ADR-0020)
 - Código reorganizado em `domain/`, `application/`, `config/`, `infrastructure/`, `bootstrap/`, `interfaces/` e `structures/`, com a regra de dependência, a ausência de I/O no domínio e a independência dos adaptadores verificadas pelo `import-linter`.
 - Arquivos que misturavam regra e I/O foram divididos (VAD, embeddings, montagem do app).

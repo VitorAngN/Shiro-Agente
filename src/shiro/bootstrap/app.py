@@ -75,6 +75,7 @@ type Closer = Callable[[], Awaitable[None]]
 class App:
     settings: Settings
     agent: AgentLoop
+    router: IntentRouter
     registry: ToolRegistry
     database: Database
     audit: SqliteAuditLog
@@ -208,16 +209,17 @@ async def build_app(
         log.warning(problem)
     problems += routine_problems
     agent_settings = settings.agent
-    agent = AgentLoop(
-        router=IntentRouter(
-            apps=app_aliases(settings),
-            cloud_triggers=settings.router.cloud_triggers,
-            rules=(
-                RoutineRules(routines),
-                ActivityRules(clock.now),
-                *((MemoryRules(clock.now),) if memory is not None else ()),
-            ),
+    router = IntentRouter(
+        apps=app_aliases(settings),
+        cloud_triggers=settings.router.cloud_triggers,
+        rules=(
+            RoutineRules(routines),
+            ActivityRules(clock.now),
+            *((MemoryRules(clock.now),) if memory is not None else ()),
         ),
+    )
+    agent = AgentLoop(
+        router=router,
         providers=providers,
         tools=registry,
         policy=PolicyEngine(
@@ -243,6 +245,7 @@ async def build_app(
     return App(
         settings=settings,
         agent=agent,
+        router=router,
         registry=registry,
         database=database,
         audit=audit,

@@ -123,6 +123,9 @@ class STTSettings(_Section):
     beam_size: int = Field(default=1, ge=1, le=5)  # 1 = mais rápido; 5 = um pouco mais preciso
     threads: int = Field(default=4, ge=1, le=32)
     hotwords: bool = True  # puxa o Whisper para "Shiro" e os nomes dos apps
+    # Comando curto mal transcrito ("Ausa música") é comparado com os comandos conhecidos
+    # e trocado pelo que o áudio diz ("Pausa a música."); custa uma passada a mais do Whisper.
+    commands: bool = True
 
 
 class TTSSettings(_Section):
@@ -166,6 +169,9 @@ class VoiceSettings(_Section):
     push_to_talk_hotkey: str = "ctrl+alt+space"
     stop_hotkey: str = "ctrl+alt+shift+s"  # para de falar e de ouvir na hora
     input_device: str = "default"  # nome (ou parte) do microfone; "shiro voice devices" lista
+    # Como pedir o som ao Windows: "mme" (padrão, com os efeitos de áudio), "wasapi",
+    # "raw" (sem os efeitos) ou "exclusive" (direto do aparelho). "shiro voice mic-test" compara.
+    capture: Literal["mme", "wasapi", "raw", "exclusive"] = "mme"
     output_device: str = "default"
     cue_volume: float = Field(default=0.15, ge=0, le=1)  # bipes de "ouvindo"; 0 desliga
     listen: ListenSettings = ListenSettings()

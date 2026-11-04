@@ -36,3 +36,15 @@ def test_quiet_microphone() -> None:
     assert report.quiet and not report.gated
     assert "baixo" in report.advice()[0]
     assert not inspect_recording(Audio(np.zeros(10, dtype=np.float32), RATE)).gated
+
+
+def test_best_capture_prefers_the_least_intrusive_mode_that_keeps_the_speech() -> None:
+    from shiro.domain.voice.diagnostics import MicReport, best_capture
+
+    cut = MicReport(zeros_before_speech=0.95, onset_jump=400.0, peak_rms=0.3)
+    clean = MicReport(zeros_before_speech=0.0, onset_jump=3.0, peak_rms=0.3)
+    assert best_capture({"mme": clean, "raw": clean}) == "mme"  # nada a mudar
+    assert best_capture({"mme": cut, "exclusive": clean, "raw": clean}) == "raw"
+    assert best_capture({"mme": cut, "wasapi": clean, "exclusive": clean}) == "exclusive"
+    assert best_capture({"mme": cut, "raw": cut}) is None  # o corte vem antes do Windows
+    assert best_capture({}) is None

@@ -10,6 +10,7 @@ transcrição recupera um som que não chegou.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -63,3 +64,18 @@ def inspect_recording(audio: Audio) -> MicReport:
     zeros = float(np.mean(np.abs(before) < _ZERO)) if len(before) else 0.0
     jump = float(rms[onset] / (rms[onset - 1] + 1e-9)) if onset > 0 else 1.0
     return MicReport(zeros_before_speech=zeros, onset_jump=jump, peak_rms=peak)
+
+
+# Do jeito mais simples ao mais intrusivo: o exclusivo tira o microfone dos outros apps.
+CAPTURE_PREFERENCE = ("mme", "raw", "exclusive", "wasapi")
+
+
+def best_capture(
+    reports: Mapping[str, MicReport], preference: Sequence[str] = CAPTURE_PREFERENCE
+) -> str | None:
+    """O primeiro modo de captura que não corta o começo da fala; ``None`` se todos cortam."""
+    for mode in preference:
+        report = reports.get(mode)
+        if report is not None and not report.gated:
+            return mode
+    return None

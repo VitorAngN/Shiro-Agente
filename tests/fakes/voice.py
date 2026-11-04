@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import io
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from types import SimpleNamespace
 from typing import Any
 
@@ -76,8 +76,11 @@ SPEECH = frames(3) + frames(10, 0.9) + frames(30)
 
 
 class FakeSTT:
-    def __init__(self, texts: list[str]) -> None:
+    """Whisper de mentira; ``scores`` dá a nota de frases para a correção de comandos."""
+
+    def __init__(self, texts: list[str], scores: dict[str, float] | None = None) -> None:
         self.texts = texts
+        self.scores = scores or {}
         self.heard: list[float] = []
 
     async def load(self) -> None:
@@ -86,6 +89,10 @@ class FakeSTT:
     async def transcribe(self, audio: Audio) -> Transcript:
         self.heard.append(audio.duration)
         return Transcript(text=self.texts.pop(0) if self.texts else "", audio_s=1, latency_ms=5)
+
+    async def score(self, audio: Audio, phrases: Sequence[str]) -> list[float]:
+        # Sem nota na tabela, a transcrição livre (a primeira) explica o áudio muito melhor.
+        return [self.scores.get(p, -0.2 if i == 0 else -6.0) for i, p in enumerate(phrases)]
 
 
 class FakeTTS:

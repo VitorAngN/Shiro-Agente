@@ -87,6 +87,7 @@ Voz (marco 1b):
 uv run shiro voice setup     # baixa o Whisper e a voz Kokoro (uma vez, ~600 MB)
 uv run shiro voice devices   # lista microfones e saídas
 uv run shiro voice listen    # testa o microfone: ouve uma frase e mostra o texto
+uv run shiro voice mic-test  # compara os modos de captura e diz se algum corta o começo da fala
 uv run shiro voice -v        # conversa por voz: Ctrl+Alt+Espaço fala, Ctrl+Alt+Shift+S para
 uv run shiro voice bench     # mede voz e transcrição sem tocar áudio
 ```

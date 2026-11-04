@@ -14,13 +14,15 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any, TextIO
 
+from shiro.application.agent.router import IntentRouter
+from shiro.application.voice.commands import CommandCatalog, CommandRescoringSTT
 from shiro.bootstrap.app import App, build_app
 from shiro.config import paths
 from shiro.config.settings import Settings
 from shiro.domain.ports import ConfirmationChannel, LLMError, Notifier
 from shiro.domain.voice.audio import Cues
 from shiro.domain.voice.endpointing import EndpointConfig
-from shiro.domain.voice.ports import TextToSpeech
+from shiro.domain.voice.ports import SpeechToText, TextToSpeech
 from shiro.infrastructure.voice.stt import (
     FasterWhisperSTT,
     vocabulary_hotwords,
@@ -108,6 +110,21 @@ async def whisper_for(
     return FasterWhisperSTT(stt_settings, source=str(folder), prompt=prompt, hotwords=words)
 
 
+def with_commands(
+    whisper: FasterWhisperSTT, settings: Settings, router: IntentRouter
+) -> SpeechToText:
+    """Whisper que corrige comandos curtos mal transcritos, se ``[voice.stt] commands``."""
+    if not settings.voice.stt.commands:
+        return whisper
+    return CommandRescoringSTT(
+        whisper,
+        scorer=whisper,
+        catalog=CommandCatalog.build(router.match_tier0, app_labels(settings)),
+        recognize=router.match_tier0,
+        name=settings.general.assistant_name,
+    )
+
+
 def endpoint_for(settings: Settings) -> EndpointConfig:
     listen = settings.voice.listen
     return EndpointConfig(
@@ -141,7 +158,7 @@ class VoiceRuntime:
     session: VoiceSession
     triggers: TriggerSource
     tts: TextToSpeech
-    stt: FasterWhisperSTT
+    stt: SpeechToText
     talk_hint: str = "Enter"
     hotkeys: Any = None
     wake: Any = None
@@ -160,7 +177,7 @@ class VoiceRuntime:
             except LLMError as exc:
                 report(False, f"modelo local offline ({exc}); comandos simples continuam")
         await self.stt.load()
-        report(True, f"ouvido: {self.stt.name}")
+        report(True, f"ouvido: {getattr(self.stt, 'name', 'Whisper')}")
         start = getattr(self.tts, "start", None)
         if start is not None:
             await start()
@@ -206,7 +223,7 @@ class VoiceRuntime:
         voice = self.settings.voice
         word = voice.wake_word
         listener = WakeListener(
-            microphone=SoundDeviceMicrophone(voice.input_device),
+            microphone=SoundDeviceMicrophone(voice.input_device, voice.capture),
             events=self.triggers,
             is_idle=lambda: self.session.idle,
         )
@@ -304,19 +321,20 @@ async def build_voice_runtime(
 
     voice = settings.voice
     tts, _ = tts_for(settings)
-    stt = await whisper_for(settings)
+    whisper = await whisper_for(settings)
     confirmation = VoiceConfirmation(keyboard=keyboard)
     voice_notifier = VoiceNotifier()
     notifier: Notifier = (
         FanOutNotifier(voice_notifier, extra_notifier) if extra_notifier else voice_notifier
     )
     app = await build_app(settings, confirmation=confirmation, notifier=notifier, channel="voice")
+    stt = with_commands(whisper, settings, app.router)
     session = VoiceSession(
         run_turn=app.agent.run_turn,
         stt=stt,
         tts=tts,
         player=SoundDevicePlayer(voice.output_device),
-        microphone=SoundDeviceMicrophone(voice.input_device),
+        microphone=SoundDeviceMicrophone(voice.input_device, voice.capture),
         detector=SileroVAD(),
         listen=endpoint_for(settings),
         cues=Cues.generate(voice.cue_volume),
