@@ -236,7 +236,17 @@ async def _listen(settings: Settings, args: argparse.Namespace) -> int:
     took = _seconds(transcript.latency_ms / 1000)
     print(f"ouvi ({_seconds(audio.duration)}, transcrito em {took}):")
     print(f"  {transcript.text or '(nada reconhecível)'}")
+    _warn_about_mic(audio)
     return 0
+
+
+def _warn_about_mic(audio: Any) -> bool:
+    from shiro.domain.voice.diagnostics import inspect_recording
+
+    tips = inspect_recording(audio).advice()
+    for tip in tips:
+        print(f"  ⚠ {tip}")
+    return bool(tips)
 
 
 SAMPLES_DIR = "voice-samples"
@@ -289,6 +299,8 @@ async def _record(settings: Settings, args: argparse.Namespace) -> int:
         (folder / name).write_bytes(audio.to_wav())
         saved.append({"file": name, "text": phrase})
         print(f"  ok ({_seconds(audio.duration)})")
+        if number == 1:
+            _warn_about_mic(audio)
     (folder / _MANIFEST).write_text(json.dumps(saved, ensure_ascii=False, indent=2), "utf-8")
     print(f"\n{len(saved)} gravações salvas. Para medir: uv run shiro voice bench --samples")
     return 0 if saved else 1
