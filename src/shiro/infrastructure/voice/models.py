@@ -109,8 +109,13 @@ def whisper_dir(data_dir: Path, model: str) -> Path:
     return data_dir / "models" / "whisper" / whisper_repo(model).replace("/", "--")
 
 
+def _has_vocabulary(folder: Path) -> bool:
+    return any((folder / name).is_file() for name in ("vocabulary.txt", "vocabulary.json"))
+
+
 def whisper_ready(data_dir: Path, model: str) -> bool:
-    return (whisper_dir(data_dir, model) / COMPLETE_MARK).is_file()
+    folder = whisper_dir(data_dir, model)
+    return (folder / COMPLETE_MARK).is_file() and _has_vocabulary(folder)
 
 
 async def ensure_whisper(
@@ -118,6 +123,11 @@ async def ensure_whisper(
 ) -> Path:
     """Pasta com o modelo do Whisper pronto, baixando o que faltar."""
     repo = whisper_repo(model)
+    folder = whisper_dir(data_dir, model)
+    if (folder / COMPLETE_MARK).is_file() and not _has_vocabulary(folder):
+        # Marcado como completo antes de o vocabulary.json entrar na lista: completa agora
+        # (os arquivos que já estão aqui, com o tamanho certo, não são baixados de novo).
+        (folder / COMPLETE_MARK).unlink()
     try:
         return await ensure_hf_files(
             client,

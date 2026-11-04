@@ -7,6 +7,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from shiro.infrastructure.system.downloads import COMPLETE_MARK
 from shiro.infrastructure.voice import models
 
 
@@ -62,3 +63,15 @@ async def test_whisper_download_verifies_every_file(tmp_path: Path) -> None:
         await models.ensure_whisper(empty, tmp_path / "y", "outra")
     for c in (client, missing, empty):
         await c.aclose()
+
+
+def test_whisper_without_vocabulary_is_not_ready(tmp_path: Path) -> None:
+    from shiro.infrastructure.voice.models import whisper_dir, whisper_ready
+
+    folder = whisper_dir(tmp_path, "large-v3-turbo")
+    assert folder.name == "mobiuslabsgmbh--faster-whisper-large-v3-turbo"
+    folder.mkdir(parents=True)
+    (folder / COMPLETE_MARK).write_text("x")
+    assert not whisper_ready(tmp_path, "large-v3-turbo")  # falta o vocabulário
+    (folder / "vocabulary.json").write_text("{}")
+    assert whisper_ready(tmp_path, "large-v3-turbo")
