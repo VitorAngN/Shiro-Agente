@@ -7,7 +7,7 @@ import re
 import pytest
 
 from shiro.domain.ids import uuid7
-from shiro.domain.text import normalize, parse_number
+from shiro.domain.text import normalize, parse_number, similarity, sound_key
 
 
 @pytest.mark.parametrize(
@@ -41,3 +41,23 @@ def test_uuid7_is_versioned_and_time_ordered() -> None:
     pattern = r"^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
     assert re.match(pattern, first)
     assert first[:13] <= second[:13]
+
+
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        ("Chrome", "crome"),
+        ("Steam", "istim"),
+        ("Steam", "stin"),
+        ("WhatsApp", "uatsap"),
+        ("Discord", "discórdia"),
+    ],
+)
+def test_sound_key_matches_portuguese_pronunciation(a: str, b: str) -> None:
+    assert sound_key(a) == sound_key(b)
+
+
+def test_similarity() -> None:
+    assert similarity("abc", "abc") == 1.0 and similarity("", "abc") == 0.0
+    assert similarity("kron", "kroma") == 0.6
+    assert sound_key("Einstein") != sound_key("Steam")

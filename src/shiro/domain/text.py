@@ -75,3 +75,59 @@ def parse_number(text: str) -> int | None:
         unit = _UNITS[words[2]]
         return _TENS[words[0]] + unit if 0 < unit < 10 else None
     return None
+
+
+# ------------------------------------------------------------------ som das palavras
+
+_SOUND_RULES: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (re.compile(pattern), replacement)
+    for pattern, replacement in (
+        (r"^[ei](?=s[bcdfgklmnpqrtvz])", ""),  # "esteam", "istim" → "steam", "stim"
+        (r"chr", "kr"),  # "chrome" se fala "crome"
+        (r"ch|sh", "x"),
+        (r"ph", "f"),
+        (r"th", "t"),
+        (r"ck|qu|c(?=[aou])|c$", "k"),
+        (r"c(?=[eiy])|ç|z", "s"),
+        (r"c", "k"),
+        (r"w", "u"),
+        (r"y", "i"),
+        (r"ee|ea|ie", "i"),  # "steam" → "stim"
+        (r"oo|ou", "u"),
+        (r"h", ""),
+        (r"m(?=[^aeiou]|$)", "n"),  # "stim" e "stin" soam igual
+        (r"(.)\1+", r"\1"),
+        (r"(?<=..)[aeiou]+$", ""),  # vogal final some: "crome", "cromo" → "kron"
+    )
+)
+
+
+def sound_key(text: str) -> str:
+    """Chave de pronúncia aproximada, para nomes estrangeiros ditos em português.
+
+    >>> sound_key("Chrome") == sound_key("crome")
+    True
+    >>> sound_key("Steam") == sound_key("istim")
+    True
+    """
+    key = re.sub(r"[^a-z]", "", strip_accents(text.casefold()))
+    for pattern, replacement in _SOUND_RULES:
+        key = pattern.sub(replacement, key)
+    return key
+
+
+def similarity(a: str, b: str) -> float:
+    """1 menos a distância de edição relativa (Levenshtein): 1.0 é igual, 0.0 nada a ver."""
+    if a == b:
+        return 1.0
+    if not a or not b:
+        return 0.0
+    previous = list(range(len(b) + 1))
+    for i, left in enumerate(a, start=1):
+        current = [i]
+        for j, right in enumerate(b, start=1):
+            current.append(
+                min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (left != right))
+            )
+        previous = current
+    return 1.0 - previous[-1] / max(len(a), len(b))

@@ -21,7 +21,11 @@ from shiro.domain.ports import ConfirmationChannel, LLMError, Notifier
 from shiro.domain.voice.audio import Cues
 from shiro.domain.voice.endpointing import EndpointConfig
 from shiro.domain.voice.ports import TextToSpeech
-from shiro.infrastructure.voice.stt import FasterWhisperSTT, vocabulary_prompt
+from shiro.infrastructure.voice.stt import (
+    FasterWhisperSTT,
+    vocabulary_hotwords,
+    vocabulary_prompt,
+)
 from shiro.interfaces.text.theme import Theme
 from shiro.interfaces.voice.session import (
     Phase,
@@ -65,7 +69,12 @@ def app_labels(settings: Settings) -> list[str]:
 
 
 async def whisper_for(
-    settings: Settings, model: str | None = None, *, threads: int | None = None
+    settings: Settings,
+    model: str | None = None,
+    *,
+    threads: int | None = None,
+    hotwords: bool | None = None,
+    device: str | None = None,
 ) -> FasterWhisperSTT:
     """Whisper com o modelo baixado pelo SHIRO (com verificação de hash), ainda não carregado."""
     import httpx
@@ -77,6 +86,10 @@ async def whisper_for(
         update["model"] = model
     if threads is not None:
         update["threads"] = threads
+    if hotwords is not None:
+        update["hotwords"] = hotwords
+    if device is not None:
+        update.update(device=device, compute_type="int8_float16" if device == "cuda" else "int8")
     stt_settings = settings.voice.stt.model_copy(update=update)
     data_dir = paths.data_dir()
     ready = whisper_ready(data_dir, stt_settings.model)
@@ -89,8 +102,10 @@ async def whisper_for(
         )
     if not ready and sys.stdout is not None:
         print()  # noqa: T201
-    prompt = vocabulary_prompt(settings.general.assistant_name, app_labels(settings))
-    return FasterWhisperSTT(stt_settings, source=str(folder), prompt=prompt)
+    name, apps = settings.general.assistant_name, app_labels(settings)
+    prompt = vocabulary_prompt(name, apps)
+    words = vocabulary_hotwords(name, apps) if stt_settings.hotwords else ""
+    return FasterWhisperSTT(stt_settings, source=str(folder), prompt=prompt, hotwords=words)
 
 
 def endpoint_for(settings: Settings) -> EndpointConfig:

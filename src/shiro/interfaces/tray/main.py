@@ -122,6 +122,9 @@ class RuntimeActions:
 
 
 async def run_tray(settings: Settings) -> int:
+    from shiro.infrastructure.observability.logging import watch_event_loop
+
+    watch_event_loop()
     loop = asyncio.get_running_loop()
     tray = TrayController(name=settings.general.assistant_name, loop=loop)
     try:
@@ -175,7 +178,10 @@ def _alert(message: str) -> None:
 
 
 def main() -> int:
-    from shiro.infrastructure.observability.logging import configure_logging
+    from shiro.infrastructure.observability.logging import (
+        configure_logging,
+        log_lifecycle,
+    )
     from shiro.infrastructure.system.singleton import AlreadyRunningError, single_instance
 
     try:
@@ -184,6 +190,7 @@ def main() -> int:
         _alert(f"Configuração inválida:\n\n{exc}")
         return 1
     configure_logging(settings.logging, paths.log_dir(), console=False)
+    log_lifecycle("tray")
     try:
         lock = single_instance()
     except AlreadyRunningError as exc:

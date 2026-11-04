@@ -86,3 +86,48 @@ def test_tier0_falls_through_to_the_model(text: str) -> None:
 def test_cloud_triggers() -> None:
     assert ROUTER.wants_cloud("Pensa bem: qual a melhor ordem pra estudar?")
     assert not ROUTER.wants_cloud("abre o spotify")
+
+
+SOUNDS = IntentRouter(
+    apps={
+        "chrome": ["Chrome", "google chrome"],
+        "steam": ["Steam"],
+        "discord": ["Discord"],
+        "spotify": ["Spotify"],
+        "vscode": ["VS Code"],
+    },
+    cloud_triggers=[],
+)
+
+
+@pytest.mark.parametrize(
+    ("spoken", "expected"),
+    [
+        ("Apra o crome.", [("open_app", {"app": "chrome"})]),
+        ("abre o stim", [("open_app", {"app": "steam"})]),
+        ("abra o istim", [("open_app", {"app": "steam"})]),
+        ("fecha o discórdia", [("close_app", {"app": "discord"})]),
+        (
+            "abra o crome e o stim",
+            [("open_app", {"app": "chrome"}), ("open_app", {"app": "steam"})],
+        ),
+    ],
+)
+def test_app_names_that_sound_alike(
+    spoken: str, expected: list[tuple[str, dict[str, str]]]
+) -> None:
+    calls = SOUNDS.match_tier0(spoken)
+    assert calls is not None and [(c.name, c.arguments) for c in calls] == expected
+
+
+@pytest.mark.parametrize("spoken", ["Abra, Einstein.", "abra o programa este", "abra o vs"])
+def test_does_not_guess_names_that_are_too_different(spoken: str) -> None:
+    assert SOUNDS.match_tier0(spoken) is None
+
+
+def test_taught_alias_is_used_right_away() -> None:
+    router = IntentRouter(apps={"steam": ["Steam"]}, cloud_triggers=[])
+    assert router.match_tier0("abra einstein") is None
+    router.teach_alias("einstein", "steam")
+    calls = router.match_tier0("Abra, Einstein.")
+    assert calls is not None and calls[0].arguments == {"app": "steam"}

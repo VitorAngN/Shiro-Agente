@@ -122,6 +122,7 @@ class STTSettings(_Section):
     language: str = "pt"
     beam_size: int = Field(default=1, ge=1, le=5)  # 1 = mais rápido; 5 = um pouco mais preciso
     threads: int = Field(default=4, ge=1, le=32)
+    hotwords: bool = True  # puxa o Whisper para "Shiro" e os nomes dos apps
 
 
 class TTSSettings(_Section):

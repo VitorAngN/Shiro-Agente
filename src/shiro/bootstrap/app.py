@@ -133,6 +133,10 @@ async def build_app(
 
     data_dir = data_dir or paths.data_dir()
     database = await Database.open(database_path or data_dir / DATABASE_FILE)
+    problems: list[str] = []
+    if database.recovery is not None:
+        problems.append(database.recovery.describe())
+    await database.daily_backup()
     closers.append(database.close)
     audit = SqliteAuditLog(database)
     bus = EventBus()
@@ -198,10 +202,11 @@ async def build_app(
     for group, keywords in TOOL_GATES.items():
         registry.gate(group, keywords)
     registry.except_phrases(GATE_EXCEPTIONS)
-    routines, problems = load_routines(settings.routines, registry)
+    routines, routine_problems = load_routines(settings.routines, registry)
     registry.register(ListRoutinesTool(routines))
-    for problem in problems:
+    for problem in routine_problems:
         log.warning(problem)
+    problems += routine_problems
     agent_settings = settings.agent
     agent = AgentLoop(
         router=IntentRouter(

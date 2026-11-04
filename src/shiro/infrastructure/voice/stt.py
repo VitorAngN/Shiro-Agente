@@ -43,11 +43,20 @@ def _whisper(settings: STTSettings, source: str) -> Any:
 
 
 def vocabulary_prompt(name: str, apps: Sequence[str]) -> str:
-    """Prompt inicial com nomes que o Whisper erraria sem contexto ("Shiro", apps)."""
-    listed = ", ".join(apps[:12])
-    base = f"{name}, abre o {apps[0]}." if apps else f"{name}."
-    extra = f" Aplicativos: {listed}." if listed else ""
-    return f"{base} Volume, atividade, lembrete, prova, trabalho.{extra}"
+    """Prompt inicial em forma de comandos de exemplo, com os nomes que o Whisper erraria.
+
+    Frases completas puxam mais o Whisper que uma lista solta: ele tende a
+    continuar no mesmo estilo e com a mesma grafia.
+    """
+    commands = [f"Abra o {app}." for app in apps[:8]]
+    return " ".join(
+        [f"{name}, que horas são?", *commands, "Volume em 30.", "Me lembra da prova às 18h."]
+    )
+
+
+def vocabulary_hotwords(name: str, apps: Sequence[str]) -> str:
+    """Palavras que o Whisper deve preferir quando o som for parecido (``hotwords``)."""
+    return " ".join([name, *apps[:12]])
 
 
 class FasterWhisperSTT:
@@ -57,12 +66,14 @@ class FasterWhisperSTT:
         *,
         source: str | None = None,
         prompt: str = "",
+        hotwords: str = "",
         factory: ModelFactory = _whisper,
     ) -> None:
         """``source``: pasta do modelo já baixado; sem ela, usa o nome em ``settings.model``."""
         self._settings = settings
         self._source = source or settings.model
         self._prompt = prompt or None
+        self._hotwords = hotwords or None
         self._factory = factory
         self._model: Any = None
         self._lock = asyncio.Lock()
@@ -93,6 +104,7 @@ class FasterWhisperSTT:
             condition_on_previous_text=False,
             without_timestamps=True,
             initial_prompt=self._prompt,
+            hotwords=self._hotwords,
         )
         kept: list[str] = []
         for segment in segments:

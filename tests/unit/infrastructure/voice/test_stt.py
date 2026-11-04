@@ -6,7 +6,7 @@ import pytest
 
 from shiro.config.settings import STTSettings
 from shiro.domain.voice.audio import tone
-from shiro.infrastructure.voice.stt import FasterWhisperSTT, vocabulary_prompt
+from shiro.infrastructure.voice.stt import FasterWhisperSTT, vocabulary_hotwords, vocabulary_prompt
 from tests.fakes.voice import FakeWhisper, segment
 
 
@@ -41,6 +41,7 @@ async def test_whisper_filters_noise_and_loads_once() -> None:
 
 def test_vocabulary_prompt_names_the_assistant_and_apps() -> None:
     prompt = vocabulary_prompt("Shiro", ["Spotify", "VS Code"])
-    assert prompt.startswith("Shiro, abre o Spotify.")
-    assert "VS Code" in prompt
-    assert vocabulary_prompt("Shiro", []).startswith("Shiro.")
+    assert prompt.startswith("Shiro, que horas são?")
+    assert "Abra o Spotify." in prompt and "Abra o VS Code." in prompt  # comandos de exemplo
+    assert vocabulary_prompt("Shiro", []).startswith("Shiro,")
+    assert vocabulary_hotwords("Shiro", ["Steam", "Chrome"]) == "Shiro Steam Chrome"

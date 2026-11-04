@@ -91,9 +91,17 @@ async def ensure_kokoro(
     return files
 
 
+_WHISPER_REPOS = {
+    "large-v3-turbo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+    "turbo": "mobiuslabsgmbh/faster-whisper-large-v3-turbo",
+}
+
+
 def whisper_repo(model: str) -> str:
     """ "small" → "Systran/faster-whisper-small"; um id com "/" vale como está."""
-    return model if "/" in model else f"Systran/faster-whisper-{model}"
+    if "/" in model:
+        return model
+    return _WHISPER_REPOS.get(model, f"Systran/faster-whisper-{model}")
 
 
 def whisper_dir(data_dir: Path, model: str) -> Path:

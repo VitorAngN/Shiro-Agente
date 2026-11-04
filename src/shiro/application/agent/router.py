@@ -10,7 +10,7 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 
 from shiro.domain.models import ToolCall
-from shiro.domain.text import normalize, parse_number
+from shiro.domain.text import normalize, parse_number, similarity, sound_key
 
 _WAKE_PREFIX = re.compile(r"^(?:(?:ei|ok|hey|oi)\s+)?shiro\s+")
 _POLITE_SUFFIX = re.compile(r"\s+(?:por favor|pf|pfv)$")
@@ -51,8 +51,11 @@ _MEDIA = (
     ),
 )
 
-_OPEN = re.compile(r"^(?:abre|abra|abrir|inicia|executa)\s+(?P<apps>.+)$")
-_CLOSE = re.compile(r"^(?:fecha|feche|fechar|encerra)\s+(?P<apps>.+)$")
+# "apra" e "habra": o Whisper às vezes troca ou acrescenta letras no começo da frase.
+_OPEN = re.compile(r"^(?:abre|abra|apra|habra|abrir|inicia|inicie|executa|execute)\s+(?P<apps>.+)$")
+_CLOSE = re.compile(r"^(?:fecha|feche|fechar|encerra|encerre)\s+(?P<apps>.+)$")
+_SOUND_MATCH = 0.75  # parecido o bastante com o nome de um app
+_SOUND_MARGIN = 0.15  # e claramente mais parecido que o segundo colocado
 _APP_SEPARATOR = re.compile(r"\s+e\s+|\s*,\s*")
 _ARTICLE = re.compile(r"^(?:o|a|os|as)\s+")
 
@@ -139,10 +142,17 @@ class IntentRouter:
     ) -> None:
         self._rules = tuple(rules)
         self._aliases: dict[str, str] = {}
+        self._sounds: dict[str, str] = {}  # chave de pronúncia → app
         for key, aliases in apps.items():
             for alias in (key, *aliases):
-                self._aliases[normalize(alias)] = key
+                self.teach_alias(alias, key)
         self._cloud_triggers = tuple(normalize(t) for t in cloud_triggers if t.strip())
+
+    def teach_alias(self, alias: str, key: str) -> None:
+        """Mais um jeito de chamar o app ``key`` (configurado ou ensinado pelo usuário)."""
+        self._aliases[normalize(alias)] = key
+        if sound := sound_key(alias):
+            self._sounds[sound] = key
 
     def match_tier0(self, text: str) -> tuple[ToolCall, ...] | None:
         """Chamadas de ferramenta para o pedido, ou ``None`` se não for Tier 0."""
@@ -207,9 +217,27 @@ class IntentRouter:
     def _resolve_apps(self, spoken: str) -> list[str] | None:
         keys: list[str] = []
         for part in _APP_SEPARATOR.split(spoken):
-            key = self._aliases.get(_ARTICLE.sub("", part.strip()))
+            name = _ARTICLE.sub("", part.strip())
+            key = self._aliases.get(name) or self._sounds_like(name)
             if key is None:
                 return None
             if key not in keys:
                 keys.append(key)
         return keys or None
+
+    def _sounds_like(self, name: str) -> str | None:
+        """O app cujo nome soa parecido ("crome" → chrome), só se não houver dúvida."""
+        sound = sound_key(name)
+        if len(sound) < 3:
+            return None
+        scored = sorted(
+            ((similarity(sound, known), key) for known, key in self._sounds.items()),
+            reverse=True,
+        )
+        if not scored or scored[0][0] < _SOUND_MATCH:
+            return None
+        best, key = scored[0]
+        rivals = [s for s, k in scored[1:] if k != key]
+        if rivals and best - rivals[0] < _SOUND_MARGIN:
+            return None
+        return key

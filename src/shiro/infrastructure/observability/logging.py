@@ -8,8 +8,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import atexit
 import logging
+import os
 import sys
+import threading
 from collections.abc import MutableMapping
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -17,6 +21,7 @@ from typing import Any
 
 import structlog
 
+from shiro import __version__
 from shiro.config.settings import LoggingSettings
 
 LOG_FILE_NAME = "shiro.log"
@@ -95,3 +100,41 @@ def configure_logging(
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=False,
     )
+
+
+def log_lifecycle(command: str) -> None:
+    """Registra início, fim e erros não tratados (do processo, de threads e do asyncio).
+
+    Sem isso, um processo que morre ou trava não deixa rastro no log.
+    """
+    log = logging.getLogger("shiro")
+    log.info("SHIRO %s iniciando (pid %d, versão %s)", command, os.getpid(), __version__)
+    previous = sys.excepthook
+
+    def on_crash(kind: type[BaseException], value: BaseException, tb: Any) -> None:
+        log.critical("erro não tratado em %s", command, exc_info=(kind, value, tb))
+        previous(kind, value, tb)
+
+    def on_thread_crash(args: threading.ExceptHookArgs) -> None:
+        name = args.thread.name if args.thread is not None else "?"
+        log.critical(
+            "erro não tratado na thread %s",
+            name,
+            exc_info=(args.exc_type, args.exc_value, args.exc_traceback),  # type: ignore[arg-type]
+        )
+
+    sys.excepthook = on_crash
+    threading.excepthook = on_thread_crash
+    atexit.register(log.info, "SHIRO %s encerrando (pid %d)", command, os.getpid())
+
+
+def watch_event_loop() -> None:
+    """Erros de tarefas do asyncio que ninguém aguardou vão para o log."""
+    log = logging.getLogger("shiro")
+
+    def handler(_loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+        log.error(
+            "erro no laço do asyncio: %s", context.get("message"), exc_info=context.get("exception")
+        )
+
+    asyncio.get_running_loop().set_exception_handler(handler)

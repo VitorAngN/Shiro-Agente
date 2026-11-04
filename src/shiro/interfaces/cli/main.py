@@ -73,7 +73,11 @@ async def _chat(settings: Settings, args: argparse.Namespace) -> int:
 
     from shiro.bootstrap.app import build_app
     from shiro.domain.ports import LLMError
-    from shiro.infrastructure.observability.logging import configure_logging
+    from shiro.infrastructure.observability.logging import (
+        configure_logging,
+        log_lifecycle,
+        watch_event_loop,
+    )
     from shiro.interfaces.text.session import (
         CliConfirmation,
         CliNotifier,
@@ -85,6 +89,8 @@ async def _chat(settings: Settings, args: argparse.Namespace) -> int:
 
     use_safe_output()
     configure_logging(settings.logging, paths.log_dir(), console=False)
+    log_lifecycle("chat")
+    watch_event_loop()
     theme = Theme.for_stream(sys.stdout)
     app = await build_app(
         settings, confirmation=CliConfirmation(theme=theme), notifier=CliNotifier(theme)
@@ -131,12 +137,18 @@ async def _dashboard(settings: Settings, args: argparse.Namespace) -> int:
     import webbrowser
 
     from shiro.bootstrap.app import build_app
-    from shiro.infrastructure.observability.logging import configure_logging
+    from shiro.infrastructure.observability.logging import (
+        configure_logging,
+        log_lifecycle,
+        watch_event_loop,
+    )
     from shiro.interfaces.api.dashboard import Dashboard
     from shiro.interfaces.text.session import use_safe_output
 
     use_safe_output()
     configure_logging(settings.logging, paths.log_dir(), console=False)
+    log_lifecycle("dashboard")
+    watch_event_loop()
     app = await build_app(settings, confirmation=_NoConfirmation())
     panel = Dashboard(app)
     try:

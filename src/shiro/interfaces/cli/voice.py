@@ -38,11 +38,25 @@ def add_voice_parser(commands: Any) -> None:
     say.add_argument("--out", type=Path, help="salva em WAV em vez de tocar")
     say.add_argument("--engine", choices=("kokoro", "sapi"), help="motor de voz")
     actions.add_parser("listen", help="ouve uma frase e mostra a transcrição")
+    record = actions.add_parser(
+        "record", help="grava você dizendo comandos, para medir o Whisper (fica só no PC)"
+    )
+    record.add_argument("--count", type=int, help="quantas frases gravar (padrão: todas)")
     actions.add_parser("setup", help="baixa e prepara os modelos de voz")
     bench = actions.add_parser("bench", help="mede fala e transcrição sem tocar áudio")
     bench.add_argument("--engine", nargs="*", choices=("kokoro", "sapi"), help="motores de voz")
     bench.add_argument("--stt", nargs="*", help="modelos do Whisper (ex.: base small)")
     bench.add_argument("--out", type=Path, help="salva o relatório em JSON")
+    bench.add_argument(
+        "--samples",
+        nargs="?",
+        const="latest",
+        help="usa as suas gravações (shiro voice record) em vez da voz sintetizada",
+    )
+    bench.add_argument(
+        "--hotwords", choices=("on", "off", "both"), default="on", help="compara com e sem hotwords"
+    )
+    bench.add_argument("--device", nargs="*", choices=("cpu", "cuda"), help="onde rodar o Whisper")
     bench.add_argument(
         "--wake", action="store_true", help='mede a palavra de ativação ("Ei, Shiro")'
     )
@@ -56,6 +70,7 @@ def run_voice(settings: Settings, args: argparse.Namespace) -> int:
         None: _session,
         "say": _say,
         "listen": _listen,
+        "record": _record,
         "setup": _setup,
         "bench": _bench,
     }
@@ -83,7 +98,11 @@ def _seconds(value: float) -> str:
 
 
 async def _session(settings: Settings, args: argparse.Namespace) -> int:
-    from shiro.infrastructure.observability.logging import configure_logging
+    from shiro.infrastructure.observability.logging import (
+        configure_logging,
+        log_lifecycle,
+        watch_event_loop,
+    )
     from shiro.infrastructure.system.singleton import AlreadyRunningError, single_instance
     from shiro.infrastructure.voice.devices import AudioDeviceError
     from shiro.infrastructure.voice.models import DownloadError
@@ -94,6 +113,8 @@ async def _session(settings: Settings, args: argparse.Namespace) -> int:
 
     use_safe_output()
     configure_logging(settings.logging, paths.log_dir(), console=False)
+    log_lifecycle("voice")
+    watch_event_loop()
     theme = Theme.for_stream(sys.stdout)
     try:
         lock = single_instance()
@@ -213,6 +234,79 @@ async def _listen(settings: Settings, args: argparse.Namespace) -> int:
     print(f"ouvi ({_seconds(audio.duration)}, transcrito em {took}):")
     print(f"  {transcript.text or '(nada reconhecível)'}")
     return 0
+
+
+SAMPLES_DIR = "voice-samples"
+_MANIFEST = "frases.json"
+
+
+def record_phrases(settings: Settings) -> list[str]:
+    """Comandos para gravar: os apps configurados primeiro, depois o resto do dia a dia."""
+    apps = [entry.label for entry in settings.policy.allowed_apps.values()]
+    phrases = [f"abra o {app}" for app in apps[:6]]
+    if len(apps) > 1:
+        phrases.append(f"feche o {apps[1]}")
+    return [
+        *phrases,
+        "abaixa o volume pra vinte",
+        "pausa a música",
+        "que horas são",
+        "o que eu tenho essa semana",
+        "anota prova de cálculo sexta às dez",
+        "me lembra de beber água daqui a vinte minutos",
+        "quanto de memória ram eu tô usando",
+    ]
+
+
+async def _record(settings: Settings, args: argparse.Namespace) -> int:
+    from shiro.application.voice.listening import record_utterance
+    from shiro.domain.voice.audio import Cues
+    from shiro.infrastructure.voice.devices import SoundDeviceMicrophone, SoundDevicePlayer
+    from shiro.infrastructure.voice.silero import SileroVAD
+
+    phrases = record_phrases(settings)[: args.count or None]
+    stamp = datetime.now(ZoneInfo(settings.general.timezone)).strftime("%Y%m%d-%H%M%S")
+    folder = paths.data_dir() / SAMPLES_DIR / stamp
+    folder.mkdir(parents=True)
+    player = SoundDevicePlayer(settings.voice.output_device)
+    cues = Cues.generate(settings.voice.cue_volume)
+    print(f"Vou pedir {len(phrases)} frases. Fale do jeito normal, depois do bipe.")
+    print(f"As gravações ficam só neste PC, em {folder}.\n")
+    saved: list[dict[str, str]] = []
+    for number, phrase in enumerate(phrases, start=1):
+        print(f"[{number}/{len(phrases)}] diga: {phrase}")
+        await player.play(cues.listening)
+        audio = await record_utterance(
+            SoundDeviceMicrophone(settings.voice.input_device), SileroVAD(), _endpoint(settings)
+        )
+        if audio is None:
+            print("  não ouvi nada; pulando esta")
+            continue
+        await player.play(cues.done)
+        name = f"{number:02d}.wav"
+        (folder / name).write_bytes(audio.to_wav())
+        saved.append({"file": name, "text": phrase})
+        print(f"  ok ({_seconds(audio.duration)})")
+    (folder / _MANIFEST).write_text(json.dumps(saved, ensure_ascii=False, indent=2), "utf-8")
+    print(f"\n{len(saved)} gravações salvas. Para medir: uv run shiro voice bench --samples")
+    return 0 if saved else 1
+
+
+def load_samples(spec: str) -> list[tuple[str, Any]]:
+    """Gravações de ``shiro voice record``: ``"latest"`` ou o caminho de uma pasta."""
+    from shiro.domain.voice.audio import Audio
+
+    root = paths.data_dir() / SAMPLES_DIR
+    if spec == "latest":
+        folders = sorted(p for p in root.glob("*") if (p / _MANIFEST).is_file())
+        if not folders:
+            msg = "nenhuma gravação ainda: rode 'uv run shiro voice record' antes"
+            raise FileNotFoundError(msg)
+        folder = folders[-1]
+    else:
+        folder = Path(spec)
+    items = json.loads((folder / _MANIFEST).read_text("utf-8"))
+    return [(i["text"], Audio.from_wav((folder / i["file"]).read_bytes())) for i in items]
 
 
 async def _setup(settings: Settings, args: argparse.Namespace) -> int:
@@ -361,8 +455,9 @@ async def _bench(settings: Settings, args: argparse.Namespace) -> int:
     from shiro.infrastructure.voice.models import kokoro_files, kokoro_installed
     from shiro.infrastructure.voice.tts import TTSError
 
+    samples: str | None = getattr(args, "samples", None)
     engines: list[str] = args.engine or []
-    if not engines:
+    if not engines and samples is None:
         if (
             kokoro_installed()
             and kokoro_files(paths.data_dir(), settings.voice.tts.kokoro_model).present
@@ -371,6 +466,10 @@ async def _bench(settings: Settings, args: argparse.Namespace) -> int:
         if sys.platform == "win32":
             engines.append("sapi")
     models: list[str] = args.stt or [settings.voice.stt.model]
+    devices: list[str] = getattr(args, "device", None) or [settings.voice.stt.device]
+    hotword_modes = {"on": [True], "off": [False], "both": [True, False]}[
+        getattr(args, "hotwords", "on") or "on"
+    ]
     now = datetime.now(ZoneInfo(settings.general.timezone))
     router = IntentRouter(
         apps=app_aliases(settings),
@@ -381,8 +480,15 @@ async def _bench(settings: Settings, args: argparse.Namespace) -> int:
     def intent(text: str) -> object:
         return command_meaning(router.match_tier0(text), now)
 
-    report: dict[str, Any] = {"phrases": list(BENCH_PHRASES), "tts": {}, "stt": []}
-    clips: dict[str, list[Any]] = {}
+    report: dict[str, Any] = {"tts": {}, "stt": []}
+    clips: dict[str, list[tuple[str, Any]]] = {}
+    if samples is not None:
+        try:
+            clips["sua voz"] = load_samples(samples)
+        except (FileNotFoundError, json.JSONDecodeError) as exc:
+            print(f"✗ {exc}")
+            return 1
+        print(f"{len(clips['sua voz'])} gravações suas")
     for engine in engines:
         try:
             tts, status = _tts(settings, engine)
@@ -396,51 +502,75 @@ async def _bench(settings: Settings, args: argparse.Namespace) -> int:
                 started = time.perf_counter()
                 audio = await tts.synthesize(phrase)
                 times.append(time.perf_counter() - started)
-                clips[engine].append(audio)
+                clips[engine].append((phrase, audio))
         finally:
             await tts.aclose()
-        speech = sum(a.duration for a in clips[engine])
+        speech = sum(a.duration for _, a in clips[engine])
         rtf = sum(times) / speech if speech else 0.0
         median = _seconds(statistics.median(times))
         print(f"voz {status}: síntese mediana {median}, fator de tempo real {rtf:.2f}")
         report["tts"][engine] = {"median_s": statistics.median(times), "rtf": rtf}
 
+    summary: list[str] = []
     for model in models:
-        stt = await _ready_stt(settings, model)
-        started = time.perf_counter()
-        await stt.load()
-        print(f"\n{stt.name} carregado em {_seconds(time.perf_counter() - started)}")
-        for engine, audios in clips.items():
-            rows: list[dict[str, Any]] = []
-            for phrase, audio in zip(BENCH_PHRASES, audios, strict=True):
-                transcript = await stt.transcribe(audio)
-                expected, got = intent(phrase), intent(transcript.text)
-                wer = word_error_rate(phrase, transcript.text)
-                # Sem comando do Tier 0 (ex.: pergunta ao modelo), vale a fidelidade do texto.
-                ok = expected == got if expected is not None else wer <= _WER_OK
-                rows.append(
-                    {
-                        "phrase": phrase,
-                        "heard": transcript.text,
-                        "latency_s": transcript.latency_ms / 1000,
-                        "wer": wer,
-                        "intent_ok": ok,
-                    }
-                )
-                mark = "✓" if rows[-1]["intent_ok"] else "✗"
-                print(
-                    f"  {mark} [{engine}] {transcript.latency_ms / 1000:4.2f} s  {transcript.text}"
-                )
-            wer = statistics.mean(r["wer"] for r in rows)
-            latency = statistics.median(r["latency_s"] for r in rows)
-            intents = sum(r["intent_ok"] for r in rows)
-            print(
-                f"  → {engine}: comando certo {intents}/{len(rows)}"
-                f" · erro de palavras {100 * wer:.0f}% · transcrição mediana {_seconds(latency)}"
-            )
-            report["stt"].append({"model": model, "engine": engine, "rows": rows})
-    if getattr(args, "wake", False) and clips:
-        report["wake"] = await _bench_wake(settings, next(iter(clips)))
+        for device in devices:
+            for hotwords in hotword_modes:
+                label = f"{model} · {device} · {'com' if hotwords else 'sem'} hotwords"
+                try:
+                    stt = await _ready_stt(settings, model, hotwords=hotwords, device=device)
+                    started = time.perf_counter()
+                    await stt.load()
+                except Exception as exc:
+                    print(f"\n✗ {label}: {exc}")
+                    continue
+                print(f"\n{label} (carregado em {_seconds(time.perf_counter() - started)})")
+                for engine, items in clips.items():
+                    rows: list[dict[str, Any]] = []
+                    for phrase, audio in items:
+                        transcript = await stt.transcribe(audio)
+                        expected, got = intent(phrase), intent(transcript.text)
+                        wer = word_error_rate(phrase, transcript.text)
+                        # Sem comando do Tier 0 (pergunta ao modelo), vale a fidelidade do texto.
+                        ok = expected == got if expected is not None else wer <= _WER_OK
+                        rows.append(
+                            {
+                                "phrase": phrase,
+                                "heard": transcript.text,
+                                "latency_s": transcript.latency_ms / 1000,
+                                "wer": wer,
+                                "intent_ok": ok,
+                            }
+                        )
+                        mark = "✓" if ok else "✗"
+                        took = transcript.latency_ms / 1000
+                        print(f"  {mark} [{engine}] {took:4.2f} s  {transcript.text}")
+                    if not rows:
+                        continue
+                    wer = statistics.mean(r["wer"] for r in rows)
+                    latency = statistics.median(r["latency_s"] for r in rows)
+                    intents = sum(r["intent_ok"] for r in rows)
+                    line = (
+                        f"{label} [{engine}]: comando certo {intents}/{len(rows)}"
+                        f" · erro de palavras {100 * wer:.0f}% · mediana {_seconds(latency)}"
+                    )
+                    print(f"  → {line}")
+                    summary.append(line)
+                    report["stt"].append(
+                        {
+                            "model": model,
+                            "device": device,
+                            "hotwords": hotwords,
+                            "engine": engine,
+                            "rows": rows,
+                        }
+                    )
+    if len(summary) > 1:
+        print("\nResumo:")
+        for line in summary:
+            print(f"  {line}")
+    if getattr(args, "wake", False) and engines:
+        first = next(iter(e for e in clips if e in engines))
+        report["wake"] = await _bench_wake(settings, first)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
