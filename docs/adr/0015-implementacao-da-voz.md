@@ -22,7 +22,7 @@ O que foi verificado antes de decidir:
 3. **VAD:** o Silero v6 do faster-whisper, quadro a quadro. A fala começa depois de 3 quadros seguidos acima do limiar (~100 ms) e guarda 300 ms antes do início. Ela termina após 700 ms abaixo de *limiar − 0,15*; essa histerese impede que pausas entre palavras cortem a frase. Há também um limite de 15 s e um prazo de 6 s para começar.
 4. **STT:** faster-whisper na CPU, int8, `beam_size` 1, sem o VAD interno (o áudio já vem recortado). Um prompt inicial com "Shiro" e os nomes dos apps ajuda no vocabulário. Frases que o Whisper inventa no silêncio ("Legendas pela comunidade Amara.org", "Obrigado.") são descartadas. O modelo padrão é `small`; o `base` fica como alternativa se a latência incomodar. O `shiro voice bench` decide.
 5. **TTS:**
-   - **Kokoro `pf_dora`** num **processo separado** (`shiro.voice.kokoro_worker`). A conversa é por stdin/stdout: uma linha JSON de pedido, depois cabeçalho JSON e PCM de 16 bits. O processo principal nunca importa espeak-ng nem phonemizer.
+   - **Kokoro `pf_dora`** num **processo separado** (`shiro.infrastructure.voice.kokoro_worker`). A conversa é por stdin/stdout: uma linha JSON de pedido, depois cabeçalho JSON e PCM de 16 bits. O processo principal nunca importa espeak-ng nem phonemizer.
    - O `kokoro-onnx` fica num **grupo de dependências do uv** instalado por padrão (`default-groups`), fora dos metadados do pacote `shiro`.
    - O modelo é baixado das releases do kokoro-onnx por `shiro voice setup`, com **SHA-256 fixado**.
    - **Reserva:** a voz do Windows pelo SAPI 5, renderizada em memória e tocada pelo mesmo player. Sem Kokoro, a SHIRO fala com a Maria e avisa.

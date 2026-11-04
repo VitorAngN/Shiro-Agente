@@ -31,13 +31,14 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from evals.bench_ollama import args_match
-from shiro import paths
-from shiro.activities import dates
-from shiro.app import App, Desktop, build_app
-from shiro.core.models import AgentResult, DecisionKind
-from shiro.settings import AppEntry, Settings, load_settings
-from shiro.tools.builtin.media import MediaAction
-from shiro.tools.builtin.system import GB, Battery, GpuUsage, Usage
+from shiro.bootstrap.app import App, build_app
+from shiro.bootstrap.tools import Desktop
+from shiro.config import paths
+from shiro.config.settings import AppEntry, Settings, load_settings
+from shiro.domain.activities import dates
+from shiro.domain.models import AgentResult, DecisionKind
+from shiro.infrastructure.tools.media import MediaAction
+from shiro.infrastructure.tools.system import GB, Battery, GpuUsage, Usage
 
 DATASET = Path(__file__).parent / "datasets" / "comandos_ptbr.jsonl"
 # Quarta-feira, 4 de novembro de 2026, 10h, no fuso do shiro.toml.

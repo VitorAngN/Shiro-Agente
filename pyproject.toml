@@ -40,11 +40,11 @@ dependencies = [
 ]
 
 [project.scripts]
-shiro = "shiro.cli:main"
+shiro = "shiro.interfaces.cli.main:main"
 
 [project.gui-scripts]
 # Sem janela de console: é o que o início com o Windows chama (ADR-0008).
-shiro-tray = "shiro.tray_main:main"
+shiro-tray = "shiro.interfaces.tray.main:main"
 
 [project.urls]
 Repository = "https://github.com/VitorAngN/Shiro-Agente"
@@ -103,8 +103,7 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
-"src/shiro/cli.py" = ["T201"]
-"src/shiro/cli_voice.py" = ["T201"]
+"src/shiro/interfaces/cli/*" = ["T201"]
 "evals/**" = ["T201"]  # scripts de avaliação imprimem relatório no terminal
 
 # ---------------------------------------------------------------- pyright
@@ -113,16 +112,12 @@ include = ["src", "tests"]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
 strict = [
-    "src/shiro/core",
-    "src/shiro/policy",
-    "src/shiro/llm",
-    "src/shiro/activities",
-    "src/shiro/api",
-    "src/shiro/settings.py",
-    "src/shiro/paths.py",
-    "src/shiro/voice/audio.py",
-    "src/shiro/voice/speech.py",
-    "src/shiro/voice/vad.py",
+    "src/shiro/structures",
+    "src/shiro/domain",
+    "src/shiro/application",
+    "src/shiro/config",
+    "src/shiro/infrastructure/llm",
+    "src/shiro/interfaces/api",
 ]
 venvPath = "."
 venv = ".venv"
@@ -145,12 +140,12 @@ branch = true
 # Adaptadores que só rodam no Windows real (COM, teclas de mídia, ShellExecute).
 # São verificados manualmente no PC; a lógica das ferramentas é testada com dublês.
 omit = [
-    "src/shiro/tools/windows/*",
-    "src/shiro/voice/windows/*",
-    "src/shiro/voice/devices.py",
-    "src/shiro/voice/kokoro_worker.py",
-    "src/shiro/autostart.py",
-    "src/shiro/interfaces/dialogs.py",
+    "src/shiro/infrastructure/tools/windows/*",
+    "src/shiro/infrastructure/voice/windows/*",
+    "src/shiro/infrastructure/voice/devices.py",
+    "src/shiro/infrastructure/voice/kokoro_worker.py",
+    "src/shiro/infrastructure/system/autostart.py",
+    "src/shiro/interfaces/tray/dialogs.py",
 ]
 
 [tool.coverage.report]
@@ -162,38 +157,45 @@ exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]
 # ---------------------------------------------------------------- arquitetura
 [tool.importlinter]
 root_package = "shiro"
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
-name = "Núcleo e política não dependem de adaptadores (ADR-0002)"
-type = "forbidden"
-source_modules = ["shiro.core", "shiro.policy"]
-forbidden_modules = [
-    "shiro.activities",
-    "shiro.api",
-    "shiro.cli",
+name = "Camadas: cada uma só depende das de baixo (ADR-0020)"
+type = "layers"
+layers = [
     "shiro.interfaces",
-    "shiro.llm",
-    "shiro.memory",
-    "shiro.persistence",
-    "shiro.scheduler",
-    "shiro.tools",
-    "shiro.voice",
+    "shiro.bootstrap",
+    "shiro.infrastructure",
+    "shiro.application",
+    "shiro.config",
+    "shiro.domain",
+    "shiro.structures",
 ]
 
 [[tool.importlinter.contracts]]
-name = "Adaptadores não dependem da composição nem uns dos outros (ADR-0002)"
+name = "Domínio e aplicação sem I/O nem bibliotecas de infraestrutura (ADR-0020)"
 type = "forbidden"
-source_modules = ["shiro.api", "shiro.llm", "shiro.persistence", "shiro.tools", "shiro.voice"]
-forbidden_modules = ["shiro.app", "shiro.cli", "shiro.interfaces"]
+source_modules = ["shiro.domain", "shiro.application", "shiro.structures"]
+forbidden_modules = [
+    "aiosqlite",
+    "fastapi",
+    "faster_whisper",
+    "httpx",
+    "keyring",
+    "onnxruntime",
+    "psutil",
+    "sounddevice",
+    "starlette",
+    "uvicorn",
+]
 
 [[tool.importlinter.contracts]]
-name = "Atividades dependem só do núcleo, não de infraestrutura (ADR-0009)"
-type = "forbidden"
-source_modules = ["shiro.activities"]
-forbidden_modules = [
-    "shiro.cli",
-    "shiro.interfaces",
-    "shiro.llm",
-    "shiro.persistence",
-    "shiro.voice",
+name = "Adaptadores não dependem uns dos outros (ADR-0002)"
+type = "independence"
+modules = [
+    "shiro.infrastructure.embeddings",
+    "shiro.infrastructure.llm",
+    "shiro.infrastructure.observability",
+    "shiro.infrastructure.persistence",
+    "shiro.infrastructure.voice",
 ]

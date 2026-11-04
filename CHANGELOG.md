@@ -5,6 +5,18 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Mudado (arquitetura em camadas, ADR-0020)
+- Código reorganizado em `domain/`, `application/`, `config/`, `infrastructure/`, `bootstrap/`, `interfaces/` e `structures/`, com a regra de dependência, a ausência de I/O no domínio e a independência dos adaptadores verificadas pelo `import-linter`.
+- Arquivos que misturavam regra e I/O foram divididos (VAD, embeddings, montagem do app).
+- Testes espelham o código em `tests/unit/`; os que montam o app real ficam em `tests/integration/`, e os dublês compartilhados em `tests/fakes/`.
+- Documento 09: árvore do projeto, conceitos de POO, padrões de projeto e estruturas de dados.
+
+### Adicionado (estruturas de dados)
+- `structures/`: fila de prioridade, buffer circular, janela deslizante, cache LRU, trie de palavras-chave, cadeia de hashes e índice de vetores, cada uma com a complexidade documentada e testes.
+- Agendador sobre a fila de prioridade: o lembrete dispara no segundo certo, e não até 15 s depois.
+- Memória busca num índice em memória em vez de reler o SQLite a cada turno, relê quando outro processo muda o banco e guarda em cache os vetores de frases repetidas.
+- Ferramentas por assunto com palavras-chave numa trie; "imagem" (singular) agora também traz as ferramentas de arquivos.
+
 ### Adicionado (Fase 4 · painel)
 - Painel local em `127.0.0.1` (ADR-0019), aberto pela bandeja ("Abrir painel") ou por `shiro dashboard`:
   - turnos com camada, tempo, ferramentas e a decisão da política, p50/p95 por camada e ações barradas;

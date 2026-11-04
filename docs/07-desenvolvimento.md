@@ -53,19 +53,21 @@ uv run shiro                         # modo completo, com voz (marco 1b)
 |---|---|
 | Idioma | Código e identificadores em inglês. Documentação e falas do SHIRO em pt-BR |
 | Estilo | `ruff format` + `ruff check` (inclui regras de import, bugbear, segurança) |
-| Tipos | `pyright --strict` em `core`, `policy` e `llm`; modo padrão no restante |
+| Tipos | `pyright --strict` em `structures`, `domain`, `application`, `config`, `infrastructure/llm` e `interfaces/api`; modo padrão no restante |
 | Docstrings | Estilo Google, obrigatórias em portas e ferramentas |
 | Commits | [Conventional Commits](https://www.conventionalcommits.org/): `feat(voice): …`, `fix(policy): …` |
 | Branches | `main` sempre verde; trabalho em `feat/…`, `fix/…`, `docs/…` com PR (mesmo sozinho, para manter o histórico) |
 | Versão | SemVer. `0.x` até a Fase 2 |
 | Changelog | `CHANGELOG.md` no formato Keep a Changelog |
 | Decisões | Mudança de arquitetura ou de dependência importante → ADR novo |
+| Onde fica o código | Pela camada ([ADR-0020](adr/0020-camadas-e-estruturas-de-dados.md)): regra pura em `domain`, caso de uso em `application`, I/O em `infrastructure`, entrada em `interfaces`. A CI recusa import contra a regra |
+| Onde fica o teste | `tests/unit/` espelha `src/shiro/` (`domain/voice/endpointing.py` → `tests/unit/domain/voice/test_endpointing.py`); o que monta o app real vai para `tests/integration/`; dublês compartilhados em `tests/fakes/`. Um arquivo de teste não importa outro |
 
 ## 3. Estratégia de testes
 
 ```mermaid
 flowchart BT
-    U["Unitários<br/>core · policy · router · intents<br/>rápidos, sem I/O"] --> I["Integração<br/>adaptadores com fakes e fixtures gravadas"]
+    U["Unitários (tests/unit)<br/>domain · application · structures · adaptadores com dublês<br/>rápidos"] --> I["Integração (tests/integration)<br/>build_app de verdade, dublês só nas bordas"]
     I --> W["Windows<br/>ferramentas reais em runner Windows"]
     W --> E["Avaliação do agente<br/>qualidade do modelo, roda localmente com GPU"]
 ```

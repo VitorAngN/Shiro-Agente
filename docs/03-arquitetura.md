@@ -8,6 +8,7 @@ Este documento descreve a arquitetura do SHIRO em níveis de zoom crescentes (in
 |---|---|---|
 | **Monólito modular** em um único processo Python | Um usuário, um PC. Microsserviços só trariam latência e complexidade operacional | [0002](adr/0002-monolito-modular-hexagonal.md) |
 | **Arquitetura hexagonal** (portas e adaptadores) | O núcleo fica testável e independente de Windows, Ollama e SQLite | [0002](adr/0002-monolito-modular-hexagonal.md) |
+| **Árvore em camadas** (domínio, aplicação, infraestrutura, interfaces, composição) | A pasta diz se o código faz I/O; a regra de dependência é verificada na CI | [0020](adr/0020-camadas-e-estruturas-de-dados.md) |
 | **Barramento de eventos interno** assíncrono | Desacopla voz, agente, interface e observabilidade | [0002](adr/0002-monolito-modular-hexagonal.md) |
 | **Roteamento em três camadas** (Tier 0/1/2) | Comandos simples sem LLM, o dia a dia no modelo local, o difícil na nuvem | [0003](adr/0003-roteamento-hibrido-de-llm.md) |
 | **Ferramentas com risco declarado** e motor de políticas | Segurança como regra do sistema, não como pedido educado ao modelo | [0005](adr/0005-ferramentas-com-politica-de-risco.md) |
@@ -87,7 +88,7 @@ flowchart LR
     aout -.->|"implementam"| ports
 ```
 
-**Regra de dependência:** `core` e `policy` não importam nada de `voice`, `llm`, `tools/builtin`, `persistence` ou `interfaces`. Eles dependem só das portas. A ligação concreta acontece em um único lugar, a *composition root* (`app.py`). A regra é verificada na CI com `import-linter`.
+**Regra de dependência:** `domain` e `application` não importam nada de `infrastructure` nem de `interfaces`. Eles dependem só das portas. A ligação concreta acontece em um único lugar, a raiz de composição (`bootstrap/app.py`). A ordem completa das camadas é `interfaces → bootstrap → infrastructure → application → config → domain → structures`, verificada na CI com `import-linter` ([ADR-0020](adr/0020-camadas-e-estruturas-de-dados.md)).
 
 ### 4.1 Responsabilidades
 
@@ -374,36 +375,17 @@ Cada estágio vira uma métrica com `trace_id`, então dá para ver onde o tempo
 
 ```text
 src/shiro/
-├── __main__.py              # ponto de entrada: python -m shiro
-├── app.py                   # composition root: monta e liga tudo
-├── settings.py              # pydantic-settings + shiro.toml
-├── core/                    # lógica pura, sem I/O
-│   ├── models.py            # entidades e value objects
-│   ├── events.py            # eventos tipados
-│   ├── bus.py               # EventBus
-│   ├── ports.py             # Protocols
-│   ├── router.py            # IntentRouter (Tier 0/1/2)
-│   ├── intents/             # gramática Tier 0 em pt-BR
-│   ├── agent.py             # AgentLoop
-│   └── context.py           # ContextBuilder + persona
-├── policy/                  # PolicyEngine, níveis de risco, taint
-├── llm/                     # adaptadores + rate limiter + custo
-│   ├── ollama.py
-│   ├── gemini.py
-│   ├── anthropic.py
-│   └── openai.py
-├── voice/                   # áudio, wake word, VAD, STT, TTS
-├── tools/
-│   ├── registry.py
-│   ├── builtin/             # apps, áudio, mídia, sistema, arquivos, web, tempo
-│   └── mcp/                 # ponte MCP → Tool
-├── activities/              # atividades com prazo: modelo, regras, datas, ferramentas
-├── memory/                  # curto e longo prazo, embeddings
-├── scheduler/               # lembretes, timers, rotinas
-├── persistence/             # SQLite, migrações, repositórios
-├── interfaces/              # bandeja, atalhos, CLI, API local, toast
-└── observability/           # logs, métricas, auditoria, supervisor
+├── __main__.py      # python -m shiro
+├── domain/          # entidades, valores, regras puras e portas (Protocols); sem I/O
+├── application/     # casos de uso: agente, roteador, atividades, memória, rotinas, agendador
+├── config/          # esquema do shiro.toml (pydantic-settings) e pastas do usuário
+├── infrastructure/  # adaptadores: llm, persistence, embeddings, tools, voice, system
+├── bootstrap/       # raiz de composição: build_app monta e liga tudo
+├── interfaces/      # entradas: cli, text, voice, tray, api (painel)
+└── structures/      # estruturas de dados genéricas: heap, ring, lru, trie…
 ```
+
+A árvore completa, os conceitos de orientação a objetos, os padrões de projeto e as estruturas de dados, com a complexidade de cada uma, estão no [documento 09](09-poo-e-estruturas-de-dados.md).
 
 ## 13. Implantação no Windows
 

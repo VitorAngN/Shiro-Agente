@@ -51,7 +51,20 @@ flowchart LR
     TOOLS --> OUT["Resposta falada<br/>+ notificação"]
 ```
 
-Detalhes completos em [docs/03-arquitetura.md](docs/03-arquitetura.md).
+No código, isso vira camadas com uma regra de dependência verificada na CI ([ADR-0020](docs/adr/0020-camadas-e-estruturas-de-dados.md)):
+
+```text
+src/shiro/
+├── domain/          regras puras e portas, sem I/O
+├── application/     casos de uso: agente, atividades, memória, rotinas, agendador
+├── config/          shiro.toml e pastas
+├── infrastructure/  Ollama, Gemini, SQLite, Whisper, Kokoro, Windows
+├── bootstrap/       monta tudo
+├── interfaces/      terminal, voz, bandeja e painel
+└── structures/      heap, buffer circular, LRU, trie, cadeia de hashes, índice de vetores
+```
+
+Detalhes completos em [docs/03-arquitetura.md](docs/03-arquitetura.md); orientação a objetos, padrões e estruturas de dados em [docs/09](docs/09-poo-e-estruturas-de-dados.md).
 
 ## Como rodar
 
@@ -139,6 +152,7 @@ Para personalizar, copie [`config/shiro.example.toml`](config/shiro.example.toml
 | [06 · Roadmap](docs/06-roadmap.md) | Fases, entregas e critérios de pronto |
 | [07 · Desenvolvimento](docs/07-desenvolvimento.md) | Ambiente, convenções, testes e avaliação |
 | [08 · Identidade](docs/08-identidade.md) | Quem é a SHIRO: persona, voz, aparência e paleta |
+| [09 · POO e estruturas de dados](docs/09-poo-e-estruturas-de-dados.md) | Árvore do projeto, conceitos de POO, padrões de projeto e estruturas com a complexidade |
 | [ADRs](docs/adr/README.md) | Registro das decisões de arquitetura |
 | [Benchmarks](docs/benchmarks/2026-10-31-modelo-local.md) | Medições no hardware real |
 

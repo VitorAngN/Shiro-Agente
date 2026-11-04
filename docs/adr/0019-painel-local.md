@@ -33,7 +33,7 @@ O roadmap previa FastAPI e React. Três restrições pesam:
 
 ### Página
 
-10. HTML, CSS e JavaScript sem framework e sem build, servidos de `shiro/api/static`. Todo dado do banco entra como texto (`textContent`), nunca como HTML: respostas, memórias e resultados de ferramentas podem conter qualquer coisa (A-01).
+10. HTML, CSS e JavaScript sem framework e sem build, servidos de `shiro/interfaces/api/static`. Todo dado do banco entra como texto (`textContent`), nunca como HTML: respostas, memórias e resultados de ferramentas podem conter qualquer coisa (A-01).
 11. A identidade do [ADR-0012](0012-identidade-da-shiro.md): paleta grafite, ciano para "sistema ok", âmbar só para confirmação e para o que foi barrado, vermelho só na identidade. Os estados mudam de forma além da cor (tracejado para negado e para nuvem, anel tracejado enquanto ela pensa).
 12. Fontes Chakra Petch, JetBrains Mono e Noto Sans JP (só 白シロ), em subconjuntos woff2 dentro do pacote (~80 KB, licença OFL junto). Nada vem da internet.
 

@@ -1,5 +1,5 @@
 """Permite rodar o SHIRO com ``python -m shiro``."""
 
-from shiro.cli import main
+from shiro.interfaces.cli.main import main
 
 raise SystemExit(main())

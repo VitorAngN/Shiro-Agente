@@ -1,0 +1,1 @@
+"""Dublês compartilhados pelos testes."""

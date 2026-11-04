@@ -167,4 +167,4 @@ A limpeza roda como tarefa interna do agendador, uma vez por dia, e também é r
 
 ## 5. Migrações
 
-Migrações SQL numeradas em `src/shiro/persistence/migrations/` (`0001_init.sql`, `0002_…`), aplicadas na inicialização dentro de uma transação, com a versão registrada em `PRAGMA user_version`. Antes de migrar, o SHIRO copia o banco para `shiro.db.bak`.
+Migrações SQL numeradas em `src/shiro/infrastructure/persistence/migrations/` (`0001_init.sql`, `0002_…`), aplicadas na inicialização dentro de uma transação, com a versão registrada em `PRAGMA user_version`. Antes de migrar, o SHIRO copia o banco para `shiro.db.bak`.
