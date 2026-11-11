@@ -314,6 +314,30 @@ class ApiSettings(_Section):
         return value
 
 
+_TAILNET = ipaddress.ip_network("100.64.0.0/10")  # faixa CGNAT que o Tailscale usa
+
+
+class DevicesSettings(_Section):
+    """API dos aparelhos (ADR-0022): celular e programa do PC falando com o motor."""
+
+    enabled: bool = False
+    host: str = "127.0.0.1"  # o endereço deste PC no Tailscale (100.x.y.z) para o celular alcançar
+    port: int = Field(default=8766, ge=1024, le=65535)
+
+    @field_validator("host")
+    @classmethod
+    def _private_only(cls, value: str) -> str:
+        # Ameaça A-05: nunca na rede local nem em 0.0.0.0; só loopback ou a rede do Tailscale.
+        try:
+            address = ipaddress.ip_address(value)
+        except ValueError:
+            address = None
+        if address is None or not (address.is_loopback or address in _TAILNET):
+            msg = "a API dos aparelhos só escuta em 127.0.0.1 ou no endereço do Tailscale (100.x)"
+            raise ValueError(msg)
+        return value
+
+
 class LoggingSettings(_Section):
     level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     max_file_mb: int = Field(default=10, ge=1)
@@ -350,6 +374,7 @@ class Settings(BaseSettings):
     routines: dict[str, RoutineSettings] = Field(default_factory=dict[str, RoutineSettings])
     retention: RetentionSettings = RetentionSettings()
     api: ApiSettings = ApiSettings()
+    devices: DevicesSettings = DevicesSettings()
     logging: LoggingSettings = LoggingSettings()
     mcp: McpSettings = McpSettings()
 

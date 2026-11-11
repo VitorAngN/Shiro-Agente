@@ -5,6 +5,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (aparelhos, ADR-0022)
+- Pareamento por código de uso único (2 min) e chave própria por aparelho; o banco guarda só o hash (migração 0004).
+- API dos aparelhos: `POST /v1/pair`, `GET /v1/me`, `GET /v1/devices`, `DELETE /v1/me`, `POST /v1/chat`, sempre com a chave do aparelho.
+- `[devices]`: só aceita escutar no loopback ou no endereço do Tailscale. Ainda não é ligada pela bandeja.
+
 ### Adicionado (reconhecimento de comandos, ADR-0021)
 - Comando curto mal transcrito ("Ausa música.", "Abra, Einstein.") é comparado com os comandos que o roteador conhece. O próprio Whisper mede quanto cada um explica o áudio (`align` do CTranslate2, codificador uma vez só), e o texto é trocado quando um comando ganha com folga. Liga em `[voice.stt] commands`.
 - `[voice] capture`: `mme` (padrão), `wasapi`, `raw` (sem os efeitos de áudio do Windows) ou `exclusive`. Se o modo não abrir, a SHIRO volta para o MME.

@@ -6,6 +6,7 @@ from datetime import time
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from shiro.config.settings import ConfigError, Settings, load_settings
 from tests.conftest import EXAMPLE_CONFIG
@@ -146,3 +147,14 @@ def test_allowed_apps_reject_bad_keys(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError, match="nome de app inválido"):
         load_settings(config)
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "::1", "100.101.102.103"])
+def test_device_api_accepts_loopback_and_tailscale(host: str) -> None:
+    assert Settings.model_validate({"devices": {"host": host}}).devices.host == host
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "192.168.0.10", "10.0.0.5", "100.128.0.1", "meupc"])  # noqa: S104
+def test_device_api_never_listens_on_the_local_network(host: str) -> None:
+    with pytest.raises(ValidationError, match="Tailscale"):
+        Settings.model_validate({"devices": {"host": host}})
