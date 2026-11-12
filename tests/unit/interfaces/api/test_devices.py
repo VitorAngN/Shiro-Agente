@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -102,3 +103,49 @@ def test_a_device_that_leaves_loses_access_and_the_others_keep_it(
     assert client.delete("/v1/me", headers=phone).json() == {"revoked": True}
     assert client.get("/v1/me", headers=phone).status_code == 401
     assert [d["name"] for d in client.get("/v1/devices", headers=laptop).json()] == ["Notebook"]
+
+
+async def test_confirmations_wait_for_the_client_and_default_to_no() -> None:
+    import asyncio
+
+    from shiro.application.devices.confirmations import RemoteConfirmations
+    from shiro.domain.models import DecisionKind
+
+    confirmations = RemoteConfirmations(timeout_s=0.05)
+    assert await confirmations.ask("Abrir a Steam?", DecisionKind.CONFIRM_VOICE) is False  # venceu
+    assert confirmations.pending() == []
+
+    confirmations = RemoteConfirmations(timeout_s=5)
+    asking = asyncio.create_task(confirmations.ask("Abrir a Steam?", DecisionKind.CONFIRM_VOICE))
+    await asyncio.sleep(0)
+    (pending,) = confirmations.pending()
+    assert pending.prompt == "Abrir a Steam?"
+    assert confirmations.answer(pending.id, True)
+    assert await asking is True
+    assert not confirmations.answer(pending.id, True)  # já respondida
+
+
+def test_confirmation_and_lesson_routes(
+    setup: tuple[TestClient, DeviceRegistry, list[tuple[str, str]]],
+) -> None:
+    client, registry, _ = setup
+    auth = pair(client, registry)
+    assert client.get("/v1/confirmations").status_code == 401
+    assert client.get("/v1/confirmations", headers=auth).json() == []
+    missing = client.post("/v1/confirmations/x", json={"approve": True}, headers=auth)
+    assert missing.status_code == 404
+    assert client.get("/v1/lessons", headers=auth).json() == []
+
+
+async def test_the_local_program_key_is_created_once_and_reused(tmp_path: Path) -> None:
+    from shiro.interfaces.api.engine import LOCAL_TOKEN_FILE, ensure_local_token
+
+    registry = DeviceRegistry(MemoryStore(), MovableClock())
+    token = await ensure_local_token(registry, tmp_path)
+    assert (tmp_path / LOCAL_TOKEN_FILE).read_text("utf-8") == token
+    assert await ensure_local_token(registry, tmp_path) == token
+    assert [d.name for d in await registry.devices()] == ["Este PC"]
+
+    (device,) = await registry.devices()
+    await registry.revoke(device.id)  # desligado pelo usuário: a próxima execução cria outra
+    assert await ensure_local_token(registry, tmp_path) != token

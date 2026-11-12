@@ -61,6 +61,7 @@ def _build_parser() -> argparse.ArgumentParser:
     dashboard.add_argument(
         "--no-browser", action="store_true", help="só mostra o link, sem abrir o navegador"
     )
+    commands.add_parser("serve", help="roda o motor para o programa e o celular (ADR-0022)")
     commands.add_parser("setup", help="baixa e prepara os modelos (ouvido, voz e memória)")
     start = commands.add_parser("autostart", help="iniciar com o Windows (na bandeja)")
     start.add_argument("action", choices=("on", "off", "status"))
@@ -174,6 +175,56 @@ async def _dashboard(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+async def _serve(settings: Settings) -> int:
+    from zoneinfo import ZoneInfo
+
+    from shiro.application.devices.confirmations import RemoteConfirmations
+    from shiro.application.devices.service import DeviceRegistry
+    from shiro.bootstrap.app import build_app
+    from shiro.infrastructure.observability.logging import (
+        configure_logging,
+        log_lifecycle,
+        watch_event_loop,
+    )
+    from shiro.infrastructure.persistence.devices import SqliteDeviceStore
+    from shiro.infrastructure.system.clock import SystemClock
+    from shiro.interfaces.api.engine import EngineServer, engine_api, ensure_local_token
+    from shiro.interfaces.text.session import use_safe_output
+
+    use_safe_output()
+    configure_logging(settings.logging, paths.log_dir(), console=False)
+    log_lifecycle("serve")
+    watch_event_loop()
+    confirmations = RemoteConfirmations()
+    app = await build_app(settings, confirmation=confirmations, channel="api")
+    try:
+        registry = DeviceRegistry(
+            SqliteDeviceStore(app.database), SystemClock(ZoneInfo(settings.general.timezone))
+        )
+        await ensure_local_token(registry, paths.data_dir())
+        server = EngineServer(
+            engine_api(app, registry, confirmations),
+            host=settings.devices.host,
+            port=settings.devices.port,
+        )
+        try:
+            await server.start()
+        except OSError:
+            print(f"✗ A porta {settings.devices.port} já está em uso: o motor já está rodando?")
+            return 1
+        print(f"Motor da SHIRO em http://{settings.devices.host}:{settings.devices.port}")
+        for problem in app.problems:
+            print(f"! {problem}")
+        print("Ctrl+C para encerrar.")
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await server.stop()
+    finally:
+        await app.aclose()
+    return 0
+
+
 class _NoConfirmation:
     """O painel sozinho não roda turnos; se algo pedir confirmação, a resposta é não."""
 
@@ -276,7 +327,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         from shiro.interfaces.tray.main import main as tray_main
 
         return tray_main()
-    if args.command in ("chat", "voice", "setup", "dashboard"):
+    if args.command in ("chat", "voice", "setup", "dashboard", "serve"):
         try:
             settings = load_settings()
         except ConfigError as exc:
@@ -288,6 +339,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "voice":
             return run_voice(settings, args)
         try:
+            if args.command == "serve":
+                return asyncio.run(_serve(settings))
             if args.command == "dashboard":
                 return asyncio.run(_dashboard(settings, args))
             return asyncio.run(_chat(settings, args))

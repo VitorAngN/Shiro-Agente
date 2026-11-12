@@ -15,6 +15,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from shiro import __version__
+from shiro.application.devices.confirmations import RemoteConfirmations
 from shiro.application.devices.service import DeviceRegistry
 from shiro.domain.devices.models import MAX_NAME, Device
 from shiro.domain.models import AgentResult
@@ -64,7 +65,25 @@ class ChatResponse(BaseModel):
     tools: list[str]
 
 
-def create_device_api(*, registry: DeviceRegistry, chat: Chat) -> FastAPI:
+class ConfirmationInfo(BaseModel):
+    id: str
+    prompt: str
+
+
+class ConfirmationAnswer(BaseModel):
+    approve: bool
+
+
+type Lessons = Callable[[], list[dict[str, str]]]
+
+
+def create_device_api(
+    *,
+    registry: DeviceRegistry,
+    chat: Chat,
+    confirmations: RemoteConfirmations | None = None,
+    lessons: Lessons | None = None,
+) -> FastAPI:
     api = FastAPI(title="SHIRO · aparelhos", version=__version__, docs_url=None, redoc_url=None)
 
     async def device(request: Request) -> Device:
@@ -105,5 +124,23 @@ def create_device_api(*, registry: DeviceRegistry, chat: Chat) -> FastAPI:
             latency_ms=result.latency_ms,
             tools=[executed.call.name for executed in result.calls],
         )
+
+    @api.get("/v1/confirmations")
+    async def get_confirmations(current: Device = paired) -> list[ConfirmationInfo]:
+        """Perguntas esperando um sim ou não ("Abrir a Steam?")."""
+        waiting = confirmations.pending() if confirmations else []
+        return [ConfirmationInfo(id=p.id, prompt=p.prompt) for p in waiting]
+
+    @api.post("/v1/confirmations/{pending_id}")
+    async def answer_confirmation(
+        pending_id: str, body: ConfirmationAnswer, current: Device = paired
+    ) -> dict[str, bool]:
+        if confirmations is None or not confirmations.answer(pending_id, body.approve):
+            raise HTTPException(status_code=404, detail="essa pergunta já foi respondida ou venceu")
+        return {"answered": True}
+
+    @api.get("/v1/lessons")
+    async def get_lessons(current: Device = paired) -> list[dict[str, str]]:
+        return lessons() if lessons else []
 
     return api

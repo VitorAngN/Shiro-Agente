@@ -80,6 +80,7 @@ class App:
     settings: Settings
     agent: AgentLoop
     router: IntentRouter
+    lessons: Lessons
     registry: ToolRegistry
     database: Database
     audit: SqliteAuditLog
@@ -256,6 +257,7 @@ async def build_app(
         settings=settings,
         agent=agent,
         router=router,
+        lessons=lessons,
         registry=registry,
         database=database,
         audit=audit,
