@@ -5,6 +5,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (aprendizado, ADR-0023)
+- "Quando eu disser X, faça Y" e "aprende que X é Y" ensinam uma expressão; "desaprende X" e "o que você aprendeu?" completam. As lições ficam no banco (migração 0005).
+- A expressão ensinada é trocada pelo significado antes do roteador e também no texto que vai para o modelo.
+- Comandos em sequência no Tier 0: "feche o Discord e abra a Steam" quando cada parte é um comando conhecido.
+
 ### Adicionado (aparelhos, ADR-0022)
 - Pareamento por código de uso único (2 min) e chave própria por aparelho; o banco guarda só o hash (migração 0004).
 - API dos aparelhos: `POST /v1/pair`, `GET /v1/me`, `GET /v1/devices`, `DELETE /v1/me`, `POST /v1/chat`, sempre com a chave do aparelho.

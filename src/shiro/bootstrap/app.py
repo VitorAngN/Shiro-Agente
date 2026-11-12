@@ -25,6 +25,9 @@ from shiro.application.agent.context import ContextBuilder
 from shiro.application.agent.loop import AgentLimits, AgentLoop
 from shiro.application.agent.router import IntentRouter
 from shiro.application.bus import EventBus
+from shiro.application.learning.rules import LearningRules
+from shiro.application.learning.service import Lessons
+from shiro.application.learning.tools import learning_tools
 from shiro.application.memory.rules import MemoryRules
 from shiro.application.memory.service import MemoryService
 from shiro.application.memory.tools import memory_tools
@@ -55,6 +58,7 @@ from shiro.infrastructure.persistence.activities import SqliteActivityStore, Sql
 from shiro.infrastructure.persistence.audit import SqliteAuditLog
 from shiro.infrastructure.persistence.conversation import SqliteConversationStore
 from shiro.infrastructure.persistence.database import Database
+from shiro.infrastructure.persistence.lessons import SqliteLessonStore
 from shiro.infrastructure.persistence.memory import SqliteMemoryStore
 from shiro.infrastructure.persistence.usage import SqliteUsageLedger
 from shiro.infrastructure.system.clock import SystemClock
@@ -191,6 +195,10 @@ async def build_app(
         )
         for memory_tool in memory_tools(memory):
             registry.register(memory_tool)
+    lessons = Lessons(SqliteLessonStore(database), clock)
+    await lessons.load()
+    for learning_tool in learning_tools(lessons):
+        registry.register(learning_tool)
     folders = AllowedFolders(settings.policy.allowed_folders)
     trash: Trash | None = None
     if folders:
@@ -217,6 +225,8 @@ async def build_app(
             ActivityRules(clock.now),
             *((MemoryRules(clock.now),) if memory is not None else ()),
         ),
+        teaching=(LearningRules(),),
+        expand=lessons.expand,
     )
     agent = AgentLoop(
         router=router,

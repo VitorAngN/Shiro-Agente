@@ -26,6 +26,7 @@ Cada decisão importante fica registrada aqui, com o contexto e as alternativas 
 | [0020](0020-camadas-e-estruturas-de-dados.md) | Árvore em camadas e estruturas de dados próprias | Aceito |
 | [0021](0021-comandos-conhecidos-e-captura-do-microfone.md) | Comandos conhecidos na voz e captura sem os efeitos do Windows | Aceito |
 | [0022](0022-motor-como-servico-e-aparelhos.md) | Motor como serviço; programa e celular como clientes pareados | Aceito |
+| [0023](0023-aprendizado-por-licoes.md) | Aprender com o usuário: lições "quando eu disser X, faça Y" | Aceito |
 
 ## Modelo
 

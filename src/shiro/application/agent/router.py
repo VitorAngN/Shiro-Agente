@@ -115,6 +115,9 @@ _LIST = re.compile(
     r"|^(?:o que|oque) (?:esta|ta) (?P<p4>atrasado|atrasada|atrasados|atrasadas)$"
 )
 
+_THEN = re.compile(r"\s+(?:e\s+depois|e\s+entao|depois|e)\s+")
+_MAX_PARTS = 5
+
 type Tier0Calls = Sequence[tuple[str, Mapping[str, object]]]
 type Tier0Rule = Callable[[str], Tier0Calls | None]
 """Regra extra do Tier 0, plugada pela composição; recebe o texto original."""
@@ -131,6 +134,9 @@ class IntentRouter:
         apps: chave do app → apelidos falados (ex.: ``{"vscode": ["vs code", "code"]}``).
         cloud_triggers: expressões que pedem a nuvem explicitamente ("pensa bem").
         rules: regras extras, testadas depois das embutidas (ex.: criar atividade, ADR-0014).
+        teaching: regras que olham o texto como foi falado, antes das lições ("quando eu
+            disser X, faça Y", ADR-0023).
+        expand: troca as expressões que o usuário ensinou pelo significado delas.
     """
 
     def __init__(
@@ -139,8 +145,12 @@ class IntentRouter:
         apps: Mapping[str, Sequence[str]],
         cloud_triggers: Sequence[str],
         rules: Sequence[Tier0Rule] = (),
+        teaching: Sequence[Tier0Rule] = (),
+        expand: Callable[[str], str] | None = None,
     ) -> None:
         self._rules = tuple(rules)
+        self._teaching = tuple(teaching)
+        self._expand = expand
         self._aliases: dict[str, str] = {}
         self._sounds: dict[str, str] = {}  # chave de pronúncia → app
         for key, aliases in apps.items():
@@ -154,8 +164,33 @@ class IntentRouter:
         if sound := sound_key(alias):
             self._sounds[sound] = key
 
+    def rewrite(self, text: str) -> str:
+        """O pedido com as expressões ensinadas trocadas pelo significado (ADR-0023).
+
+        Quem está ensinando ou desaprendendo fala a expressão crua: aí nada é trocado.
+        """
+        if self._expand is None or any(rule(text) is not None for rule in self._teaching):
+            return text
+        return self._expand(text)
+
     def match_tier0(self, text: str) -> tuple[ToolCall, ...] | None:
         """Chamadas de ferramenta para o pedido, ou ``None`` se não for Tier 0."""
+        calls: Tier0Calls | None = None
+        for rule in self._teaching:
+            calls = rule(text)
+            if calls is not None:
+                break
+        if calls is None:
+            text = self.rewrite(text)
+            calls = self._single(text) or self._sequence(text)
+        if calls is None:
+            return None
+        return tuple(
+            ToolCall(id=f"t0_{i}", name=name, arguments=dict(args))
+            for i, (name, args) in enumerate(calls)
+        )
+
+    def _single(self, text: str) -> Tier0Calls | None:
         command = self._clean(text)
         if not command:
             return None
@@ -164,12 +199,20 @@ class IntentRouter:
             if calls is not None:
                 break
             calls = rule(text)
-        if calls is None:
+        return calls
+
+    def _sequence(self, text: str) -> Tier0Calls | None:
+        """ "feche o discord e abra a steam": só vale se cada parte for um comando conhecido."""
+        parts = [part for part in _THEN.split(self._clean(text)) if part]
+        if not 2 <= len(parts) <= _MAX_PARTS:
             return None
-        return tuple(
-            ToolCall(id=f"t0_{i}", name=name, arguments=dict(args))
-            for i, (name, args) in enumerate(calls)
-        )
+        calls: list[tuple[str, Mapping[str, object]]] = []
+        for part in parts:
+            found = self._single(part)
+            if found is None:
+                return None
+            calls.extend(found)
+        return calls
 
     def wants_cloud(self, text: str) -> bool:
         command = normalize(text)

@@ -183,7 +183,7 @@ class AgentLoop:
             if calls is not None:
                 result = await self._run_tier0(calls, trace_id)
             else:
-                result = await self._run_llm(text, trace_id)
+                result = await self._run_llm(self._router.rewrite(text), trace_id)
         finally:
             del self._utterances[trace_id]
 
