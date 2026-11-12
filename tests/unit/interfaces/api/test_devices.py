@@ -149,3 +149,14 @@ async def test_the_local_program_key_is_created_once_and_reused(tmp_path: Path) 
     (device,) = await registry.devices()
     await registry.revoke(device.id)  # desligado pelo usuário: a próxima execução cria outra
     assert await ensure_local_token(registry, tmp_path) != token
+
+
+def test_launch_spec_tells_the_program_how_to_start_the_engine(tmp_path: Path) -> None:
+    import json
+
+    from shiro.interfaces.api.engine import ENGINE_FILE, write_launch_spec
+
+    write_launch_spec(tmp_path)
+    spec = json.loads((tmp_path / ENGINE_FILE).read_text("utf-8"))
+    assert Path(spec["exe"]).name.startswith("python") and spec["args"][0] == "-c"
+    assert "serve" in spec["args"][1]

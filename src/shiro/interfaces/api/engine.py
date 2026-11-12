@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 import socket
 import sys
@@ -42,6 +43,21 @@ async def ensure_local_token(registry: DeviceRegistry, folder: Path) -> str:
         raise RuntimeError(msg)
     _write(file, paired.token)
     return paired.token
+
+
+ENGINE_FILE = "engine.json"
+_RUN = "from shiro.interfaces.cli.main import main; raise SystemExit(main(['serve']))"
+
+
+def write_launch_spec(folder: Path) -> None:
+    """Grava como ligar o motor de novo, para o programa do PC fazer isso sozinho.
+
+    Prefere o ``pythonw.exe`` (sem janela de terminal) do mesmo ambiente.
+    """
+    python = Path(sys.executable)
+    windowless = python.with_name("pythonw.exe")
+    spec = {"exe": str(windowless if windowless.exists() else python), "args": ["-c", _RUN]}
+    _write(folder / ENGINE_FILE, json.dumps(spec))
 
 
 def _read(file: Path) -> str:

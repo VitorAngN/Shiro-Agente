@@ -188,7 +188,12 @@ async def _serve(settings: Settings) -> int:
     )
     from shiro.infrastructure.persistence.devices import SqliteDeviceStore
     from shiro.infrastructure.system.clock import SystemClock
-    from shiro.interfaces.api.engine import EngineServer, engine_api, ensure_local_token
+    from shiro.interfaces.api.engine import (
+        EngineServer,
+        engine_api,
+        ensure_local_token,
+        write_launch_spec,
+    )
     from shiro.interfaces.text.session import use_safe_output
 
     use_safe_output()
@@ -202,6 +207,7 @@ async def _serve(settings: Settings) -> int:
             SqliteDeviceStore(app.database), SystemClock(ZoneInfo(settings.general.timezone))
         )
         await ensure_local_token(registry, paths.data_dir())
+        write_launch_spec(paths.data_dir())
         server = EngineServer(
             engine_api(app, registry, confirmations),
             host=settings.devices.host,
