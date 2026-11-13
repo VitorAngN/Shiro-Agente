@@ -373,8 +373,7 @@ def capture_window() -> ScreenShot:
     from PIL import ImageGrab
 
     hwnd = target_window()
-    if hwnd:
-        bring_forward(hwnd)
+    if hwnd:  # sem trazer para a frente: um vigia não pode roubar o foco de quem está usando
         left, top, right, bottom = window_rect(hwnd)
     else:
         left, top = 0, 0

@@ -30,6 +30,7 @@ Cada decisão importante fica registrada aqui, com o contexto e as alternativas 
 | [0024](0024-controle-do-pc.md) | Controle do PC: sites, teclado, leitura da tela e cliques | Aceito |
 | [0025](0025-habilidades.md) | Habilidades montadas pela SHIRO a partir das ferramentas | Aceito |
 | [0026](0026-escrever-por-voz.md) | Escrever por voz: texto pronto colado e modo ditado | Aceito |
+| [0027](0027-visao-da-tela-e-esperas.md) | Visão da tela (clicar no que não tem nome) e esperas/vigias | Aceito |
 
 ## Modelo
 

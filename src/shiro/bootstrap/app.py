@@ -38,6 +38,8 @@ from shiro.application.scheduler import Scheduler
 from shiro.application.skills.service import Skills
 from shiro.application.skills.tools import skill_tools
 from shiro.application.voice.dictation import Dictation
+from shiro.application.watch.service import Steps, Waits
+from shiro.application.watch.tools import wait_tools
 from shiro.bootstrap.llm import (
     build_cloud_llm,
     build_local_llm,
@@ -58,9 +60,10 @@ from shiro.bootstrap.tools import (
 from shiro.config import paths
 from shiro.config.settings import Settings
 from shiro.domain.activities.models import Job, parse_offset
-from shiro.domain.events import TurnFinished
+from shiro.domain.events import BackgroundNotice, TurnFinished
+from shiro.domain.ids import uuid7
 from shiro.domain.memory.embedding import CachedEmbedder
-from shiro.domain.models import Channel, Tier
+from shiro.domain.models import AgentResult, Channel, Tier
 from shiro.domain.policy.engine import PolicyConfig, PolicyEngine
 from shiro.domain.ports import Clock, ConfirmationChannel, LLMProvider, Notifier
 from shiro.infrastructure.embeddings.setup import build_embedder
@@ -74,6 +77,7 @@ from shiro.infrastructure.persistence.memory import SqliteMemoryStore
 from shiro.infrastructure.persistence.skills import SqliteSkillStore
 from shiro.infrastructure.persistence.usage import SqliteUsageLedger
 from shiro.infrastructure.system.clock import SystemClock
+from shiro.infrastructure.tools.control import screen_watcher
 from shiro.infrastructure.tools.files import AllowedFolders, Trash, file_tools
 from shiro.infrastructure.tools.system import PsutilProbe, SystemProbe
 from shiro.infrastructure.tools.web import WebSearchTool
@@ -105,6 +109,7 @@ class App:
     trash: Trash | None = None
     bus: EventBus | None = None
     dictation: Dictation | None = None
+    waits: Waits | None = None
     routines: dict[str, Routine] = field(default_factory=dict[str, Routine])
     problems: list[str] = field(default_factory=list[str])
     """Avisos da montagem (rotina inválida etc.), para a CLI e a bandeja mostrarem."""
@@ -226,6 +231,22 @@ async def build_app(
     searcher = build_web_searcher(settings, SqliteUsageLedger(database))
     if searcher is not None:
         registry.register(WebSearchTool(searcher))
+
+    async def run_steps(steps: Steps) -> AgentResult:
+        return await agent.run_calls(steps)  # ``agent`` é montado logo abaixo
+
+    async def notify(text: str) -> None:
+        await bus.publish(BackgroundNotice(trace_id=uuid7(), text=text))
+
+    waits = Waits(
+        run_steps,
+        notify,
+        seen=screen_watcher(desktop.control, vision) if desktop.control is not None else None,
+    )
+    closers.append(waits.aclose)
+    if desktop.control is not None and settings.policy.pc_control:
+        for wait_tool in wait_tools(waits, step_check(registry)):
+            registry.register(wait_tool)
     skills = Skills(SqliteSkillStore(database), clock)
     await skills.load()
     catalog = step_catalog(registry)  # antes das ferramentas de habilidade entrarem
@@ -300,6 +321,7 @@ async def build_app(
         trash=trash,
         bus=bus,
         dictation=dictation,
+        waits=waits,
         routines=routines,
         problems=problems,
         _closers=closers,

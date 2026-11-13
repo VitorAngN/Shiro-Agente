@@ -37,6 +37,12 @@ class TurnProgress(Event):
     detail: str
 
 
+class BackgroundNotice(Event):
+    """Algo que aconteceu fora de um pedido (uma espera terminou, um vigia agiu)."""
+
+    text: str
+
+
 class ToolCallCompleted(Event):
     executed: ExecutedCall
 

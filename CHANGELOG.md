@@ -5,6 +5,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (visão e esperas, ADR-0027)
+- `click_on` olha a tela quando o item não tem nome (linha de texto, ícone, jogo); `look_at_screen`, `scroll` e `hold_keys`; teclas com código físico para jogos.
+- `wait_then` ("daqui a 3 minutos pausa") e `when_visible` ("quando aparecer Aceitar, clica"), em segundo plano, com aviso em voz e na conversa; `list_waits` e `cancel_waits`.
+- Microfone travado é reaberto sozinho; limite padrão da nuvem: 15 pedidos por minuto.
+
 ### Adicionado (escrever por voz, ADR-0026)
 - `write_text`: a SHIRO redige e cola o texto ou o código pronto no programa pedido ("anota no Obsidian...", "escreve uma função que...").
 - Modo ditado: "modo ditado" liga, cada frase falada é escrita na janela em uso, com pontuação falada; "parar ditado" encerra.

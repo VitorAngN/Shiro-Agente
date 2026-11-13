@@ -16,7 +16,7 @@ import re
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
 from urllib.parse import quote_plus, urlparse
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -629,3 +629,19 @@ def control_tools(
     if vision is not None:
         tools.append(LookAtScreenTool(control, vision))
     return tools
+
+
+def screen_watcher(control: DesktopControl, vision: ScreenVision | None) -> Any:
+    """Função que diz se algo está visível: pelo nome (barato) e, se não, olhando o print."""
+
+    async def seen(target: str) -> bool:
+        wanted = _plain(target)
+        screen = await control.screen()
+        if any(wanted and wanted in _plain(e.name) for e in screen.elements):
+            return True
+        if vision is None:
+            return False
+        shot = await control.capture()
+        return await vision.locate(shot.png, target) is not None
+
+    return seen

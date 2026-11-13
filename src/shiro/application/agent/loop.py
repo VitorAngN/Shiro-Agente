@@ -226,6 +226,19 @@ class AgentLoop:
 
     # ------------------------------------------------------------------ Tier 0
 
+    async def run_calls(self, calls: Sequence[tuple[str, Mapping[str, object]]]) -> AgentResult:
+        """Roda ações já decididas (espera agendada, vigia), com a mesma política e confirmação."""
+        trace_id = uuid7()
+        tool_calls = [
+            ToolCall(id=f"bg_{i}", name=name, arguments=dict(args))
+            for i, (name, args) in enumerate(calls)
+        ]
+        result = await self._run_tier0(tool_calls, trace_id)
+        await self._audit.record(
+            "background", trace_id, {"calls": [c.call.name for c in result.calls]}
+        )
+        return result
+
     async def _run_tier0(self, calls: Sequence[ToolCall], trace_id: str) -> AgentResult:
         executed: list[ExecutedCall] = []
         for call in calls:

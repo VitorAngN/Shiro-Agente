@@ -27,7 +27,7 @@ from shiro.application.devices.service import DeviceRegistry
 from shiro.application.voice.dictation import is_stop, spoken_punctuation
 from shiro.bootstrap.app import App
 from shiro.domain.devices.models import Device
-from shiro.domain.events import TurnFinished, TurnProgress, TurnStarted
+from shiro.domain.events import BackgroundNotice, TurnFinished, TurnProgress, TurnStarted
 from shiro.domain.models import AgentResult, DecisionKind
 from shiro.interfaces.api.devices import create_device_api
 from shiro.interfaces.api.server import _server_class  # pyright: ignore[reportPrivateUsage]
@@ -301,6 +301,24 @@ class VoiceBox:
         self.activity.set("speaking", "respondendo")
         await session.say("Ditado encerrado.")
 
+    async def on_notice(self, event: BackgroundNotice) -> None:
+        """Uma espera ou um vigia agiu: aparece na conversa e é dito em voz alta."""
+        self.history.append(
+            {
+                "id": len(self.history) + 1,
+                "source": "nome",
+                "heard": "(em segundo plano)",
+                "text": event.text,
+                "tier": "T0",
+                "latency_ms": 0,
+                "tools": ["wait"],
+            }
+        )
+        del self.history[:-50]
+        if self._session is not None and not self._busy.locked():
+            async with self._busy:
+                await self._session.say(event.text)
+
     # ------------------------------------------------------------ confirmação por voz
 
     def _confirm_aloud(self, pending: Pending) -> None:
@@ -438,6 +456,7 @@ def engine_api(
     voice = VoiceBox(app, turn, confirmations)
     if app.bus is not None:
         voice.activity.follow(app.bus)
+        app.bus.subscribe(BackgroundNotice, voice.on_notice)
 
     async def chat(text: str, device: Device) -> AgentResult:
         async with turn:
