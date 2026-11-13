@@ -68,6 +68,26 @@ def _backups_newest_first(file: Path) -> list[Path]:
     return sorted(found, key=lambda p: p.stat().st_mtime, reverse=True)
 
 
+_INDEX_ONLY = re.compile(r"^(?:wrong # of entries in index|row \d+ missing from index) ")
+
+
+def repair_indexes(file: Path, problem: str) -> bool:
+    """Só os índices estragados (os dados estão bons): ``REINDEX`` resolve sem perder nada."""
+    lines = [line for line in problem.splitlines() if line.strip()]
+    if not lines or not all(_INDEX_ONLY.match(line) for line in lines):
+        return False
+    try:
+        connection = sqlite3.connect(str(file))
+        try:
+            connection.execute("REINDEX")
+            connection.commit()
+        finally:
+            connection.close()
+    except sqlite3.Error:
+        return False
+    return check_file(file) is None
+
+
 def recover(file: Path, problem: str) -> Recovery:
     """Põe o banco corrompido de lado e restaura o backup íntegro mais novo (síncrono)."""
     stamp = datetime.now(UTC).strftime("%Y-%m-%d-%H%M%S")
@@ -110,8 +130,11 @@ class Database:
         if file is not None:
             file.parent.mkdir(parents=True, exist_ok=True)
             if file.exists() and (problem := await asyncio.to_thread(check_file, file)):
-                recovery = await asyncio.to_thread(recover, file, problem)
-                log.error("banco: %s", recovery.describe())
+                if await asyncio.to_thread(repair_indexes, file, problem):
+                    log.warning("banco: índices refeitos (%s); nenhum dado perdido", problem)
+                else:
+                    recovery = await asyncio.to_thread(recover, file, problem)
+                    log.error("banco: %s", recovery.describe())
         connection = await aiosqlite.connect(str(file) if file else MEMORY)
         connection.row_factory = aiosqlite.Row
         await connection.execute("PRAGMA foreign_keys = ON")
