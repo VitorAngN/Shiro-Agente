@@ -151,6 +151,7 @@ class VoiceBox:
         self._turn = turn
         self._confirmations = confirmations
         self.activity = Activity()
+        self._shared_mic: Any = None
         self._voice_turn = False
         self._asking: set[asyncio.Task[None]] = set()
         if confirmations is not None:
@@ -162,6 +163,17 @@ class VoiceBox:
         self.history: list[dict[str, Any]] = []
         self.problem = ""
 
+    def _microphone(self) -> Any:
+        """O mesmo fluxo do microfone para a escuta do nome e para ouvir o pedido."""
+        if self._shared_mic is None:
+            from shiro.infrastructure.voice.devices import SharedMicrophone, SoundDeviceMicrophone
+
+            voice = self._app.settings.voice
+            self._shared_mic = SharedMicrophone(
+                SoundDeviceMicrophone(voice.input_device, voice.capture)
+            )
+        return self._shared_mic
+
     @property
     def listening_for_name(self) -> bool:
         return self._wake_task is not None and not self._wake_task.done() and self._wake.enabled
@@ -169,7 +181,7 @@ class VoiceBox:
     async def _ready(self) -> VoiceSession:
         if self._session is None:
             from shiro.domain.voice.audio import Cues
-            from shiro.infrastructure.voice.devices import SoundDeviceMicrophone, SoundDevicePlayer
+            from shiro.infrastructure.voice.devices import SoundDevicePlayer
             from shiro.infrastructure.voice.silero import SileroVAD
             from shiro.interfaces.voice.runtime import (
                 endpoint_for,
@@ -189,7 +201,7 @@ class VoiceBox:
                 stt=stt,
                 tts=tts,
                 player=SoundDevicePlayer(voice.output_device),
-                microphone=SoundDeviceMicrophone(voice.input_device, voice.capture),
+                microphone=self._microphone(),
                 detector=SileroVAD(),
                 listen=endpoint_for(settings),
                 cues=Cues.generate(voice.cue_volume),
@@ -393,18 +405,17 @@ class VoiceBox:
         if self._wake_task is not None and not self._wake_task.done():
             self._wake.enabled = True
             return
-        from shiro.infrastructure.voice.devices import SoundDeviceMicrophone
         from shiro.infrastructure.voice.silero import SileroVAD
         from shiro.infrastructure.voice.wake import WakeListener
         from shiro.interfaces.voice.runtime import endpoint_for, whisper_for
 
         session = await self._ready()
         settings = self._app.settings
-        voice, word = settings.voice, settings.voice.wake_word
+        word = settings.voice.wake_word
         check = await whisper_for(settings, word.check_model, threads=2)
         await check.load()
         self._wake = WakeListener(
-            microphone=SoundDeviceMicrophone(voice.input_device, voice.capture),
+            microphone=self._microphone(),
             events=self,
             is_idle=lambda: not self._busy.locked(),
         )

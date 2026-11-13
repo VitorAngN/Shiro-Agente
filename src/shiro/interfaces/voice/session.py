@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import sys
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from enum import Enum
@@ -34,6 +36,8 @@ from shiro.interfaces.text.theme import Theme
 
 _EXIT = {"sair", "exit", "quit", "tchau"}
 _STOP = {"p", "parar", "para", "stop"}
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -261,13 +265,16 @@ class VoiceSession:
         config = self._listen
         if start_timeout_s is not None:
             config = replace(config, start_timeout_s=start_timeout_s)
+        started = time.monotonic()
         try:
             await self._player.play(self._cues.listening)
+            beeped = time.monotonic()
             audio = await record_utterance(self._microphone, self._detector, config, self._control)
             cancelled = self._control.cancel.is_set()
         finally:
             self._control = None
             self.phase = Phase.IDLE
+        recorded = time.monotonic()
         if cancelled:
             return None
         if audio is None:
@@ -277,6 +284,13 @@ class VoiceSession:
             return None
         await self._player.play(self._cues.done)
         transcript = await self._stt.transcribe(audio)
+        _log.info(
+            "escuta: bipe %.1f s, gravação %.1f s (fala %.1f s), transcrição %.1f s",
+            beeped - started,
+            recorded - beeped,
+            audio.duration,
+            transcript.latency_ms / 1000,
+        )
         if self._verbose:
             seconds = f"{transcript.latency_ms / 1000:.2f}".replace(".", ",")
             self.print(self.theme.meta(f"[fala {audio.duration:.1f} s · transcrição {seconds} s]"))

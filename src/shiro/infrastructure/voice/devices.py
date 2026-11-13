@@ -19,6 +19,7 @@ import asyncio
 import contextlib
 import logging
 import threading
+import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -264,6 +265,9 @@ async def _frames(queue: asyncio.Queue[Samples], rate: int) -> AsyncIterator[Sam
             pending = pending[FRAME:]
 
 
+_PLAY_SLACK_S = 3.0
+
+
 class SoundDevicePlayer:
     """Toca áudio e pode ser interrompido a qualquer momento por ``stop``."""
 
@@ -278,7 +282,14 @@ class SoundDevicePlayer:
         if len(audio.samples) == 0:
             return True
         self._stopped.clear()
-        return await asyncio.to_thread(self._play_blocking, audio)
+        limit = audio.duration + _PLAY_SLACK_S
+        try:
+            return await asyncio.wait_for(asyncio.to_thread(self._play_blocking, audio), limit + 2)
+        except TimeoutError:
+            # a saída de som travou (fone sem fio trocando de modo, driver): segue sem o som
+            self._stopped.set()
+            log.warning("saída de som travou; segui sem tocar (%.1f s de áudio)", audio.duration)
+            return True
 
     def _play_blocking(self, audio: Audio) -> bool:
         sd = _sd()
@@ -305,6 +316,7 @@ class SoundDevicePlayer:
             if len(chunk) < frames:
                 raise sd.CallbackStop
 
+        deadline = time.monotonic() + len(samples) / audio.rate + _PLAY_SLACK_S
         with sd.OutputStream(
             samplerate=audio.rate,
             channels=1,
@@ -312,8 +324,70 @@ class SoundDevicePlayer:
             device=device,
             callback=callback,
             finished_callback=finished.set,
-        ):
+        ) as stream:
             while not finished.wait(0.05):
                 if self._stopped.is_set():
                     break
+                if time.monotonic() > deadline:  # o PortAudio parou de pedir som
+                    log.warning("saída de som parou de tocar; interrompendo")
+                    stream.abort()
+                    break
         return not self._stopped.is_set()
+
+
+class SharedMicrophone:
+    """Um só fluxo do microfone para quem quiser ouvir ao mesmo tempo.
+
+    A escuta do nome fica com o microfone aberto o tempo todo; abrir um segundo
+    fluxo no mesmo aparelho para ouvir o pedido às vezes trava no Windows (e custa
+    tempo para abrir). Aqui o fluxo é um só: cada ``open`` recebe uma cópia dos
+    quadros. Se o fluxo travar, é reaberto sozinho enquanto alguém estiver ouvindo.
+    """
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+        self._listeners: set[asyncio.Queue[Samples]] = set()
+        self._pump: asyncio.Task[None] | None = None
+
+    async def _run(self) -> None:
+        failures = 0
+        while self._listeners:
+            try:
+                async with self._inner.open() as frames:
+                    async for frame in frames:
+                        failures = 0
+                        for queue in tuple(self._listeners):
+                            if queue.full():
+                                queue.get_nowait()
+                            queue.put_nowait(frame)
+                        if not self._listeners:
+                            return
+            except (OSError, RuntimeError) as exc:
+                failures += 1
+                log.warning("microfone: %s; reabrindo", exc)
+                await asyncio.sleep(min(0.5 * failures, 5.0))
+
+    @contextlib.asynccontextmanager
+    async def open(self) -> AsyncIterator[AsyncIterator[Samples]]:
+        queue: asyncio.Queue[Samples] = asyncio.Queue(maxsize=_QUEUE_FRAMES)
+        self._listeners.add(queue)
+        if self._pump is None or self._pump.done():
+            self._pump = asyncio.get_running_loop().create_task(self._run())
+        try:
+            yield _shared_frames(queue)
+        finally:
+            self._listeners.discard(queue)
+            if not self._listeners and self._pump is not None:
+                self._pump.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await self._pump
+                self._pump = None
+
+
+async def _shared_frames(queue: asyncio.Queue[Samples]) -> AsyncIterator[Samples]:
+    while True:
+        try:
+            yield await asyncio.wait_for(queue.get(), MIC_SILENT_LIMIT_S * 3)
+        except TimeoutError:
+            msg = "o microfone não mandou som (mesmo reabrindo)"
+            raise MicrophoneStalledError(msg) from None

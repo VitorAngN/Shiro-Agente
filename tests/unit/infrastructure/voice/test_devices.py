@@ -163,3 +163,32 @@ async def test_stalled_stream_raises_instead_of_waiting_forever(
     frames = devices._frames(queue, devices.STT_RATE)  # pyright: ignore[reportPrivateUsage]
     with pytest.raises(devices.MicrophoneStalledError):
         await anext(frames)
+
+
+async def test_shared_microphone_feeds_every_listener_from_one_stream() -> None:
+    import asyncio
+    import contextlib
+    from collections.abc import AsyncIterator
+
+    import numpy as np
+
+    opened: list[int] = []
+
+    class Inner:
+        @contextlib.asynccontextmanager
+        async def open(self) -> AsyncIterator[AsyncIterator[Any]]:
+            opened.append(1)
+
+            async def frames() -> AsyncIterator[Any]:
+                for i in range(1000):
+                    await asyncio.sleep(0.001)
+                    yield np.full(4, i, dtype=np.float32)
+
+            yield frames()
+
+    shared = devices.SharedMicrophone(Inner())
+    async with shared.open() as first, shared.open() as second:
+        a = await anext(first)
+        b = await anext(second)
+        assert a.shape == b.shape == (4,)
+    assert opened == [1]  # um fluxo só para os dois
