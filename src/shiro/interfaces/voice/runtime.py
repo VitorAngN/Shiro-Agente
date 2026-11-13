@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, TextIO
 
 from shiro.application.agent.router import IntentRouter
+from shiro.application.control.rules import site_phrases, site_words
 from shiro.application.voice.commands import CommandCatalog, CommandRescoringSTT
 from shiro.bootstrap.app import App, build_app
 from shiro.config import paths
@@ -70,6 +71,14 @@ def app_labels(settings: Settings) -> list[str]:
     return [entry.label for entry in settings.policy.allowed_apps.values()]
 
 
+def spoken_terms(settings: Settings) -> list[str]:
+    """Palavras em inglês que o usuário fala: as configuradas e, com o controle do PC, os sites."""
+    terms = list(settings.voice.stt.extra_words)
+    if settings.policy.pc_control:
+        terms += site_words()
+    return list(dict.fromkeys(terms))
+
+
 async def whisper_for(
     settings: Settings,
     model: str | None = None,
@@ -104,9 +113,13 @@ async def whisper_for(
         )
     if not ready and sys.stdout is not None:
         print()  # noqa: T201
-    name, apps = settings.general.assistant_name, app_labels(settings)
-    prompt = vocabulary_prompt(name, apps)
-    words = vocabulary_hotwords(name, apps) if stt_settings.hotwords else ""
+    name, apps, terms = (
+        settings.general.assistant_name,
+        app_labels(settings),
+        spoken_terms(settings),
+    )
+    prompt = vocabulary_prompt(name, apps, terms)
+    words = vocabulary_hotwords(name, apps, terms) if stt_settings.hotwords else ""
     return FasterWhisperSTT(stt_settings, source=str(folder), prompt=prompt, hotwords=words)
 
 
@@ -119,7 +132,7 @@ def with_commands(
     return CommandRescoringSTT(
         whisper,
         scorer=whisper,
-        catalog=CommandCatalog.build(router.match_tier0, app_labels(settings)),
+        catalog=CommandCatalog.build(router.match_tier0, app_labels(settings), site_phrases()),
         recognize=router.match_tier0,
         name=settings.general.assistant_name,
     )

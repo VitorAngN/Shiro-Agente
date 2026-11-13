@@ -63,6 +63,7 @@ compute_type = "int8"
 language = "pt"
 beam_size = 1              # 1 = mais rápido
 hotwords = true            # puxa o Whisper para "Shiro" e os nomes dos apps
+# extra_words = ["Hollow Knight", "Valorant"]  # termos em inglês que você fala
 commands = true            # corrige comando curto mal transcrito ("Ausa música." → "Pausa a música.")
 
 [voice.tts]
@@ -87,6 +88,7 @@ read_only_mode = true      # primeiras semanas: tudo R1+ pede confirmação por 
 batch_confirm_threshold = 5
 confirmation_timeout_s = 30
 allowed_folders = ["~/Downloads", "~/Documents/SHIRO"]
+pc_control = true          # abrir sites, digitar, apertar teclas e clicar (ADR-0024)
 
 # Apps que o SHIRO pode abrir e fechar. Formato curto: spotify = "spotify:"
 # launch: caminho, comando do PATH ou URI | process: processo para fechar

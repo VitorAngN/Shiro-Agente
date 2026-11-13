@@ -5,6 +5,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (controle do PC, ADR-0024)
+- `open_url`, `type_text`, `press_keys`, `read_screen` e `click_on`: abrir sites e buscas no navegador, digitar, apertar atalhos, listar e clicar nos botões da janela em uso pelo nome (UI Automation). `[policy] pc_control` liga e desliga.
+- "Abre o YouTube" e "pesquisa X no YouTube" vão direto para o navegador, sem passar pelo modelo, inclusive com nomes mal transcritos ("iutubi").
+- Nomes em inglês (sites e `[voice.stt] extra_words`) entram nas hotwords, no prompt e no catálogo de comandos do Whisper.
+
 ### Adicionado (aprendizado, ADR-0023)
 - "Quando eu disser X, faça Y" e "aprende que X é Y" ensinam uma expressão; "desaprende X" e "o que você aprendeu?" completam. As lições ficam no banco (migração 0005).
 - A expressão ensinada é trocada pelo significado antes do roteador e também no texto que vai para o modelo.

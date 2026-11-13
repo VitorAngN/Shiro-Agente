@@ -123,6 +123,8 @@ class STTSettings(_Section):
     beam_size: int = Field(default=1, ge=1, le=5)  # 1 = mais rápido; 5 = um pouco mais preciso
     threads: int = Field(default=4, ge=1, le=32)
     hotwords: bool = True  # puxa o Whisper para "Shiro" e os nomes dos apps
+    # Termos (em inglês, quase sempre) que você fala e o Whisper erra: ex. ["Hollow Knight"].
+    extra_words: tuple[str, ...] = ()
     # Comando curto mal transcrito ("Ausa música") é comparado com os comandos conhecidos
     # e trocado pelo que o áudio diz ("Pausa a música."); custa uma passada a mais do Whisper.
     commands: bool = True
@@ -224,6 +226,8 @@ class PolicySettings(_Section):
     confirmation_timeout_s: float = Field(default=30.0, gt=0)
     # Pastas que as ferramentas de arquivo enxergam (ADR-0018). Nada fora delas.
     allowed_folders: tuple[str, ...] = ("~/Downloads",)
+    # Abrir sites, digitar, apertar teclas, ler a tela e clicar (ADR-0024).
+    pc_control: bool = True
     allowed_apps: Annotated[dict[str, AppEntry], BeforeValidator(_apps_from_strings)] = Field(
         default_factory=dict[str, AppEntry]
     )

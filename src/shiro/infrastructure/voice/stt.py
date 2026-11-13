@@ -50,21 +50,32 @@ def _whisper(settings: STTSettings, source: str) -> Any:
     )
 
 
-def vocabulary_prompt(name: str, apps: Sequence[str]) -> str:
+def vocabulary_prompt(name: str, apps: Sequence[str], words: Sequence[str] = ()) -> str:
     """Prompt inicial em forma de comandos de exemplo, com os nomes que o Whisper erraria.
 
     Frases completas puxam mais o Whisper que uma lista solta: ele tende a
     continuar no mesmo estilo e com a mesma grafia.
     """
     commands = [f"Abra o {app}." for app in apps[:8]]
+    terms = list(dict.fromkeys(words))[:10]
+    sites = [f"Pesquisa no {terms[0]}.", f"Abre o {', o '.join(terms[1:])}."] if terms else []
     return " ".join(
-        [f"{name}, que horas são?", *commands, "Volume em 30.", "Me lembra da prova às 18h."]
+        [
+            f"{name}, que horas são?",
+            *commands,
+            *sites,
+            "Volume em 30.",
+            "Me lembra da prova às 18h.",
+        ]
     )
 
 
-def vocabulary_hotwords(name: str, apps: Sequence[str]) -> str:
-    """Palavras que o Whisper deve preferir quando o som for parecido (``hotwords``)."""
-    return " ".join([name, *apps[:12]])
+def vocabulary_hotwords(name: str, apps: Sequence[str], words: Sequence[str] = ()) -> str:
+    """Palavras que o Whisper deve preferir quando o som for parecido (``hotwords``).
+
+    Nomes em inglês (YouTube, Chrome, Steam) são os que o Whisper em português mais erra.
+    """
+    return " ".join(dict.fromkeys([name, *apps[:12], *words[:16]]))
 
 
 def score_tokens(

@@ -68,9 +68,12 @@ class CommandCatalog:
         self._candidates = tuple(candidates)
 
     @classmethod
-    def build(cls, recognize: Recognizer, apps: Sequence[str]) -> CommandCatalog:
-        """Só entram as frases que o roteador de fato reconhece."""
+    def build(
+        cls, recognize: Recognizer, apps: Sequence[str], extra: Sequence[str] = ()
+    ) -> CommandCatalog:
+        """Só entram as frases que o roteador de fato reconhece (``extra``: sites etc.)."""
         phrases = [template.format(app) for app in apps for template in _APP_TEMPLATES]
+        phrases += extra
         candidates: list[Candidate] = []
         seen: set[str] = set()
         for phrase in (*phrases, *_FIXED):

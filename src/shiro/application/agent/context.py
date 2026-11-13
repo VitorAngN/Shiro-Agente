@@ -38,6 +38,10 @@ def persona(assistant_name: str) -> str:
             "- Prazos e horários: copie a expressão exatamente como o usuário falou "
             '("pra sexta", "oito da noite"); nunca converta para outra forma.',
             "- Pedidos com várias ações: chame uma ferramenta para cada ação.",
+            "- Você controla o PC quando as ferramentas de controle estão disponíveis: abre "
+            "sites e pesquisas no navegador (open_url), digita (type_text), aperta teclas e "
+            "atalhos (press_keys), lê os botões da janela em uso (read_screen) e clica neles "
+            "pelo nome (click_on). Para pesquisar algo num site, prefira open_url com search.",
             "- Só as ferramentas executam ações. Nunca diga que fez algo sem ter chamado a "
             "ferramenta correspondente; se não existe ferramenta para o pedido, diga que ainda "
             "não consegue fazer isso.",

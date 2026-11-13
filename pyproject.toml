@@ -37,6 +37,7 @@ dependencies = [
     "uvicorn>=0.30",
     "websockets>=13",
     "tzdata>=2024.1; sys_platform == 'win32'",
+    "uiautomation>=2.0.20 ; sys_platform == 'win32'",
     "edge-tts>=7.0",
     "miniaudio>=1.61",
 ]

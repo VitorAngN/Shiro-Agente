@@ -13,6 +13,7 @@ from shiro.config.settings import Settings
 from shiro.infrastructure.tools.apps import AppLauncher, AppTarget, CloseAppTool, OpenAppTool
 from shiro.infrastructure.tools.audio import ChangeVolumeTool, SetVolumeTool, VolumeControl
 from shiro.infrastructure.tools.clock import GetTimeTool
+from shiro.infrastructure.tools.control import DesktopControl, control_tools
 from shiro.infrastructure.tools.location import IpLocator, Locator
 from shiro.infrastructure.tools.media import MediaControlTool, MediaKeys
 from shiro.infrastructure.tools.system import SystemInfoTool, SystemProbe
@@ -28,14 +29,25 @@ class Desktop:
     volume: VolumeControl | None = None
     media: MediaKeys | None = None
     launcher: AppLauncher | None = None
+    control: DesktopControl | None = None
 
 
 def windows_desktop() -> Desktop:  # pragma: no cover - exercitado no Windows real
     from shiro.infrastructure.tools.windows.apps import WindowsAppLauncher
     from shiro.infrastructure.tools.windows.audio import WindowsVolume
+    from shiro.infrastructure.tools.windows.control import (
+        WindowsDesktopControl,
+        enable_dpi_awareness,
+    )
     from shiro.infrastructure.tools.windows.media import WindowsMediaKeys
 
-    return Desktop(volume=WindowsVolume(), media=WindowsMediaKeys(), launcher=WindowsAppLauncher())
+    enable_dpi_awareness()
+    return Desktop(
+        volume=WindowsVolume(),
+        media=WindowsMediaKeys(),
+        launcher=WindowsAppLauncher(),
+        control=WindowsDesktopControl(),
+    )
 
 
 def app_targets(settings: Settings) -> dict[str, AppTarget]:
@@ -81,6 +93,9 @@ def build_registry(
     if desktop.launcher is not None and targets:
         registry.register(OpenAppTool(targets, desktop.launcher))
         registry.register(CloseAppTool(targets, desktop.launcher))
+    if desktop.control is not None and settings.policy.pc_control:
+        for tool in control_tools(desktop.control):
+            registry.register(tool)
     return registry
 
 
@@ -124,6 +139,53 @@ TOOL_GATES: dict[str, tuple[str, ...]] = {
         "apag*",
         "restaur*",
         "exclu*",
+    ),
+    # Controlar o PC: sites no navegador, digitar, teclas, ler a tela e clicar (ADR-0024).
+    "control": (
+        "clica*",
+        "clique*",
+        "clicar",
+        "aperta*",
+        "aperte*",
+        "pressiona*",
+        "digit*",
+        "escrev*",
+        "tecla*",
+        "atalho*",
+        "site*",
+        "pagina*",
+        "navegador*",
+        "link*",
+        "url",
+        "endereco",
+        "youtube*",
+        "wikipedia*",
+        "github*",
+        "chrome*",
+        "edge",
+        "firefox*",
+        "brave",
+        "opera",
+        "na tela",
+        "da tela",
+        "a tela",
+        "janela*",
+        "botao*",
+        "entra no",
+        "entra na",
+        "entre no",
+        "entre na",
+        "acessa*",
+        "acesse*",
+        "pesquisa no",
+        "pesquisa na",
+        "pesquise no",
+        "pesquise na",
+        "procura no",
+        "procure no",
+        "enter",
+        "ctrl",
+        "esc",
     ),
     "web": (
         "pesquis*",

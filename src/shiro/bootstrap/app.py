@@ -25,6 +25,7 @@ from shiro.application.agent.context import ContextBuilder
 from shiro.application.agent.loop import AgentLimits, AgentLoop
 from shiro.application.agent.router import IntentRouter
 from shiro.application.bus import EventBus
+from shiro.application.control.rules import SiteRules
 from shiro.application.learning.rules import LearningRules
 from shiro.application.learning.service import Lessons
 from shiro.application.learning.tools import learning_tools
@@ -225,6 +226,7 @@ async def build_app(
             RoutineRules(routines),
             ActivityRules(clock.now),
             *((MemoryRules(clock.now),) if memory is not None else ()),
+            *((SiteRules(),) if registry.get("open_url") is not None else ()),
         ),
         teaching=(LearningRules(),),
         expand=lessons.expand,
