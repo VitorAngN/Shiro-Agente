@@ -374,8 +374,8 @@ class _StationState extends State<Station> {
                   filled: true,
                   fillColor: surface,
                   contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: line)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: cyan, width: 2)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: line)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(14)), borderSide: BorderSide(color: cyan, width: 2)),
                 ),
               ),
             ),
@@ -417,12 +417,11 @@ class _Sidebar extends StatelessWidget {
       final on = section == value;
       return InkWell(
         onTap: () => onSelect(value),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
+          margin: const EdgeInsets.only(bottom: 4),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-          decoration: BoxDecoration(
-            color: on ? surface : null,
-            border: Border(left: BorderSide(color: on ? fg : Colors.transparent, width: 2)),
-          ),
+          decoration: BoxDecoration(color: on ? surface : null, borderRadius: BorderRadius.circular(12)),
           child: Row(children: [
             Icon(icon, size: 18, color: on ? fg : muted),
             const SizedBox(width: 12),
@@ -484,8 +483,8 @@ class _TurnView extends StatelessWidget {
           SelectableText(turn.asked, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.only(left: 16),
-            decoration: const BoxDecoration(border: Border(left: BorderSide(color: line, width: 2))),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: BoxDecoration(color: surface, borderRadius: BorderRadius.circular(16)),
             child: turn.reply == null
                 ? const Text('…', style: TextStyle(fontSize: 16, color: cyan))
                 : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -497,8 +496,8 @@ class _TurnView extends StatelessWidget {
                         for (final tool in turn.tools)
                           Text(tool, style: const TextStyle(fontSize: 12, fontFamily: 'JetBrains Mono')),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-                          decoration: BoxDecoration(border: Border.all(color: turn.tier == 'T0' ? fg : cyan)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                          decoration: BoxDecoration(border: Border.all(color: turn.tier == 'T0' ? fg : cyan), borderRadius: BorderRadius.circular(20)),
                           child: Text('$tierLabel$seconds',
                               style: TextStyle(fontSize: 12, color: turn.tier == 'T0' ? fg : cyan)),
                         ),
@@ -523,7 +522,7 @@ class _Confirm extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.fromLTRB(32, 0, 32, 16),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: surface, border: Border.all(color: yellow)),
+      decoration: BoxDecoration(color: surface, border: Border.all(color: yellow), borderRadius: BorderRadius.circular(16)),
       child: Row(children: [
         Expanded(
           child: Text(prompt, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: yellow)),
@@ -553,7 +552,7 @@ class _Button extends StatelessWidget {
         backgroundColor: fill,
         foregroundColor: fill == null ? fg : bg,
         disabledForegroundColor: muted,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: fill ?? line)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: fill ?? line)),
         textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, fontFamily: 'Chakra Petch'),
       ),
       child: Text(label),
@@ -726,7 +725,8 @@ class _DevicesState extends State<_Devices> {
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(border: Border.all(color: cyan, width: 2)),
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(color: fg, border: Border.all(color: cyan, width: 2), borderRadius: BorderRadius.circular(20)),
             child: QrImageView(
               data: jsonEncode({'shiro': 1, 'host': pairing!['host'], 'port': pairing!['port'], 'code': pairing!['code']}),
               size: 220,
@@ -785,7 +785,9 @@ class _AvatarState extends State<_Avatar> {
     try {
       final folder = Directory('${Engine.dataDir()}\\avatar');
       if (!await File('${folder.path}\\SHIRO.vrm').exists()) return;
-      await File('${folder.path}\\avatar.html').writeAsString(await rootBundle.loadString('assets/avatar.html'));
+      for (final name in const ['avatar.html', 'three.module.js', 'GLTFLoader.js', 'BufferGeometryUtils.js', 'three-vrm.module.js']) {
+        await File('${folder.path}\\$name').writeAsString(await rootBundle.loadString('assets/$name'));
+      }
       await controller.initialize();
       await controller.setBackgroundColor(surface);
       await controller.setPopupWindowPolicy(WebviewPopupWindowPolicy.deny);
@@ -843,9 +845,11 @@ class _Presence extends StatelessWidget {
         AspectRatio(
           aspectRatio: 52 / 64,
           child: Container(
-            decoration: BoxDecoration(color: surface, border: Border.all(color: color, width: 2)),
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+                color: surface, border: Border.all(color: color, width: 2), borderRadius: BorderRadius.circular(24)),
             child: Stack(children: [
-              Positioned.fill(child: _Avatar(mood: mood)),
+              Positioned.fill(child: ClipRRect(borderRadius: BorderRadius.circular(22), child: _Avatar(mood: mood))),
               Positioned(
                 top: 12,
                 right: 12,
@@ -859,7 +863,7 @@ class _Presence extends StatelessWidget {
           const Text('SHIRO', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            decoration: BoxDecoration(border: Border.all(color: color)),
+            decoration: BoxDecoration(border: Border.all(color: color), borderRadius: BorderRadius.circular(20)),
             child: Text(label, style: TextStyle(fontSize: 13, color: mood == Mood.idle ? muted : color)),
           ),
         ]),
@@ -919,7 +923,7 @@ class _CoreState extends State<_Core> with SingleTickerProviderStateMixin {
               child: Container(
                 width: 130,
                 height: 130,
-                decoration: BoxDecoration(border: Border.all(color: color, width: 1.5)),
+                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: color, width: 1.5)),
               ),
             ),
             RotationTransition(
@@ -927,7 +931,7 @@ class _CoreState extends State<_Core> with SingleTickerProviderStateMixin {
               child: Container(
                 width: 92,
                 height: 92,
-                decoration: BoxDecoration(border: Border.all(color: color.withValues(alpha: 0.6), width: 1.5)),
+                decoration: BoxDecoration(borderRadius: BorderRadius.circular(28), border: Border.all(color: color.withValues(alpha: 0.6), width: 1.5)),
               ),
             ),
             const Text('白', style: TextStyle(fontSize: 44, fontWeight: FontWeight.w300, height: 1)),

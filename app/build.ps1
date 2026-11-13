@@ -32,11 +32,12 @@ foreach ($name in $files.Keys) {
 
 # pubspec: a tela do avatar e as fontes.
 $pubspec = Get-Content pubspec.yaml -Raw
+$pubspec = $pubspec -replace '    - assets/avatar.html', '    - assets/'
 if ($pubspec -notmatch 'family: Chakra Petch') {
     $block = @'
   uses-material-design: true
   assets:
-    - assets/avatar.html
+    - assets/
   fonts:
     - family: Chakra Petch
       fonts:
@@ -53,8 +54,8 @@ if ($pubspec -notmatch 'family: Chakra Petch') {
         - asset: fonts/JetBrainsMono.ttf
 '@
     $pubspec = $pubspec -replace '(?m)^  uses-material-design: true\s*$', $block
-    Set-Content pubspec.yaml $pubspec -Encoding utf8
 }
+Set-Content pubspec.yaml $pubspec -Encoding utf8
 
 # Título da janela.
 $runner = 'windows\runner\main.cpp'
