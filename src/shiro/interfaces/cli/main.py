@@ -195,9 +195,17 @@ def _record_crashes(folder: Path) -> None:
     handle.write(f"--- motor iniciado (pid {os.getpid()})\n")
     handle.flush()
     faulthandler.enable(handle)
+    # se a subida travar, a pilha de cada thread vai para o arquivo (cancelado quando sobe)
+    faulthandler.dump_traceback_later(25, repeat=True, file=handle)
     _crash_log.append(handle)
     # saída normal do Python deixa rastro; se o log terminar sem isto, o processo foi morto
     atexit.register(lambda: logging.getLogger("shiro").warning("motor saiu (atexit)"))
+
+
+def _startup_finished() -> None:
+    import faulthandler
+
+    faulthandler.cancel_dump_traceback_later()
 
 
 async def _serve(settings: Settings) -> int:
@@ -249,6 +257,7 @@ async def _serve(settings: Settings) -> int:
         except OSError:
             print(f"✗ A porta {settings.devices.port} já está em uso: o motor já está rodando?")
             return 1
+        _startup_finished()
         print(f"Motor da SHIRO em http://{settings.devices.host}:{settings.devices.port}")
         for problem in app.problems:
             print(f"! {problem}")
