@@ -5,6 +5,15 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (habilidades, ADR-0025)
+- "Quero que você saiba fazer X": a SHIRO monta os passos com as ações que já tem, mostra para você aprovar e guarda com um nome. Depois é só falar o nome; `{x}` no fim do nome pega o resto da frase.
+- `list_skills` e `forget_skill`; migração 0006.
+
+### Adicionado (programa e controle)
+- Barra de progresso: ouvindo, pensando (local ou nuvem), fazendo qual ação, esperando você, respondendo, com os segundos.
+- `open_program` abre qualquer programa do menu Iniciar (inclusive da Store); `switch_window` traz uma janela aberta para a frente; `list_windows`.
+- Pedidos de controlar o PC e de criar habilidades vão direto para a nuvem (`[router] cloud_groups`).
+
 ### Adicionado (controle do PC, ADR-0024)
 - "Toca X no YouTube" e "pesquisa X e coloca no YouTube" abrem direto o primeiro vídeo da busca (`open_url` com `play`).
 - Pedido feito por voz que precisa de confirmação: a SHIRO pergunta em voz alta e aceita "sim" ou "não"; o botão na tela continua valendo. Ação crítica (R3) só no botão.

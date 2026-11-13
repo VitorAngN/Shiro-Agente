@@ -28,6 +28,7 @@ Cada decisão importante fica registrada aqui, com o contexto e as alternativas 
 | [0022](0022-motor-como-servico-e-aparelhos.md) | Motor como serviço; programa e celular como clientes pareados | Aceito |
 | [0023](0023-aprendizado-por-licoes.md) | Aprender com o usuário: lições "quando eu disser X, faça Y" | Aceito |
 | [0024](0024-controle-do-pc.md) | Controle do PC: sites, teclado, leitura da tela e cliques | Aceito |
+| [0025](0025-habilidades.md) | Habilidades montadas pela SHIRO a partir das ferramentas | Aceito |
 
 ## Modelo
 

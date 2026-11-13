@@ -111,6 +111,22 @@ def build_registry(
 # Palavras que trazem cada grupo de ferramentas para o pedido (texto normalizado, ADR-0018).
 # Palavras de cada assunto (sobre o texto normalizado). "*" no fim: radical.
 TOOL_GATES: dict[str, tuple[str, ...]] = {
+    # Habilidades: "quero que você saiba fazer X" (ADR-0025).
+    "skills": (
+        "habilidade*",
+        "saiba fazer",
+        "saber fazer",
+        "seja capaz",
+        "ser capaz",
+        "capaz de",
+        "aprenda a",
+        "aprende a",
+        "aprender a",
+        "consiga fazer",
+        "conseguir fazer",
+        "que voce saiba",
+        "quero que voce consiga",
+    ),
     "learning": (
         "aprend*",
         "desaprend*",

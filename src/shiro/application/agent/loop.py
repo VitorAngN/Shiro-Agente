@@ -476,6 +476,18 @@ class AgentLoop:
                 result=ToolResult.failure(f"Ação não permitida: {decision.reason}."),
             )
         outcome = CallOutcome.ALLOWED
+        # Ferramenta que sabe que o pedido não vai dar certo avisa antes da confirmação:
+        # não faz sentido o usuário aprovar algo que vai falhar (ex.: habilidade com erro).
+        precheck = getattr(tool, "problem", None)
+        problem = precheck(args) if callable(precheck) else None
+        if isinstance(problem, str) and problem:
+            return ExecutedCall(
+                call=call,
+                risk=spec.risk,
+                outcome=CallOutcome.BLOCKED,
+                reason="argumentos inválidos",
+                result=ToolResult.failure(problem),
+            )
         if decision.needs_confirmation:
             prompt = _sentence(tool.describe(args)) + "?"
             await self._progress(trace_id, "confirming", f"esperando você: {prompt}")

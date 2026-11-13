@@ -85,7 +85,7 @@ class RouterSettings(_Section):
     cloud_triggers: tuple[str, ...] = ("pensa bem", "pesquisa", "analisa com calma")
     # Assuntos que vão direto para a nuvem (se houver chave): controlar o PC tem muitos
     # passos (clicar, digitar, enviar) e o modelo local pequeno erra ou recusa (ADR-0024).
-    cloud_groups: tuple[str, ...] = ("control",)
+    cloud_groups: tuple[str, ...] = ("control", "skills")
 
 
 class LocalLLMSettings(_Section):

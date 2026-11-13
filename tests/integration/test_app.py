@@ -225,3 +225,52 @@ def test_chat_command_end_to_end(
     assert volume.level == 30
     assert (isolated_env / "data" / "shiro.db").is_file()
     assert (isolated_env / "data" / "logs" / "shiro.log").is_file()
+
+
+async def test_skill_is_created_after_approval_and_then_runs_without_the_model(
+    tmp_path: Path, offline_http: httpx.AsyncClient
+) -> None:
+    import json
+
+    volume, launcher = FakeVolume(40), FakeLauncher()
+    asked: list[str] = []
+
+    class Approve:
+        async def ask(self, prompt: str, kind: DecisionKind) -> bool:
+            asked.append(prompt)
+            return True
+
+    bad = json.dumps([{"tool": "format_disk", "args": {}}])
+    good = json.dumps(
+        [
+            {"tool": "set_volume", "args": {"level": 15}},
+            {"tool": "open_app", "args": {"app": "spotify"}},
+        ]
+    )
+    llm = FakeProvider(
+        [
+            reply("", ("create_skill", {"name": "modo noite", "steps_json": bad})),
+            reply("", ("create_skill", {"name": "modo noite", "steps_json": good})),
+            reply("Pronto, aprendi."),
+        ]
+    )
+    app = await build_app(
+        settings_with_apps(tmp_path),
+        confirmation=Approve(),
+        database_path=tmp_path / "data" / "shiro.db",
+        desktop=Desktop(volume=volume, launcher=launcher),
+        local_llm=llm,
+        http=offline_http,
+        probe=FakeProbe(),
+    )
+    try:
+        created = await app.agent.run_turn("quero que você saiba fazer o modo noite")
+        assert [c.call.name for c in created.calls] == ["create_skill", "create_skill"]
+        assert not created.calls[0].result.ok  # passo inválido: nem pediu aprovação
+        assert len(asked) == 1 and "modo noite" in asked[0] and "volume" in asked[0].lower()
+
+        used = await app.agent.run_turn("Shiro, modo noite.")
+        assert used.tier is Tier.T0
+        assert volume.level == 15 and launcher.launched == ["spotify:"]
+    finally:
+        await app.aclose()

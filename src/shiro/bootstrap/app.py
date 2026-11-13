@@ -35,7 +35,10 @@ from shiro.application.memory.tools import memory_tools
 from shiro.application.registry import ToolRegistry
 from shiro.application.routines import ListRoutinesTool, Routine, RoutineRules, load_routines
 from shiro.application.scheduler import Scheduler
+from shiro.application.skills.service import Skills
+from shiro.application.skills.tools import skill_tools
 from shiro.bootstrap.llm import build_cloud_llm, build_local_llm, build_web_searcher
+from shiro.bootstrap.skills import step_catalog, step_check, step_words
 from shiro.bootstrap.tools import (
     GATE_EXCEPTIONS,
     TOOL_GATES,
@@ -62,6 +65,7 @@ from shiro.infrastructure.persistence.conversation import SqliteConversationStor
 from shiro.infrastructure.persistence.database import Database
 from shiro.infrastructure.persistence.lessons import SqliteLessonStore
 from shiro.infrastructure.persistence.memory import SqliteMemoryStore
+from shiro.infrastructure.persistence.skills import SqliteSkillStore
 from shiro.infrastructure.persistence.usage import SqliteUsageLedger
 from shiro.infrastructure.system.clock import SystemClock
 from shiro.infrastructure.tools.files import AllowedFolders, Trash, file_tools
@@ -211,6 +215,11 @@ async def build_app(
     searcher = build_web_searcher(settings, SqliteUsageLedger(database))
     if searcher is not None:
         registry.register(WebSearchTool(searcher))
+    skills = Skills(SqliteSkillStore(database), clock)
+    await skills.load()
+    catalog = step_catalog(registry)  # antes das ferramentas de habilidade entrarem
+    for skill_tool in skill_tools(skills, step_check(registry), step_words(registry), catalog):
+        registry.register(skill_tool)
     for group, keywords in TOOL_GATES.items():
         registry.gate(group, keywords)
     registry.except_phrases(GATE_EXCEPTIONS)
@@ -234,7 +243,7 @@ async def build_app(
                 else ()
             ),
         ),
-        teaching=(LearningRules(),),
+        teaching=(LearningRules(), skills.match),
         expand=lessons.expand,
     )
     agent = AgentLoop(
