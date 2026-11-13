@@ -20,7 +20,7 @@ from collections.abc import Mapping, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from shiro.application.agent.claims import claims_action
+from shiro.application.agent.claims import claims_action, refuses
 from shiro.application.agent.context import CLAIM_CORRECTION, ContextBuilder
 from shiro.application.agent.router import IntentRouter
 from shiro.application.bus import EventBus
@@ -289,6 +289,13 @@ class AgentLoop:
                 continue
 
             final = response.text.strip()
+            if refuses(final) and not state.executed and self._retry_in_cloud(state, text):
+                # O modelo local disse que não consegue: a nuvem tenta, com as ferramentas de
+                # controlar o PC à mão (ler a tela, clicar, digitar).
+                definitions = self._tools.definitions_for(
+                    text, self._recent_groups() | self._limits.cloud_groups
+                )
+                continue
             if claims_action(final) and not any(e.had_effect for e in state.executed):
                 state.claim_detected = True
                 await self._audit.record(
@@ -378,6 +385,16 @@ class AgentLoop:
             return False
         state.tier, state.provider, state.escalated = Tier.T2, cloud, True
         return True
+
+    def _retry_in_cloud(self, state: _TurnState, text: str) -> bool:
+        """Sobe para a nuvem um pedido que o modelo local recusou (sem memórias no contexto)."""
+        if state.tier is not Tier.T1 or state.escalated or not self._limits.cloud_groups:
+            return False
+        if Tier.T2 not in self._providers or state.private_results:
+            return False
+        if state.local_only:
+            return self._escalate_without_memories(state, text)
+        return self._escalate(state)
 
     def _escalate_without_memories(self, state: _TurnState, text: str) -> bool:
         """O modelo local caiu num turno com memórias: tenta a nuvem, mas sem elas.

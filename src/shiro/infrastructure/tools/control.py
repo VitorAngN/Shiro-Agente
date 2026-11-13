@@ -11,6 +11,7 @@ de uma página não pode mandar a SHIRO clicar em nada.
 
 from __future__ import annotations
 
+import asyncio
 import difflib
 import re
 import unicodedata
@@ -612,6 +613,32 @@ class HoldKeysTool:
         return ToolResult.success(f"Segurei {parsed.keys}.", say="Pronto.")
 
 
+class PauseArgs(Args):
+    seconds: float = Field(gt=0, le=60, description="Quantos segundos esperar")
+
+
+class PauseTool:
+    spec = ToolSpec(
+        name="pause",
+        description=(
+            "Espera alguns segundos antes do próximo passo (ex.: olhar a tela, esperar 20 s, "
+            "olhar de novo e comparar o progresso)."
+        ),
+        args_model=PauseArgs,
+        risk=RiskLevel.R0,
+        timeout_s=65.0,
+        group="control",
+    )
+
+    def describe(self, args: BaseModel) -> str:
+        return f"esperar {br_number(expect(args, PauseArgs).seconds)} s"
+
+    async def run(self, args: BaseModel, ctx: ToolContext) -> ToolResult:
+        seconds = expect(args, PauseArgs).seconds
+        await asyncio.sleep(seconds)
+        return ToolResult.success(f"Esperei {br_number(seconds)} s.")
+
+
 def control_tools(
     control: DesktopControl,
     videos: VideoFinder | None = None,
@@ -625,6 +652,7 @@ def control_tools(
         ScrollTool(control),
         ReadScreenTool(control),
         ClickOnTool(control, vision),
+        PauseTool(),
     ]
     if vision is not None:
         tools.append(LookAtScreenTool(control, vision))

@@ -377,3 +377,19 @@ async def test_local_model_down_with_memories_goes_to_the_cloud_without_them() -
     assert h.cloud is not None
     sent = " ".join(m.content or "" for m in h.cloud.requests[0].messages)
     assert "Curitiba" not in sent  # as memórias ficam no PC
+
+
+async def test_local_refusal_is_retried_in_the_cloud() -> None:
+    h = Harness(
+        [reply("Não consigo analisar a tela, não tenho acesso.")],
+        cloud=[reply("Faltam uns 12 minutos.")],
+        limits=AgentLimits(cloud_groups=frozenset({"control"})),
+    )
+    result = await h.agent.run_turn("quanto falta pro download terminar")
+    assert result.tier is Tier.T2 and result.text == "Faltam uns 12 minutos."
+
+    without_cloud_groups = Harness(
+        [reply("Não consigo fazer isso.")], cloud=[reply("nunca")], limits=AgentLimits()
+    )
+    kept = await without_cloud_groups.agent.run_turn("faz algo")
+    assert kept.tier is Tier.T1

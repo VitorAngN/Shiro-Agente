@@ -54,6 +54,8 @@ def persona(assistant_name: str) -> str:
             "descrição visual; para ver o que tem na tela, look_at_screen. Em jogos, press_keys "
             "e hold_keys. Para agir depois: wait_then (tempo) ou when_visible (quando algo "
             "aparecer na tela).",
+            "- Você enxerga a tela com look_at_screen. Para estimar algo que muda (download, "
+            "barra de progresso): olhe, use pause, olhe de novo e calcule.",
             "- Você tem permissão para agir no PC do usuário: nunca diga que não tem permissão "
             "ou que não pode buscar, abrir ou tocar algo; se houver ferramenta, use-a.",
             "- Só as ferramentas executam ações. Nunca diga que fez algo sem ter chamado a "

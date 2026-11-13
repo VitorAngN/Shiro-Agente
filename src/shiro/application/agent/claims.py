@@ -60,3 +60,14 @@ def claims_action(text: str) -> bool:
             if not _NEGATIONS.intersection(before):
                 return True
     return False
+
+
+_REFUSAL = re.compile(
+    r"\b(?:nao (?:consigo|posso|tenho (?:acesso|permissao|como)|sou capaz|estou autorizada|"
+    r"e possivel para mim)|sem (?:acesso|permissao)|fora do meu alcance)\b"
+)
+
+
+def refuses(text: str) -> bool:
+    """``True`` se a resposta diz que não dá para fazer ("não consigo ver a tela")."""
+    return bool(_REFUSAL.search(normalize(text)))
