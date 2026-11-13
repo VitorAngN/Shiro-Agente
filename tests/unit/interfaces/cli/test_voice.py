@@ -89,6 +89,7 @@ def test_voice_commands_explain_missing_audio(
     capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("SHIRO_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("SHIRO_VOICE__TTS__ENGINE", "kokoro")  # a voz local, sem rede
     assert main(["voice", "say", "oi", "--out", str(tmp_path / "x.wav")]) == 1
     assert "shiro voice setup" in capsys.readouterr().out
     assert main(["voice", "devices"]) in (0, 1)  # sem PortAudio: explica e sai com 1

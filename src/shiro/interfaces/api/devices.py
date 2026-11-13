@@ -97,6 +97,16 @@ class PairingResponse(BaseModel):
     port: int
 
 
+async def require_device(request: Request) -> Device:
+    """O aparelho dono da chave em ``Authorization: Bearer``; 401 se não houver."""
+    registry: DeviceRegistry = request.app.state.registry
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    found = await registry.authenticate(token.strip()) if scheme.lower() == "bearer" else None
+    if found is None:
+        raise HTTPException(status_code=401, detail="aparelho não pareado ou desligado")
+    return found
+
+
 def create_device_api(
     *,
     registry: DeviceRegistry,
@@ -109,12 +119,10 @@ def create_device_api(
 ) -> FastAPI:
     api = FastAPI(title="SHIRO · aparelhos", version=__version__, docs_url=None, redoc_url=None)
 
+    api.state.registry = registry
+
     async def device(request: Request) -> Device:
-        scheme, _, token = request.headers.get("authorization", "").partition(" ")
-        found = await registry.authenticate(token.strip()) if scheme.lower() == "bearer" else None
-        if found is None:
-            raise HTTPException(status_code=401, detail="aparelho não pareado ou desligado")
-        return found
+        return await require_device(request)
 
     paired = Depends(device)
 

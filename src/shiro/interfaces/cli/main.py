@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
@@ -197,7 +198,7 @@ async def _serve(settings: Settings) -> int:
     from shiro.interfaces.text.session import use_safe_output
 
     use_safe_output()
-    configure_logging(settings.logging, paths.log_dir(), console=False)
+    configure_logging(settings.logging, paths.log_dir(), console=sys.stderr is not None)
     log_lifecycle("serve")
     watch_event_loop()
     confirmations = RemoteConfirmations()
@@ -223,10 +224,18 @@ async def _serve(settings: Settings) -> int:
         print(f"Motor da SHIRO em http://{settings.devices.host}:{settings.devices.port}")
         for problem in app.problems:
             print(f"! {problem}")
+        voice = api.state.voice
+        if settings.voice.activation in ("wake_word", "both"):
+            try:
+                await voice.set_listening(True)
+                print('Escutando o nome: diga "Shiro" e o pedido.')
+            except Exception as exc:
+                print(f"! não consegui ligar a escuta do nome: {exc}")
         print("Ctrl+C para encerrar.")
         try:
             await asyncio.Event().wait()
         finally:
+            await voice.aclose()
             await server.stop()
     finally:
         await app.aclose()

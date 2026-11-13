@@ -139,6 +139,19 @@ class KokoroProcessTTS:
 
 def build_tts(settings: TTSSettings, data_dir: Path) -> tuple[TextToSpeech, str]:
     """Motor configurado e uma linha de estado. Sem Kokoro, cai para a voz do Windows."""
+    if settings.engine == "edge":
+        from shiro.infrastructure.voice.edge import EdgeTTS, FallbackTTS
+
+        edge = EdgeTTS(
+            voice=settings.edge_voice, speed=settings.speed, pitch_hz=settings.edge_pitch_hz
+        )
+        try:
+            backup, backup_line = build_tts(
+                settings.model_copy(update={"engine": "kokoro"}), data_dir
+            )
+        except TTSError:
+            return edge, f"voz: {edge.name} (sem reserva offline)"
+        return FallbackTTS(edge, backup), f"voz: {edge.name}; sem internet, {backup_line}"
     if settings.engine == "kokoro":
         files = kokoro_files(data_dir, settings.kokoro_model)
         if kokoro_installed() and files.present:

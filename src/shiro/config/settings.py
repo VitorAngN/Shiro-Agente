@@ -129,8 +129,12 @@ class STTSettings(_Section):
 
 
 class TTSSettings(_Section):
-    # Voz feminina pt-BR da SHIRO (ADR-0012). "sapi" usa a voz do Windows (Maria), sem download.
-    engine: Literal["kokoro", "sapi"] = "kokoro"
+    # Voz feminina pt-BR da SHIRO (ADR-0012).
+    # "edge": voz neural da Microsoft (precisa de internet; sem ela, cai para a Kokoro/Windows).
+    # "kokoro": local, sem internet. "sapi": voz do Windows (Maria), sem download.
+    engine: Literal["edge", "kokoro", "sapi"] = "edge"
+    edge_voice: str = "pt-BR-FranciscaNeural"  # ou pt-BR-ThalitaMultilingualNeural
+    edge_pitch_hz: int = Field(default=0, ge=-50, le=50)
     voice: str = "pf_dora"
     speed: float = Field(default=1.0, gt=0.5, le=2.0)
     kokoro_model: Literal["int8", "fp16", "fp32"] = "int8"

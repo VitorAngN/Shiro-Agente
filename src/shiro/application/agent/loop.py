@@ -91,6 +91,7 @@ class _TurnState:
         self.executed: list[ExecutedCall] = []
         self.tainted = False
         self.local_only = False
+        self.private_results = False  # saída de ferramenta local_only no contexto
         self.escalated = False
         self.fell_back = False
         self.invalid = 0
@@ -254,6 +255,8 @@ class AgentLoop:
             if response is None:
                 if self._escalate(state) or self._fall_back_local(state):
                     continue
+                if self._escalate_without_memories(state, text):
+                    continue
                 return state.result(_REPLY_LLM_DOWN, step)
 
             if response.tool_calls:
@@ -338,6 +341,7 @@ class AgentLoop:
             if tool is not None:
                 if tool.spec.local_only:
                     state.local_only = True
+                    state.private_results = True
                 if not tool.spec.output_trusted and done.result.ok:
                     state.tainted = True
                     content = UNTRUSTED_PREFIX + content
@@ -350,6 +354,21 @@ class AgentLoop:
         cloud = self._providers.get(Tier.T2)
         if cloud is None:
             return False
+        state.tier, state.provider, state.escalated = Tier.T2, cloud, True
+        return True
+
+    def _escalate_without_memories(self, state: _TurnState, text: str) -> bool:
+        """O modelo local caiu num turno com memórias: tenta a nuvem, mas sem elas.
+
+        As memórias não saem do PC (ADR-0013); o pedido em si vai, como qualquer turno.
+        """
+        if not state.local_only or state.private_results or state.escalated:
+            return False
+        cloud = self._providers.get(Tier.T2)
+        if cloud is None or state.tier is not Tier.T1:
+            return False
+        state.messages = self._context.build(self._history, text, ())
+        state.local_only = False
         state.tier, state.provider, state.escalated = Tier.T2, cloud, True
         return True
 

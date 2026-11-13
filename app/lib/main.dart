@@ -73,7 +73,11 @@ class Engine {
     final response = await request.close();
     final text = await utf8.decodeStream(response);
     if (response.statusCode >= 400) {
-      throw HttpException('${response.statusCode}: $text');
+      var detail = text;
+      try {
+        detail = (jsonDecode(text) as Map<String, dynamic>)['detail'].toString();
+      } catch (_) {}
+      throw HttpException(detail);
     }
     return text.isEmpty ? null : jsonDecode(text);
   }
@@ -87,6 +91,10 @@ class Engine {
   Future<Map<String, dynamic>> voice() async => (await _send('POST', '/v1/voice')) as Map<String, dynamic>;
   Future<Map<String, dynamic>> pairing() async => (await _send('POST', '/v1/pairing')) as Map<String, dynamic>;
   Future<void> revoke(String id) => _send('DELETE', '/v1/devices/$id');
+  Future<Map<String, dynamic>> voiceHistory(int after) async =>
+      (await _send('GET', '/v1/voice/history?after=$after')) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> setListening(bool on) async =>
+      (await _send('POST', '/v1/voice/listening', {'enabled': on})) as Map<String, dynamic>;
   Future<List<dynamic>> devices() async => (await _send('GET', '/v1/devices')) as List<dynamic>;
 }
 
@@ -127,6 +135,10 @@ class _StationState extends State<Station> {
   Process? _engineProcess;
   Timer? _poll;
   String problem = 'Procurando o motor da SHIRO…';
+  bool listeningForName = false;
+  bool switchingName = false;
+  String voiceProblem = '';
+  int lastVoiceId = -1;
 
   @override
   void initState() {
@@ -188,7 +200,29 @@ class _StationState extends State<Station> {
       if (_engineProcess == null) _connect();
       return;
     }
-    if (mood != Mood.thinking && mood != Mood.listening) return;
+    try {
+      final voice = await current.voiceHistory(lastVoiceId < 0 ? 0 : lastVoiceId);
+      final items = voice['items'] as List<dynamic>;
+      final firstLook = lastVoiceId < 0;
+      if (firstLook) lastVoiceId = 0;
+      if (mounted) {
+        setState(() {
+          listeningForName = voice['listening'] as bool? ?? false;
+          voiceProblem = voice['problem'] as String? ?? '';
+          for (final raw in items) {
+            final item = raw as Map<String, dynamic>;
+            lastVoiceId = item['id'] as int;
+            if (firstLook || item['source'] != 'nome') continue; // o que veio antes de abrir fica de fora
+            turns.add(Turn(item['heard'] as String, DateTime.now(), spoken: true)
+              ..reply = item['text'] as String?
+              ..tier = item['tier'] as String?
+              ..latencyMs = item['latency_ms'] as int?
+              ..tools = [for (final t in item['tools'] as List<dynamic>) t as String]);
+          }
+        });
+        if (items.isNotEmpty && !firstLook) _toEnd();
+      }
+    } catch (_) {}
     try {
       final waiting = await current.confirmations();
       if (mounted) setState(() => pending = waiting);
@@ -274,7 +308,7 @@ class _StationState extends State<Station> {
       turn
         ..asked = '(voz)'
         ..failed = true
-        ..reply = 'A voz não funcionou: confira o microfone e se os modelos de voz foram baixados (shiro setup).';
+        ..reply = 'A voz não funcionou: ${error is HttpException ? error.message : error}';
     }
     if (!mounted) return;
     setState(() {
@@ -283,6 +317,23 @@ class _StationState extends State<Station> {
     });
     _toEnd();
     _refreshLists();
+  }
+
+  Future<void> _toggleName(bool on) async {
+    final current = engine;
+    if (current == null) return;
+    setState(() {
+      switchingName = true;
+      voiceProblem = '';
+    });
+    try {
+      final state = await current.setListening(on);
+      listeningForName = state['listening'] as bool? ?? false;
+      voiceProblem = state['problem'] as String? ?? '';
+    } catch (error) {
+      voiceProblem = error is HttpException ? error.message : '$error';
+    }
+    if (mounted) setState(() => switchingName = false);
   }
 
   void _toEnd() {
@@ -314,7 +365,18 @@ class _StationState extends State<Station> {
             Expanded(child: _main()),
             if (wide) ...[
               const VerticalDivider(width: 1, color: line),
-              SizedBox(width: 320, child: _Presence(mood: mood, lessons: lessons.length, devices: devices.length)),
+              SizedBox(
+                width: 320,
+                child: _Presence(
+                  mood: mood,
+                  lessons: lessons.length,
+                  devices: devices.length,
+                  listening: listeningForName,
+                  switching: switchingName,
+                  problem: voiceProblem,
+                  onListening: engine == null ? null : _toggleName,
+                ),
+              ),
             ],
           ],
         );
@@ -825,10 +887,22 @@ class _AvatarState extends State<_Avatar> {
 }
 
 class _Presence extends StatelessWidget {
-  const _Presence({required this.mood, required this.lessons, required this.devices});
+  const _Presence({
+    required this.mood,
+    required this.lessons,
+    required this.devices,
+    required this.listening,
+    required this.switching,
+    required this.problem,
+    required this.onListening,
+  });
   final Mood mood;
   final int lessons;
   final int devices;
+  final bool listening;
+  final bool switching;
+  final String problem;
+  final ValueChanged<bool>? onListening;
 
   @override
   Widget build(BuildContext context) {
@@ -867,7 +941,36 @@ class _Presence extends StatelessWidget {
             child: Text(label, style: TextStyle(fontSize: 13, color: mood == Mood.idle ? muted : color)),
           ),
         ]),
-        const SizedBox(height: 24),
+        const SizedBox(height: 18),
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: listening ? red : line),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Expanded(
+                child: Text('Atender quando chamarem "Shiro"',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              ),
+              if (switching)
+                const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: cyan))
+              else
+                Switch(value: listening, onChanged: onListening, activeThumbColor: red),
+            ]),
+            Text(
+              problem.isNotEmpty
+                  ? problem
+                  : listening
+                      ? 'Microfone aberto. Diga "Shiro" e o pedido.'
+                      : 'Desligado: use o microfone da conversa.',
+              style: TextStyle(fontSize: 12, height: 1.4, color: problem.isNotEmpty ? red : muted),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 18),
         _fact('Expressões aprendidas', '$lessons'),
         _fact('Aparelhos ligados', '$devices'),
       ]),

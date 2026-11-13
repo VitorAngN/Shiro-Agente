@@ -15,6 +15,7 @@ import logging
 import socket
 import sys
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 
@@ -79,13 +80,26 @@ class _Quiet(io.StringIO):
 
 
 class VoiceBox:
-    """Ouvido e voz do motor: montados no primeiro uso (carregar o Whisper leva alguns segundos)."""
+    """Ouvido e voz do motor: montados no primeiro uso (carregar o Whisper leva alguns segundos).
+
+    Com a escuta do nome ligada, o microfone fica aberto e "Shiro, ..." já vira pedido,
+    sem clicar em nada (ADR-0016). Cada conversa por voz entra em ``history``, que o
+    programa busca para mostrar na tela.
+    """
 
     def __init__(self, app: App, turn: asyncio.Lock) -> None:
         self._app = app
         self._turn = turn
         self._session: VoiceSession | None = None
         self._busy = asyncio.Lock()
+        self._wake: Any = None
+        self._wake_task: asyncio.Task[None] | None = None
+        self.history: list[dict[str, Any]] = []
+        self.problem = ""
+
+    @property
+    def listening_for_name(self) -> bool:
+        return self._wake_task is not None and not self._wake_task.done() and self._wake.enabled
 
     async def _ready(self) -> VoiceSession:
         if self._session is None:
@@ -101,7 +115,8 @@ class VoiceBox:
 
             settings = self._app.settings
             voice = settings.voice
-            tts, _ = tts_for(settings)
+            tts, line = tts_for(settings)
+            log.info(line)
             stt = with_commands(await whisper_for(settings), settings, self._app.router)
             await stt.load()
             self._session = VoiceSession(
@@ -126,11 +141,94 @@ class VoiceBox:
             heard = await session.listen()
             if heard is None:
                 return None
-            async with self._turn:
-                log.info("pedido por voz de %s", device.name)
-                result = await self._app.agent.run_turn(heard)
-            await session.say(result.text)
-            return heard, result
+            return heard, await self._answer(session, heard, device.name, source="botão")
+
+    async def _answer(
+        self, session: VoiceSession, heard: str, who: str, *, source: str
+    ) -> AgentResult:
+        async with self._turn:
+            log.info("pedido por voz de %s", who)
+            result = await self._app.agent.run_turn(heard)
+        self.history.append(
+            {
+                "id": len(self.history) + 1,
+                "source": source,
+                "heard": heard,
+                "text": result.text,
+                "tier": result.tier.value,
+                "latency_ms": result.latency_ms,
+                "tools": [executed.call.name for executed in result.calls],
+            }
+        )
+        del self.history[:-50]
+        await session.say(result.text)
+        return result
+
+    # ------------------------------------------------------------ escuta do nome
+
+    def wake(self) -> None:
+        """Ouviu só o nome ("Shiro"): bipe e escuta o pedido."""
+        asyncio.get_running_loop().create_task(self._after_name(None))
+
+    def command(self, text: str) -> None:
+        """Ouviu o nome junto do pedido ("Shiro, abre a Steam")."""
+        asyncio.get_running_loop().create_task(self._after_name(text))
+
+    async def _after_name(self, text: str | None) -> None:
+        if self._busy.locked():
+            return
+        async with self._busy:
+            session = await self._ready()
+            heard = text or await session.listen()
+            if heard:
+                await self._answer(session, heard, "voz", source="nome")
+
+    async def set_listening(self, enabled: bool) -> None:
+        if not enabled:
+            if self._wake is not None:
+                self._wake.enabled = False
+            return
+        if self._wake_task is not None and not self._wake_task.done():
+            self._wake.enabled = True
+            return
+        from shiro.infrastructure.voice.devices import SoundDeviceMicrophone
+        from shiro.infrastructure.voice.silero import SileroVAD
+        from shiro.infrastructure.voice.wake import WakeListener
+        from shiro.interfaces.voice.runtime import endpoint_for, whisper_for
+
+        session = await self._ready()
+        settings = self._app.settings
+        voice, word = settings.voice, settings.voice.wake_word
+        check = await whisper_for(settings, word.check_model, threads=2)
+        await check.load()
+        self._wake = WakeListener(
+            microphone=SoundDeviceMicrophone(voice.input_device, voice.capture),
+            events=self,
+            is_idle=lambda: not self._busy.locked(),
+        )
+
+        async def run() -> None:
+            try:
+                await self._wake.run_whisper(
+                    vad=SileroVAD(),
+                    check=check,
+                    full=session._stt,  # pyright: ignore[reportPrivateUsage]
+                    phrases=word.phrases,
+                    listen=endpoint_for(settings),
+                    max_phrase_s=word.max_phrase_s,
+                )
+            except Exception as exc:
+                log.exception("a escuta do nome caiu")
+                self.problem = f"a escuta do nome parou: {exc}"
+
+        self.problem = ""
+        self._wake_task = asyncio.create_task(run())
+
+    async def aclose(self) -> None:
+        if self._wake_task is not None:
+            self._wake_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await self._wake_task
 
 
 def engine_api(
@@ -154,7 +252,7 @@ def engine_api(
     def can_pair(device: Device) -> bool:
         return bool(local_device_id) and device.id == local_device_id
 
-    return create_device_api(
+    api = create_device_api(
         registry=registry,
         chat=chat,
         confirmations=confirmations,
@@ -163,6 +261,36 @@ def engine_api(
         can_pair=can_pair,
         address=(app.settings.devices.host, app.settings.devices.port),
     )
+    add_voice_routes(api, voice)
+    api.state.voice = voice
+    return api
+
+
+def add_voice_routes(api: FastAPI, voice: VoiceBox) -> None:
+    """Histórico das conversas por voz e a chave da escuta do nome."""
+    from fastapi import Depends, Request
+
+    from shiro.interfaces.api.devices import require_device
+
+    paired = Depends(require_device)
+
+    @api.get("/v1/voice/history")
+    async def history(request: Request, after: int = 0, current: Device = paired) -> dict[str, Any]:
+        return {
+            "listening": voice.listening_for_name,
+            "problem": voice.problem,
+            "items": [item for item in voice.history if item["id"] > after],
+        }
+
+    @api.post("/v1/voice/listening")
+    async def listening(
+        request: Request, body: dict[str, bool], current: Device = paired
+    ) -> dict[str, Any]:
+        try:
+            await voice.set_listening(bool(body.get("enabled")))
+        except Exception as exc:
+            voice.problem = f"não consegui ligar a escuta: {exc}"
+        return {"listening": voice.listening_for_name, "problem": voice.problem}
 
 
 class EngineServer:

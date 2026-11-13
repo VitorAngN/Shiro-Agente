@@ -66,8 +66,10 @@ hotwords = true            # puxa o Whisper para "Shiro" e os nomes dos apps
 commands = true            # corrige comando curto mal transcrito ("Ausa música." → "Pausa a música.")
 
 [voice.tts]
-engine = "kokoro"          # voz da SHIRO (ADR-0012); "sapi" = voz Maria do Windows, sem download
-voice = "pf_dora"
+engine = "edge"            # voz da SHIRO: "edge" (Microsoft, online) | "kokoro" (local) | "sapi" (Windows)
+edge_voice = "pt-BR-FranciscaNeural"   # ou "pt-BR-ThalitaMultilingualNeural"
+edge_pitch_hz = 0          # mais aguda: +10, +20
+voice = "pf_dora"          # voz da Kokoro (usada sem internet)
 speed = 1.0                # <1 fala mais devagar
 kokoro_model = "int8"      # int8 (88 MB) | fp16 | fp32 (310 MB)
 sapi_voice = "Maria"

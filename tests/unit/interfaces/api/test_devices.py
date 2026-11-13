@@ -204,3 +204,42 @@ def test_only_the_pc_program_opens_a_pairing_or_unlinks_others() -> None:
 def test_voice_is_optional(setup: tuple[TestClient, DeviceRegistry, list[tuple[str, str]]]) -> None:
     client, registry, _ = setup
     assert client.post("/v1/voice", headers=pair(client, registry)).status_code == 503
+
+
+async def test_voice_box_answers_after_the_name_and_keeps_history() -> None:
+    import asyncio
+    from types import SimpleNamespace
+
+    from shiro.interfaces.api.engine import VoiceBox
+
+    said: list[str] = []
+
+    class Session:
+        _stt = None
+
+        async def listen(self) -> str | None:
+            return "que horas são"
+
+        async def say(self, text: str) -> bool:
+            said.append(text)
+            return True
+
+    async def run_turn(text: str) -> AgentResult:
+        return AgentResult(text=f"resposta para {text}", tier=Tier.T0)
+
+    app = SimpleNamespace(agent=SimpleNamespace(run_turn=run_turn))
+    box = VoiceBox(app, asyncio.Lock())  # type: ignore[arg-type]
+
+    async def ready() -> Session:
+        return Session()
+
+    box._ready = ready  # type: ignore[method-assign] # pyright: ignore[reportPrivateUsage]
+    box.command("abre a steam")  # "Shiro, abre a steam" numa frase só
+    await asyncio.sleep(0.01)
+    box.wake()  # só "Shiro": escuta o pedido em seguida
+    await asyncio.sleep(0.01)
+
+    assert [item["heard"] for item in box.history] == ["abre a steam", "que horas são"]
+    assert {item["source"] for item in box.history} == {"nome"}
+    assert said == ["resposta para abre a steam", "resposta para que horas são"]
+    assert not box.listening_for_name

@@ -34,6 +34,14 @@ from tests.fakes.agent import (
 )
 
 
+class _Recall:
+    def __init__(self, facts: Sequence[str]) -> None:
+        self.facts = list(facts)
+
+    async def relevant(self, text: str) -> list[str]:
+        return self.facts
+
+
 class Harness:
     def __init__(
         self,
@@ -44,6 +52,7 @@ class Harness:
         answers: Sequence[bool] = (),
         read_only: bool = False,
         limits: AgentLimits | None = None,
+        memories: Sequence[str] = (),
     ) -> None:
         self.local = FakeProvider(script, name="ollama", model="qwen3:4b-instruct")
         self.cloud = FakeProvider(cloud, name="gemini", model="g") if cloud is not None else None
@@ -78,6 +87,7 @@ class Harness:
             clock=FixedClock(),
             context=ContextBuilder(assistant_name="Shiro"),
             limits=limits or AgentLimits(max_history_messages=4),
+            memory=_Recall(memories) if memories else None,
         )
 
 
@@ -352,3 +362,18 @@ async def test_warm_up_sends_persona_and_tools() -> None:
     request = h.local.warmed[0]
     assert [m.role for m in request.messages] == [Role.SYSTEM]
     assert [t.name for t in request.tools] == ["set_volume"]
+
+
+async def test_local_model_down_with_memories_goes_to_the_cloud_without_them() -> None:
+    h = Harness(
+        [LLMError("ollama travou")],
+        cloud=[reply("Oi! Estou aqui.")],
+        memories=["o usuário mora em Curitiba"],
+    )
+
+    result = await h.agent.run_turn("oi, tudo bem?")
+
+    assert result.tier is Tier.T2 and result.text == "Oi! Estou aqui."
+    assert h.cloud is not None
+    sent = " ".join(m.content or "" for m in h.cloud.requests[0].messages)
+    assert "Curitiba" not in sent  # as memórias ficam no PC
