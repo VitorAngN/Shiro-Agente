@@ -17,6 +17,7 @@ import os
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from typing import Any
 
 from shiro import __version__
 from shiro.config import paths
@@ -206,6 +207,39 @@ def _startup_finished() -> None:
     import faulthandler
 
     faulthandler.cancel_dump_traceback_later()
+    if _crash_log:
+        _watch_loop_stalls(asyncio.get_running_loop(), _crash_log[0])
+
+
+def _watch_loop_stalls(
+    loop: asyncio.AbstractEventLoop, handle: object, limit_s: float = 8.0
+) -> None:
+    """Se o laço do asyncio parar de responder (o motor "congela"), grava a pilha em crash.log."""
+    import faulthandler
+    import threading
+    import time
+
+    def watch() -> None:
+        stalled = False
+        while not loop.is_closed():
+            alive = threading.Event()
+            try:
+                loop.call_soon_threadsafe(alive.set)
+            except RuntimeError:
+                return
+            if alive.wait(limit_s):
+                stalled = False
+                time.sleep(2)
+                continue
+            if not stalled:  # uma pilha por travada basta
+                stalled = True
+                file: Any = handle
+                file.write(f"\n=== laço parado há {limit_s:.0f} s ({time.strftime('%H:%M:%S')})\n")
+                file.flush()
+                faulthandler.dump_traceback(file, all_threads=True)
+                file.flush()
+
+    threading.Thread(target=watch, name="shiro-watchdog", daemon=True).start()
 
 
 async def _serve(settings: Settings) -> int:
