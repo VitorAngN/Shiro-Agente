@@ -218,13 +218,19 @@ class VoiceBox:
         settings = getattr(self._app, "settings", None)
         listen = settings.voice.listen if settings is not None else None
         limit = (listen.start_timeout_s + listen.max_utterance_s + 10) if listen else 40.0
-        try:
-            listening = session.listen(quiet=True) if quiet else session.listen()
-            return await asyncio.wait_for(listening, limit)
-        except TimeoutError:
-            log.warning("voz: o microfone não respondeu em %.0f s", limit)
-            self.problem = "o microfone parou de responder; tente de novo"
-            return None
+        for attempt in range(2):  # fluxo travado: reabre o microfone uma vez e tenta de novo
+            try:
+                listening = session.listen(quiet=True) if quiet else session.listen()
+                heard = await asyncio.wait_for(listening, limit)
+            except (TimeoutError, OSError, RuntimeError) as exc:
+                log.warning("voz: o microfone travou (%s); reabrindo", exc or "sem resposta")
+                if attempt == 0:
+                    continue
+                self.problem = "o microfone parou de responder; tente de novo"
+                return None
+            self.problem = ""
+            return heard
+        return None
 
     async def _answer(
         self, session: VoiceSession, heard: str, who: str, *, source: str
@@ -386,18 +392,30 @@ class VoiceBox:
         )
 
         async def run() -> None:
-            try:
-                await self._wake.run_whisper(
-                    vad=SileroVAD(),
-                    check=check,
-                    full=session._stt,  # pyright: ignore[reportPrivateUsage]
-                    phrases=word.phrases,
-                    listen=endpoint_for(settings),
-                    max_phrase_s=word.max_phrase_s,
-                )
-            except Exception as exc:
-                log.exception("a escuta do nome caiu")
-                self.problem = f"a escuta do nome parou: {exc}"
+            failures = 0
+            while True:
+                try:
+                    await self._wake.run_whisper(
+                        vad=SileroVAD(),
+                        check=check,
+                        full=session._stt,  # pyright: ignore[reportPrivateUsage]
+                        phrases=word.phrases,
+                        listen=endpoint_for(settings),
+                        max_phrase_s=word.max_phrase_s,
+                    )
+                    return
+                except (OSError, RuntimeError) as exc:
+                    # microfone travou ou sumiu (fone desligado): reabre sozinho
+                    failures += 1
+                    log.warning("escuta do nome: %s; reabrindo o microfone", exc)
+                    if failures >= 20:
+                        self.problem = f"a escuta do nome parou: {exc}"
+                        return
+                    await asyncio.sleep(min(failures, 5))
+                except Exception as exc:
+                    log.exception("a escuta do nome caiu")
+                    self.problem = f"a escuta do nome parou: {exc}"
+                    return
 
         self.problem = ""
         self._wake_task = asyncio.create_task(run())

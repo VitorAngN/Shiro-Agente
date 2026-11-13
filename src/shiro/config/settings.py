@@ -104,7 +104,8 @@ class CloudLLMSettings(_Section):
     provider: CloudProvider = "gemini"
     model: str = "gemini-3.5-flash-lite"
     fallback: tuple[CloudProvider, ...] = ()  # adaptadores Anthropic e OpenAI: ainda não
-    rpm_limit: int = Field(default=5, ge=1)
+    # Controlar o PC gasta vários pedidos por turno (ler a tela, clicar, digitar).
+    rpm_limit: int = Field(default=15, ge=1)
     daily_request_limit: int = Field(default=200, ge=1)
     daily_budget_usd: float = Field(default=0.5, ge=0)
     # Preço por milhão de tokens; 0 no plano gratuito. Base do orçamento diário.

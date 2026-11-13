@@ -149,3 +149,17 @@ async def test_mme_converts_when_the_device_refuses_16_khz(monkeypatch: pytest.M
     async with SoundDeviceMicrophone().open():
         pass
     assert fake.opened[-1]["samplerate"] == 44100 and fake.opened[-1]["device"] is None
+
+
+async def test_stalled_stream_raises_instead_of_waiting_forever(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import asyncio
+
+    import numpy as np
+
+    monkeypatch.setattr(devices, "MIC_SILENT_LIMIT_S", 0.05)
+    queue: asyncio.Queue[np.ndarray[Any, Any]] = asyncio.Queue()
+    frames = devices._frames(queue, devices.STT_RATE)  # pyright: ignore[reportPrivateUsage]
+    with pytest.raises(devices.MicrophoneStalledError):
+        await anext(frames)

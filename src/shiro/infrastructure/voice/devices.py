@@ -238,11 +238,24 @@ def _wasapi_stream(sd: Any, name: str, capture: Capture, callback: Any) -> tuple
     raise AudioDeviceError(msg)
 
 
+MIC_SILENT_LIMIT_S = 3.0
+"""Sem nenhum bloco do PortAudio nesse tempo, o fluxo morreu (o Windows às vezes trava o
+microfone aberto por dois fluxos). Erro em vez de esperar para sempre: quem abriu reabre."""
+
+
+class MicrophoneStalledError(AudioDeviceError):
+    pass
+
+
 async def _frames(queue: asyncio.Queue[Samples], rate: int) -> AsyncIterator[Samples]:
     """Converte para 16 kHz e reagrupa em quadros de exatamente 512 amostras."""
     pending = np.zeros(0, dtype=np.float32)
     while True:
-        block = await queue.get()
+        try:
+            block = await asyncio.wait_for(queue.get(), MIC_SILENT_LIMIT_S)
+        except TimeoutError:
+            msg = f"o microfone não mandou som em {MIC_SILENT_LIMIT_S:.0f} s"
+            raise MicrophoneStalledError(msg) from None
         if rate != STT_RATE:
             block = Audio(block, rate).resampled(STT_RATE).samples
         pending = np.concatenate([pending, block])
