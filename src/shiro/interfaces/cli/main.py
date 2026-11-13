@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -201,6 +202,9 @@ async def _serve(settings: Settings) -> int:
     configure_logging(settings.logging, paths.log_dir(), console=sys.stderr is not None)
     log_lifecycle("serve")
     watch_event_loop()
+    from shiro.infrastructure.llm.ollama_service import OllamaService
+
+    print(await OllamaService(settings.llm.local.base_url).ensure())
     confirmations = RemoteConfirmations()
     app = await build_app(settings, confirmation=confirmations, channel="api")
     try:
@@ -224,6 +228,12 @@ async def _serve(settings: Settings) -> int:
         print(f"Motor da SHIRO em http://{settings.devices.host}:{settings.devices.port}")
         for problem in app.problems:
             print(f"! {problem}")
+
+        async def warm_up() -> None:  # modelo carregado antes do 1º pedido
+            with contextlib.suppress(Exception):
+                await app.agent.warm_up()
+
+        warm = asyncio.create_task(warm_up())
         voice = api.state.voice
         if settings.voice.activation in ("wake_word", "both"):
             try:
@@ -235,6 +245,7 @@ async def _serve(settings: Settings) -> int:
         try:
             await asyncio.Event().wait()
         finally:
+            warm.cancel()
             await voice.aclose()
             await server.stop()
     finally:
