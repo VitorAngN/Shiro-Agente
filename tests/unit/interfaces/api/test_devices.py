@@ -160,3 +160,47 @@ def test_launch_spec_tells_the_program_how_to_start_the_engine(tmp_path: Path) -
     spec = json.loads((tmp_path / ENGINE_FILE).read_text("utf-8"))
     assert Path(spec["exe"]).name.startswith("python") and spec["args"][0] == "-c"
     assert "serve" in spec["args"][1]
+
+
+def test_only_the_pc_program_opens_a_pairing_or_unlinks_others() -> None:
+    registry = DeviceRegistry(MemoryStore(), MovableClock())
+    local: list[str] = []
+
+    async def chat(text: str, device: Device) -> AgentResult:
+        return AgentResult(text="ok", tier=Tier.T0)
+
+    async def voice(device: Device) -> tuple[str, AgentResult] | None:
+        return ("que horas são", AgentResult(text="São 10 horas.", tier=Tier.T0))
+
+    api = create_device_api(
+        registry=registry,
+        chat=chat,
+        voice=voice,
+        can_pair=lambda device: device.id in local,
+        address=("100.101.102.103", 8766),
+    )
+    with TestClient(api) as client:
+        pc, phone = pair(client, registry, "Este PC"), pair(client, registry, "Celular")
+        ids = {d["name"]: d["id"] for d in client.get("/v1/devices", headers=pc).json()}
+        local.append(ids["Este PC"])
+
+        assert client.post("/v1/pairing", headers=phone).status_code == 403
+        opened = client.post("/v1/pairing", headers=pc).json()
+        assert (opened["host"], opened["port"]) == ("100.101.102.103", 8766)
+        joined = client.post("/v1/pair", json={"code": opened["code"], "name": "Tablet"})
+        assert joined.status_code == 200  # o código do QR pareia outro aparelho
+
+        spoken = client.post("/v1/voice", headers=phone).json()
+        assert spoken["heard"] == "que horas são" and spoken["text"] == "São 10 horas."
+
+        assert client.delete(f"/v1/devices/{ids['Celular']}", headers=phone).status_code == 403
+        assert client.delete(f"/v1/devices/{ids['Este PC']}", headers=pc).status_code == 400
+        assert client.delete(f"/v1/devices/{ids['Celular']}", headers=pc).json() == {
+            "revoked": True
+        }
+        assert client.get("/v1/me", headers=phone).status_code == 401
+
+
+def test_voice_is_optional(setup: tuple[TestClient, DeviceRegistry, list[tuple[str, str]]]) -> None:
+    client, registry, _ = setup
+    assert client.post("/v1/voice", headers=pair(client, registry)).status_code == 503

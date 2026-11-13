@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import io
 import json
 import logging
 import socket
@@ -24,6 +25,7 @@ from shiro.domain.devices.models import Device
 from shiro.domain.models import AgentResult
 from shiro.interfaces.api.devices import create_device_api
 from shiro.interfaces.api.server import _server_class  # pyright: ignore[reportPrivateUsage]
+from shiro.interfaces.voice.session import VoiceSession
 
 log = logging.getLogger(__name__)
 
@@ -69,8 +71,77 @@ def _write(file: Path, token: str) -> None:
     file.write_text(token, "utf-8")
 
 
-def engine_api(app: App, registry: DeviceRegistry, confirmations: RemoteConfirmations) -> FastAPI:
+class _Quiet(io.StringIO):
+    """Descarta o que a sessão de voz imprimiria: o motor não tem terminal."""
+
+    def write(self, text: str) -> int:
+        return len(text)
+
+
+class VoiceBox:
+    """Ouvido e voz do motor: montados no primeiro uso (carregar o Whisper leva alguns segundos)."""
+
+    def __init__(self, app: App, turn: asyncio.Lock) -> None:
+        self._app = app
+        self._turn = turn
+        self._session: VoiceSession | None = None
+        self._busy = asyncio.Lock()
+
+    async def _ready(self) -> VoiceSession:
+        if self._session is None:
+            from shiro.domain.voice.audio import Cues
+            from shiro.infrastructure.voice.devices import SoundDeviceMicrophone, SoundDevicePlayer
+            from shiro.infrastructure.voice.silero import SileroVAD
+            from shiro.interfaces.voice.runtime import (
+                endpoint_for,
+                tts_for,
+                whisper_for,
+                with_commands,
+            )
+
+            settings = self._app.settings
+            voice = settings.voice
+            tts, _ = tts_for(settings)
+            stt = with_commands(await whisper_for(settings), settings, self._app.router)
+            await stt.load()
+            self._session = VoiceSession(
+                run_turn=self._app.agent.run_turn,
+                stt=stt,
+                tts=tts,
+                player=SoundDevicePlayer(voice.output_device),
+                microphone=SoundDeviceMicrophone(voice.input_device, voice.capture),
+                detector=SileroVAD(),
+                listen=endpoint_for(settings),
+                cues=Cues.generate(voice.cue_volume),
+                name=settings.general.assistant_name,
+                volume=voice.tts.volume,
+                out=_Quiet(),
+            )
+        return self._session
+
+    async def exchange(self, device: Device) -> tuple[str, AgentResult] | None:
+        """Bipe, escuta, responde em voz alta. ``None`` se ninguém falou."""
+        async with self._busy:
+            session = await self._ready()
+            heard = await session.listen()
+            if heard is None:
+                return None
+            async with self._turn:
+                log.info("pedido por voz de %s", device.name)
+                result = await self._app.agent.run_turn(heard)
+            await session.say(result.text)
+            return heard, result
+
+
+def engine_api(
+    app: App,
+    registry: DeviceRegistry,
+    confirmations: RemoteConfirmations,
+    *,
+    local_device_id: str = "",
+) -> FastAPI:
     turn = asyncio.Lock()  # o agente atende um pedido por vez
+    voice = VoiceBox(app, turn)
 
     async def chat(text: str, device: Device) -> AgentResult:
         async with turn:
@@ -80,8 +151,17 @@ def engine_api(app: App, registry: DeviceRegistry, confirmations: RemoteConfirma
     def lessons() -> list[dict[str, str]]:
         return [{"trigger": x.trigger, "meaning": x.meaning} for x in app.lessons.lessons()]
 
+    def can_pair(device: Device) -> bool:
+        return bool(local_device_id) and device.id == local_device_id
+
     return create_device_api(
-        registry=registry, chat=chat, confirmations=confirmations, lessons=lessons
+        registry=registry,
+        chat=chat,
+        confirmations=confirmations,
+        lessons=lessons,
+        voice=voice.exchange,
+        can_pair=can_pair,
+        address=(app.settings.devices.host, app.settings.devices.port),
     )
 
 

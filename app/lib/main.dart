@@ -5,6 +5,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:webview_windows/webview_windows.dart';
 
 const bg = Color(0xFF0B0D12);
 const surface = Color(0xFF11141B);
@@ -28,7 +31,8 @@ class ShiroApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: bg,
-        fontFamily: 'Segoe UI',
+        fontFamily: 'Chakra Petch',
+        fontFamilyFallback: const ['Segoe UI', 'Yu Gothic UI'],
         colorScheme: const ColorScheme.dark(primary: cyan, surface: surface, error: red),
         textSelectionTheme: const TextSelectionThemeData(cursorColor: cyan),
       ),
@@ -80,12 +84,16 @@ class Engine {
   Future<List<dynamic>> confirmations() async => (await _send('GET', '/v1/confirmations')) as List<dynamic>;
   Future<void> answer(String id, bool approve) => _send('POST', '/v1/confirmations/$id', {'approve': approve});
   Future<List<dynamic>> lessons() async => (await _send('GET', '/v1/lessons')) as List<dynamic>;
+  Future<Map<String, dynamic>> voice() async => (await _send('POST', '/v1/voice')) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> pairing() async => (await _send('POST', '/v1/pairing')) as Map<String, dynamic>;
+  Future<void> revoke(String id) => _send('DELETE', '/v1/devices/$id');
   Future<List<dynamic>> devices() async => (await _send('GET', '/v1/devices')) as List<dynamic>;
 }
 
 class Turn {
-  Turn(this.asked, this.at);
-  final String asked;
+  Turn(this.asked, this.at, {this.spoken = false});
+  String asked;
+  final bool spoken;
   final DateTime at;
   String? reply;
   String? tier;
@@ -94,7 +102,7 @@ class Turn {
   bool failed = false;
 }
 
-enum Mood { idle, thinking, speaking, offline }
+enum Mood { idle, listening, thinking, speaking, offline }
 
 enum Section { conversa, ensinar, dispositivos }
 
@@ -180,7 +188,7 @@ class _StationState extends State<Station> {
       if (_engineProcess == null) _connect();
       return;
     }
-    if (mood != Mood.thinking) return;
+    if (mood != Mood.thinking && mood != Mood.listening) return;
     try {
       final waiting = await current.confirmations();
       if (mounted) setState(() => pending = waiting);
@@ -205,7 +213,7 @@ class _StationState extends State<Station> {
   Future<void> _send([String? preset]) async {
     final current = engine;
     final text = (preset ?? input.text).trim();
-    if (current == null || text.isEmpty || mood == Mood.thinking) return;
+    if (current == null || text.isEmpty || mood == Mood.thinking || mood == Mood.listening) return;
     final turn = Turn(text, DateTime.now());
     setState(() {
       turns.add(turn);
@@ -237,6 +245,44 @@ class _StationState extends State<Station> {
     Timer(const Duration(seconds: 2), () {
       if (mounted && mood == Mood.speaking) setState(() => mood = Mood.idle);
     });
+  }
+
+  /// Microfone: o motor dá o bipe, ouve uma frase, responde em voz alta e devolve tudo.
+  Future<void> _listen() async {
+    final current = engine;
+    if (current == null || mood == Mood.thinking || mood == Mood.listening) return;
+    final turn = Turn('…', DateTime.now(), spoken: true);
+    setState(() {
+      turns.add(turn);
+      mood = Mood.listening;
+    });
+    _toEnd();
+    try {
+      final result = await current.voice();
+      final heard = result['heard'] as String?;
+      if (heard == null) {
+        turns.remove(turn);
+      } else {
+        turn
+          ..asked = heard
+          ..reply = result['text'] as String?
+          ..tier = result['tier'] as String?
+          ..latencyMs = result['latency_ms'] as int?
+          ..tools = [for (final t in result['tools'] as List<dynamic>) t as String];
+      }
+    } catch (error) {
+      turn
+        ..asked = '(voz)'
+        ..failed = true
+        ..reply = 'A voz não funcionou: confira o microfone e se os modelos de voz foram baixados (shiro setup).';
+    }
+    if (!mounted) return;
+    setState(() {
+      pending = const [];
+      mood = Mood.idle;
+    });
+    _toEnd();
+    _refreshLists();
   }
 
   void _toEnd() {
@@ -285,7 +331,7 @@ class _StationState extends State<Station> {
           _send(text);
         });
       case Section.dispositivos:
-        return _Devices(devices: devices);
+        return _Devices(devices: devices, engine: engine!, onChanged: _refreshLists);
       case Section.conversa:
         return _conversation();
     }
@@ -330,6 +376,24 @@ class _StationState extends State<Station> {
                   contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: line)),
                   focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.zero, borderSide: BorderSide(color: cyan, width: 2)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Tooltip(
+              message: mood == Mood.listening ? 'Ouvindo…' : 'Falar',
+              child: InkWell(
+                onTap: _listen,
+                customBorder: const CircleBorder(),
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: mood == Mood.listening ? red : Colors.transparent,
+                    border: Border.all(color: mood == Mood.listening ? red : line, width: 2),
+                  ),
+                  child: Icon(Icons.mic_none, size: 24, color: mood == Mood.listening ? bg : fg),
                 ),
               ),
             ),
@@ -415,7 +479,7 @@ class _TurnView extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 800),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('$time  você', style: const TextStyle(fontSize: 12, color: muted, fontFamily: 'Consolas')),
+          Text(turn.spoken ? '$time  você, por voz' : '$time  você', style: const TextStyle(fontSize: 12, color: muted, fontFamily: 'JetBrains Mono')),
           const SizedBox(height: 6),
           SelectableText(turn.asked, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
@@ -431,7 +495,7 @@ class _TurnView extends StatelessWidget {
                       const SizedBox(height: 8),
                       Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
                         for (final tool in turn.tools)
-                          Text(tool, style: const TextStyle(fontSize: 12, fontFamily: 'Consolas')),
+                          Text(tool, style: const TextStyle(fontSize: 12, fontFamily: 'JetBrains Mono')),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
                           decoration: BoxDecoration(border: Border.all(color: turn.tier == 'T0' ? fg : cyan)),
@@ -490,7 +554,7 @@ class _Button extends StatelessWidget {
         foregroundColor: fill == null ? fg : bg,
         disabledForegroundColor: muted,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.zero, side: BorderSide(color: fill ?? line)),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, fontFamily: 'Segoe UI'),
+        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, fontFamily: 'Chakra Petch'),
       ),
       child: Text(label),
     );
@@ -568,7 +632,7 @@ class _Lessons extends StatelessWidget {
             SizedBox(
               width: 220,
               child: Text((item as Map<String, dynamic>)['trigger'] as String,
-                  style: const TextStyle(fontSize: 15, fontFamily: 'Consolas', color: cyan)),
+                  style: const TextStyle(fontSize: 15, fontFamily: 'JetBrains Mono', color: cyan)),
             ),
             Expanded(child: Text(item['meaning'] as String, style: const TextStyle(fontSize: 15))),
             _Button(label: 'Testar', onTap: () => onTry(item['trigger'] as String)),
@@ -580,30 +644,181 @@ class _Lessons extends StatelessWidget {
   }
 }
 
-class _Devices extends StatelessWidget {
-  const _Devices({required this.devices});
+class _Devices extends StatefulWidget {
+  const _Devices({required this.devices, required this.engine, required this.onChanged});
   final List<dynamic> devices;
+  final Engine engine;
+  final VoidCallback onChanged;
+
+  @override
+  State<_Devices> createState() => _DevicesState();
+}
+
+class _DevicesState extends State<_Devices> {
+  Map<String, dynamic>? pairing;
+  DateTime? expires;
+  Timer? clock;
+  String note = '';
+
+  @override
+  void dispose() {
+    clock?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _open() async {
+    try {
+      final opened = await widget.engine.pairing();
+      setState(() {
+        pairing = opened;
+        expires = DateTime.parse(opened['expires_at'] as String);
+        note = '';
+      });
+      clock?.cancel();
+      clock = Timer.periodic(const Duration(seconds: 1), (_) {
+        widget.onChanged();
+        if (mounted) setState(() {});
+      });
+    } catch (_) {
+      setState(() => note = 'Não consegui gerar o código. O motor está rodando?');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final left = expires == null ? 0 : expires!.difference(DateTime.now()).inSeconds;
+    final live = pairing != null && left > 0;
+    final local = (pairing?['host'] as String? ?? '').startsWith('127.');
     return ListView(padding: const EdgeInsets.fromLTRB(32, 28, 32, 28), children: [
       const Text('Dispositivos', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
       const SizedBox(height: 6),
-      const Text('Cada aparelho tem a própria chave. O pareamento do celular por QR vem a seguir.',
+      const Text('Cada aparelho tem a própria chave e pode ser desligado daqui.',
           style: TextStyle(fontSize: 14, color: muted)),
       const SizedBox(height: 24),
-      for (final item in devices)
+      for (final item in widget.devices)
         Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           decoration: const BoxDecoration(border: Border(top: BorderSide(color: line))),
           child: Row(children: [
             Container(width: 8, height: 8, decoration: const BoxDecoration(color: cyan, shape: BoxShape.circle)),
             const SizedBox(width: 12),
-            Text((item as Map<String, dynamic>)['name'] as String,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Expanded(
+              child: Text((item as Map<String, dynamic>)['name'] as String,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            ),
+            if (item['name'] != 'Este PC')
+              _Button(
+                label: 'Desligar',
+                onTap: () async {
+                  try {
+                    await widget.engine.revoke(item['id'] as String);
+                  } catch (_) {}
+                  widget.onChanged();
+                },
+              ),
           ]),
         ),
+      const Divider(height: 1, color: line),
+      const SizedBox(height: 28),
+      const Text('Ligar outro aparelho', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+      const SizedBox(height: 14),
+      if (live)
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(border: Border.all(color: cyan, width: 2)),
+            child: QrImageView(
+              data: jsonEncode({'shiro': 1, 'host': pairing!['host'], 'port': pairing!['port'], 'code': pairing!['code']}),
+              size: 220,
+              backgroundColor: fg,
+            ),
+          ),
+          const SizedBox(width: 24),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${left ~/ 60}:${(left % 60).toString().padLeft(2, '0')}',
+                  style: const TextStyle(fontSize: 40, fontFamily: 'JetBrains Mono', color: cyan)),
+              const Text('O código vale uma vez só.', style: TextStyle(fontSize: 14, color: muted)),
+              const SizedBox(height: 14),
+              const Text('No app da SHIRO no celular, toque em "Ligar a um PC" e aponte para o código.',
+                  style: TextStyle(fontSize: 14, height: 1.5)),
+              if (local) ...[
+                const SizedBox(height: 14),
+                const Text(
+                    'Atenção: o motor está escutando só neste PC. Para o celular alcançar, ponha o endereço '
+                    'do Tailscale em [devices] host no shiro.toml.',
+                    style: TextStyle(fontSize: 13, color: yellow, height: 1.5)),
+              ],
+            ]),
+          ),
+        ])
+      else
+        Row(children: [
+          _Button(label: pairing == null ? 'Gerar o código' : 'Gerar outro código', onTap: _open, fill: fg),
+          const SizedBox(width: 14),
+          if (note.isNotEmpty) Expanded(child: Text(note, style: const TextStyle(fontSize: 14, color: red))),
+        ]),
     ]);
+  }
+}
+
+/// Ela em 3D (o arquivo SHIRO.vrm na pasta de dados). Sem modelo ou sem WebView2, fica o núcleo.
+class _Avatar extends StatefulWidget {
+  const _Avatar({required this.mood});
+  final Mood mood;
+
+  @override
+  State<_Avatar> createState() => _AvatarState();
+}
+
+class _AvatarState extends State<_Avatar> {
+  final controller = WebviewController();
+  bool ready = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final folder = Directory('${Engine.dataDir()}\\avatar');
+      if (!await File('${folder.path}\\SHIRO.vrm').exists()) return;
+      await File('${folder.path}\\avatar.html').writeAsString(await rootBundle.loadString('assets/avatar.html'));
+      await controller.initialize();
+      await controller.setBackgroundColor(surface);
+      await controller.setPopupWindowPolicy(WebviewPopupWindowPolicy.deny);
+      await controller.addVirtualHostNameMapping('shiro.avatar', folder.path, WebviewHostResourceAccessKind.allow);
+      await controller.loadUrl('https://shiro.avatar/avatar.html');
+      if (!mounted) return;
+      setState(() => ready = true);
+      _push();
+    } catch (_) {
+      // sem WebView2 ou sem rede para as bibliotecas: o núcleo continua no lugar
+    }
+  }
+
+  void _push() {
+    if (ready) controller.executeScript("window.setMood && window.setMood('${widget.mood.name}')");
+  }
+
+  @override
+  void didUpdateWidget(_Avatar old) {
+    super.didUpdateWidget(old);
+    if (old.mood != widget.mood) _push();
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!ready) return Center(child: _Core(mood: widget.mood));
+    return IgnorePointer(child: Webview(controller));
   }
 }
 
@@ -617,6 +832,7 @@ class _Presence extends StatelessWidget {
   Widget build(BuildContext context) {
     final (label, color) = switch (mood) {
       Mood.idle => ('Na escuta', line),
+      Mood.listening => ('Ouvindo', red),
       Mood.thinking => ('Pensando', cyan),
       Mood.speaking => ('Respondeu', cyan),
       Mood.offline => ('Desligada', red),
@@ -629,7 +845,7 @@ class _Presence extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(color: surface, border: Border.all(color: color, width: 2)),
             child: Stack(children: [
-              Center(child: _Core(mood: mood)),
+              Positioned.fill(child: _Avatar(mood: mood)),
               Positioned(
                 top: 12,
                 right: 12,
@@ -660,7 +876,7 @@ class _Presence extends StatelessWidget {
       decoration: const BoxDecoration(border: Border(top: BorderSide(color: line))),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Text(label, style: const TextStyle(fontSize: 14)),
-        Text(value, style: const TextStyle(fontSize: 14, fontFamily: 'Consolas', color: muted)),
+        Text(value, style: const TextStyle(fontSize: 14, fontFamily: 'JetBrains Mono', color: muted)),
       ]),
     );
   }
@@ -688,7 +904,7 @@ class _CoreState extends State<_Core> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final still = MediaQuery.of(context).disableAnimations || widget.mood == Mood.offline;
-    final color = widget.mood == Mood.offline ? line : (widget.mood == Mood.idle ? fg : cyan);
+    final color = switch (widget.mood) { Mood.offline => line, Mood.idle => fg, Mood.listening => red, _ => cyan };
     return AnimatedBuilder(
       animation: spin,
       builder: (context, _) {

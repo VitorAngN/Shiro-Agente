@@ -77,12 +77,35 @@ class ConfirmationAnswer(BaseModel):
 type Lessons = Callable[[], list[dict[str, str]]]
 
 
+class VoiceResponse(BaseModel):
+    heard: str | None
+    """O que ela ouviu; ``None`` quando ninguém falou ou não deu para entender."""
+    text: str = ""
+    tier: str = ""
+    latency_ms: int = 0
+    tools: list[str] = []
+
+
+type Voice = Callable[[Device], Awaitable[tuple[str, AgentResult] | None]]
+"""Ouve uma frase pelo microfone do PC, responde em voz alta e devolve o que ouviu e a resposta."""
+
+
+class PairingResponse(BaseModel):
+    code: str
+    expires_at: str
+    host: str
+    port: int
+
+
 def create_device_api(
     *,
     registry: DeviceRegistry,
     chat: Chat,
     confirmations: RemoteConfirmations | None = None,
     lessons: Lessons | None = None,
+    voice: Voice | None = None,
+    can_pair: Callable[[Device], bool] | None = None,
+    address: tuple[str, int] = ("127.0.0.1", 8766),
 ) -> FastAPI:
     api = FastAPI(title="SHIRO · aparelhos", version=__version__, docs_url=None, redoc_url=None)
 
@@ -138,6 +161,47 @@ def create_device_api(
         if confirmations is None or not confirmations.answer(pending_id, body.approve):
             raise HTTPException(status_code=404, detail="essa pergunta já foi respondida ou venceu")
         return {"answered": True}
+
+    @api.post("/v1/voice")
+    async def post_voice(current: Device = paired) -> VoiceResponse:
+        if voice is None:
+            raise HTTPException(status_code=503, detail="a voz não está disponível neste motor")
+        try:
+            exchange = await voice(current)
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"a voz falhou: {exc}") from exc
+        if exchange is None:
+            return VoiceResponse(heard=None)
+        heard, result = exchange
+        return VoiceResponse(
+            heard=heard,
+            text=result.text,
+            tier=result.tier.value,
+            latency_ms=result.latency_ms,
+            tools=[executed.call.name for executed in result.calls],
+        )
+
+    @api.post("/v1/pairing")
+    async def start_pairing(current: Device = paired) -> PairingResponse:
+        """Abre um pareamento para o QR. Só o programa deste PC pode pedir."""
+        if can_pair is None or not can_pair(current):
+            raise HTTPException(status_code=403, detail="só o programa do PC abre um pareamento")
+        pairing = registry.start_pairing()
+        return PairingResponse(
+            code=pairing.code,
+            expires_at=pairing.expires_at.isoformat(),
+            host=address[0],
+            port=address[1],
+        )
+
+    @api.delete("/v1/devices/{device_id}")
+    async def revoke_device(device_id: str, current: Device = paired) -> dict[str, bool]:
+        """Desliga outro aparelho. Só o programa deste PC pode."""
+        if can_pair is None or not can_pair(current):
+            raise HTTPException(status_code=403, detail="só o programa do PC desliga aparelhos")
+        if device_id == current.id:
+            raise HTTPException(status_code=400, detail="o programa do PC não desliga a si mesmo")
+        return {"revoked": await registry.revoke(device_id)}
 
     @api.get("/v1/lessons")
     async def get_lessons(current: Device = paired) -> list[dict[str, str]]:

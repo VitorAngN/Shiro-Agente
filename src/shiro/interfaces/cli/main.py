@@ -206,10 +206,12 @@ async def _serve(settings: Settings) -> int:
         registry = DeviceRegistry(
             SqliteDeviceStore(app.database), SystemClock(ZoneInfo(settings.general.timezone))
         )
-        await ensure_local_token(registry, paths.data_dir())
+        token = await ensure_local_token(registry, paths.data_dir())
         write_launch_spec(paths.data_dir())
+        local = await registry.authenticate(token)
+        api = engine_api(app, registry, confirmations, local_device_id=local.id if local else "")
         server = EngineServer(
-            engine_api(app, registry, confirmations),
+            api,
             host=settings.devices.host,
             port=settings.devices.port,
         )
