@@ -54,3 +54,15 @@ def test_router_prefers_apps_then_sites() -> None:
     assert calls is not None and calls[0].arguments == {"url": "youtube.com"}
     catalog = CommandCatalog.build(router.match_tier0, ["Chrome"], site_phrases())
     assert "Abra o YouTube." in {c.phrase for c in catalog.candidates}
+
+
+@pytest.mark.parametrize(
+    ("text", "query"),
+    [
+        ("Pesquise, Zevaqueiro, Flash e coloque no YouTube para tocar.", "Zevaqueiro Flash"),
+        ("toca Bohemian Rhapsody no YouTube", "Bohemian Rhapsody"),
+        ("Shiro, coloca a música do Matuê no YouTube", "Matuê"),
+    ],
+)
+def test_play_on_youtube(text: str, query: str) -> None:
+    assert RULES(text) == [("open_url", {"search": query, "on": "youtube", "play": True})]

@@ -19,11 +19,11 @@ from typing import Any
 
 from fastapi import FastAPI
 
-from shiro.application.devices.confirmations import RemoteConfirmations
+from shiro.application.devices.confirmations import Pending, RemoteConfirmations
 from shiro.application.devices.service import DeviceRegistry
 from shiro.bootstrap.app import App
 from shiro.domain.devices.models import Device
-from shiro.domain.models import AgentResult
+from shiro.domain.models import AgentResult, DecisionKind
 from shiro.interfaces.api.devices import create_device_api
 from shiro.interfaces.api.server import _server_class  # pyright: ignore[reportPrivateUsage]
 from shiro.interfaces.voice.session import VoiceSession
@@ -87,9 +87,16 @@ class VoiceBox:
     programa busca para mostrar na tela.
     """
 
-    def __init__(self, app: App, turn: asyncio.Lock) -> None:
+    def __init__(
+        self, app: App, turn: asyncio.Lock, confirmations: RemoteConfirmations | None = None
+    ) -> None:
         self._app = app
         self._turn = turn
+        self._confirmations = confirmations
+        self._voice_turn = False
+        self._asking: set[asyncio.Task[None]] = set()
+        if confirmations is not None:
+            confirmations.listener = self._confirm_aloud
         self._session: VoiceSession | None = None
         self._busy = asyncio.Lock()
         self._wake: Any = None
@@ -148,7 +155,11 @@ class VoiceBox:
     ) -> AgentResult:
         async with self._turn:
             log.info("pedido por voz de %s", who)
-            result = await self._app.agent.run_turn(heard)
+            self._voice_turn = True
+            try:
+                result = await self._app.agent.run_turn(heard)
+            finally:
+                self._voice_turn = False
         self.history.append(
             {
                 "id": len(self.history) + 1,
@@ -163,6 +174,44 @@ class VoiceBox:
         del self.history[:-50]
         await session.say(result.text)
         return result
+
+    # ------------------------------------------------------------ confirmação por voz
+
+    def _confirm_aloud(self, pending: Pending) -> None:
+        """Pedido feito por voz: a pergunta também é feita em voz alta ("sim" ou "não").
+
+        O botão na tela continua valendo; o que responder primeiro decide. Ação
+        crítica (R3) só no botão, porque a voz pode vir de um vídeo.
+        """
+        if not self._voice_turn or self._session is None:
+            return
+        if pending.kind is DecisionKind.CONFIRM_PHYSICAL:
+            return
+        task = asyncio.get_running_loop().create_task(self._ask_aloud(self._session, pending))
+        self._asking.add(task)
+        task.add_done_callback(self._asking.discard)
+
+    async def _ask_aloud(self, session: VoiceSession, pending: Pending) -> None:
+        from shiro.domain.voice.speech import yes_or_no
+
+        confirmations = self._confirmations
+        if confirmations is None:
+            return
+        question = f"{pending.prompt} Sim ou não?"
+        for _ in range(2):
+            if not confirmations.is_waiting(pending.id):
+                return
+            await session.say(question)
+            if not confirmations.is_waiting(pending.id):
+                return
+            heard = await session.listen()
+            if heard is None or not confirmations.is_waiting(pending.id):
+                return
+            answer = yes_or_no(heard)
+            if answer is not None:
+                confirmations.answer(pending.id, answer)
+                return
+            question = "Não entendi. Sim ou não?"
 
     # ------------------------------------------------------------ escuta do nome
 
@@ -239,7 +288,7 @@ def engine_api(
     local_device_id: str = "",
 ) -> FastAPI:
     turn = asyncio.Lock()  # o agente atende um pedido por vez
-    voice = VoiceBox(app, turn)
+    voice = VoiceBox(app, turn, confirmations)
 
     async def chat(text: str, device: Device) -> AgentResult:
         async with turn:

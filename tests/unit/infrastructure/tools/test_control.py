@@ -182,3 +182,25 @@ async def test_registry_gates_control_tools() -> None:
     for phrase in ("clica em entrar", "abre o youtube", "digita oi", "aperta ctrl c"):
         registry.gate("control", TOOL_GATES["control"])
         assert "control" in registry.groups_for(phrase), phrase
+
+
+def test_first_video_id_from_results_page() -> None:
+    from shiro.infrastructure.tools.youtube import first_video_id
+
+    page = 'x"videoRenderer":{"videoId":"dQw4w9WgXcQ","thumb"... "videoId":"zzzzzzzzzzz"'
+    assert first_video_id(page) == "dQw4w9WgXcQ"
+    assert first_video_id("<html>nada</html>") is None
+
+
+async def test_play_opens_the_first_video() -> None:
+    class Videos:
+        async def first_video(self, query: str) -> str | None:
+            return "https://www.youtube.com/watch?v=abc" if query == "matue" else None
+
+    control = FakeControl()
+    tool = OpenUrlTool(control, Videos())
+    done = await tool.run(OpenUrlArgs(search="matue", on="youtube", play=True), CTX)
+    assert control.calls[-1][1] == "https://www.youtube.com/watch?v=abc"
+    assert done.say == "Tocando matue no YouTube."
+    await tool.run(OpenUrlArgs(search="nada", on="youtube", play=True), CTX)
+    assert "results?search_query=nada" in str(control.calls[-1][1])

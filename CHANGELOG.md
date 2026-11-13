@@ -6,6 +6,8 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 ## [Não lançado]
 
 ### Adicionado (controle do PC, ADR-0024)
+- "Toca X no YouTube" e "pesquisa X e coloca no YouTube" abrem direto o primeiro vídeo da busca (`open_url` com `play`).
+- Pedido feito por voz que precisa de confirmação: a SHIRO pergunta em voz alta e aceita "sim" ou "não"; o botão na tela continua valendo. Ação crítica (R3) só no botão.
 - `open_url`, `type_text`, `press_keys`, `read_screen` e `click_on`: abrir sites e buscas no navegador, digitar, apertar atalhos, listar e clicar nos botões da janela em uso pelo nome (UI Automation). `[policy] pc_control` liga e desliga.
 - "Abre o YouTube" e "pesquisa X no YouTube" vão direto para o navegador, sem passar pelo modelo, inclusive com nomes mal transcritos ("iutubi").
 - Nomes em inglês (sites e `[voice.stt] extra_words`) entram nas hotwords, no prompt e no catálogo de comandos do Whisper.

@@ -18,6 +18,7 @@ from shiro.infrastructure.tools.location import IpLocator, Locator
 from shiro.infrastructure.tools.media import MediaControlTool, MediaKeys
 from shiro.infrastructure.tools.system import SystemInfoTool, SystemProbe
 from shiro.infrastructure.tools.weather import WeatherTool
+from shiro.infrastructure.tools.youtube import YouTubeFinder
 
 LOCATION_CACHE_FILE = "location.json"
 
@@ -94,7 +95,7 @@ def build_registry(
         registry.register(OpenAppTool(targets, desktop.launcher))
         registry.register(CloseAppTool(targets, desktop.launcher))
     if desktop.control is not None and settings.policy.pc_control:
-        for tool in control_tools(desktop.control):
+        for tool in control_tools(desktop.control, YouTubeFinder(http)):
             registry.register(tool)
     return registry
 
@@ -159,6 +160,12 @@ TOOL_GATES: dict[str, tuple[str, ...]] = {
         "url",
         "endereco",
         "youtube*",
+        "toca*",
+        "toque*",
+        "tocar",
+        "coloca*",
+        "coloque*",
+        "video*",
         "wikipedia*",
         "github*",
         "chrome*",

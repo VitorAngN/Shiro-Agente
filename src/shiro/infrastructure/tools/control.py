@@ -230,6 +230,9 @@ class OpenUrlArgs(Args):
     )
     on: SearchSite = Field(default="google", description="Onde pesquisar (só com search)")
     browser: Browser = Field(default="padrao", description="Navegador; padrao = o do Windows")
+    play: bool = Field(
+        default=False, description="Com on=youtube: já abre e toca o primeiro vídeo da busca"
+    )
 
     @field_validator("url")
     @classmethod
@@ -249,12 +252,19 @@ class OpenUrlArgs(Args):
         return _SEARCH_URLS[self.on].format(quote_plus((self.search or "").strip()))
 
 
+class VideoFinder(Protocol):
+    async def first_video(self, query: str) -> str | None:
+        """Endereço do primeiro vídeo da busca, ou ``None``."""
+        ...
+
+
 class OpenUrlTool:
     spec = ToolSpec(
         name="open_url",
         description=(
             "Abre um site ou uma pesquisa no navegador do PC (Google, YouTube, Wikipedia...). "
-            "Use para 'abre o youtube', 'pesquisa X no Google', 'procura X na Wikipedia'."
+            "Use para 'abre o youtube', 'pesquisa X no Google', 'procura X na Wikipedia', "
+            "'toca X no YouTube' (search=X, on=youtube, play=true)."
         ),
         args_model=OpenUrlArgs,
         risk=RiskLevel.R1,
@@ -263,14 +273,25 @@ class OpenUrlTool:
         group="control",
     )
 
-    def __init__(self, control: DesktopControl) -> None:
+    def __init__(self, control: DesktopControl, videos: VideoFinder | None = None) -> None:
         self._control = control
+        self._videos = videos
 
     def describe(self, args: BaseModel) -> str:
-        return f"abrir {expect(args, OpenUrlArgs).address()}"
+        parsed = expect(args, OpenUrlArgs)
+        if parsed.play and parsed.search:
+            return f"tocar {parsed.search} no YouTube"
+        return f"abrir {parsed.address()}"
 
     async def run(self, args: BaseModel, ctx: ToolContext) -> ToolResult:
         parsed = expect(args, OpenUrlArgs)
+        if parsed.play and parsed.search and parsed.on == "youtube" and self._videos:
+            video = await self._videos.first_video(parsed.search.strip())
+            if video is not None:
+                await self._control.open_url(video, parsed.browser)
+                return ToolResult.success(
+                    f"Tocando: {video}", say=f"Tocando {parsed.search.strip()} no YouTube."
+                )
         await self._control.open_url(parsed.address(), parsed.browser)
         if parsed.search:
             say = f"Pesquisando {parsed.search.strip()} no {parsed.on.capitalize()}."
@@ -426,9 +447,9 @@ class ClickOnTool:
         )
 
 
-def control_tools(control: DesktopControl) -> list[Tool]:
+def control_tools(control: DesktopControl, videos: VideoFinder | None = None) -> list[Tool]:
     return [
-        OpenUrlTool(control),
+        OpenUrlTool(control, videos),
         TypeTextTool(control),
         PressKeysTool(control),
         ReadScreenTool(control),

@@ -56,6 +56,14 @@ _SEARCH = re.compile(
     r"(?:(?:por|sobre)\s+)?(?P<q>.+?)\s+(?:no|na|em)\s+(?:o\s+|a\s+)?"
     r"(?P<site>[a-z0-9 ]+?)" + _POLITE
 )
+_PLAY = re.compile(
+    _CALL + r"(?:(?:pesquis[ae]|pesquisar|procur[ae]|procurar|busc[ae]|buscar)\s+"
+    r"(?:(?:por|sobre)\s+)?(?P<q1>.+?)\s+e\s+)?"
+    r"(?:pode\s+)?(?:toca|toque|tocar|coloca|coloque|colocar|bota|bote|botar|poe|ponha)\s+"
+    r"(?:(?:a|o|um|uma)\s+(?:musica|video|clipe)\s+(?:do|da|de)?\s*)?"
+    r"(?P<q2>.*?)\s*(?:no|na)\s+(?:o\s+)?(?P<site>[a-z0-9 ]+?)"
+    r"(?:\s+(?:pra|para)\s+(?:tocar|eu ouvir|ouvir|mim))?" + _POLITE
+)
 _MATCH = 0.8
 
 
@@ -87,6 +95,12 @@ class SiteRules:
 
     def __call__(self, text: str) -> Calls | None:
         command = normalize(text)
+        if match := _PLAY.match(command):
+            site = self.site(match["site"])
+            spoken = (match["q1"] or match["q2"] or "").strip()
+            if site is not None and site.key == "youtube" and spoken:
+                query = _original_words(text, spoken).replace(",", "")
+                return [("open_url", {"search": query, "on": "youtube", "play": True})]
         if match := _SEARCH.match(command):
             site = self.site(match["site"])
             if site is not None and site.search:
