@@ -5,6 +5,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (escrever por voz, ADR-0026)
+- `write_text`: a SHIRO redige e cola o texto ou o código pronto no programa pedido ("anota no Obsidian...", "escreve uma função que...").
+- Modo ditado: "modo ditado" liga, cada frase falada é escrita na janela em uso, com pontuação falada; "parar ditado" encerra.
+- A escuta tem prazo de relógio: microfone que para de responder não deixa mais a SHIRO presa em "Ouvindo".
+
 ### Adicionado (habilidades, ADR-0025)
 - "Quero que você saiba fazer X": a SHIRO monta os passos com as ações que já tem, mostra para você aprovar e guarda com um nome. Depois é só falar o nome; `{x}` no fim do nome pega o resto da frase.
 - `list_skills` e `forget_skill`; migração 0006.

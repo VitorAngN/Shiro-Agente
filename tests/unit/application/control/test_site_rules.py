@@ -109,3 +109,17 @@ def test_launcher_prefix_is_ignored() -> None:
         program=lambda s: spoken_to_name(s, ["Half-Life", "Steam"]), window=lambda s: None
     )
     assert rules("Na Steam, abra Half-Life.") == [("open_program", {"name": "half life"})]
+
+
+def test_dictation_rule_and_spoken_punctuation() -> None:
+    from shiro.application.control.rules import dictation_rule
+    from shiro.application.voice.dictation import is_stop, spoken_punctuation
+
+    for text in ("Shiro, modo ditado.", "liga o ditado", "vou ditar", "ditado"):
+        assert dictation_rule(text) == [("start_dictation", {})], text
+    assert dictation_rule("o ditado de ontem foi difícil") is None
+    assert spoken_punctuation("oi vírgula tudo bem interrogação nova linha tchau ponto final") == (
+        "oi, tudo bem?\ntchau."
+    )
+    assert spoken_punctuation("soma abre parênteses a vírgula b fecha parênteses") == "soma (a, b)"
+    assert is_stop("Parar ditado.") and is_stop("Shiro, para o ditado") and not is_stop("ditado")

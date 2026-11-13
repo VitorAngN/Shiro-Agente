@@ -197,6 +197,10 @@ class DesktopControl(Protocol):
 
     async def press_keys(self, keys: Sequence[str]) -> None: ...
 
+    async def paste_text(self, text: str) -> None:
+        """Cola o texto de uma vez (texto longo ou código: o editor não mexe na indentação)."""
+        ...
+
     async def screen(self) -> Screen:
         """Elementos com nome da janela em uso (a da SHIRO fica de fora)."""
         ...

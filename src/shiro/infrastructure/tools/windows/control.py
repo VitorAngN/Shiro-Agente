@@ -300,6 +300,84 @@ def type_into_window(text: str) -> None:
         time.sleep(0.01)
 
 
+_CF_UNICODETEXT = 13
+_GMEM_MOVEABLE = 0x0002
+
+
+def _open_clipboard(user32: Any) -> bool:
+    for _ in range(20):  # outro programa pode estar com ela aberta por um instante
+        if user32.OpenClipboard(None):
+            return True
+        time.sleep(0.03)
+    return False
+
+
+def get_clipboard() -> str | None:
+    """Texto da área de transferência; ``None`` se não houver texto."""
+    _require_windows()
+    user32: Any = ctypes.windll.user32  # pyright: ignore[reportAttributeAccessIssue]
+    kernel32: Any = ctypes.windll.kernel32  # pyright: ignore[reportAttributeAccessIssue]
+    user32.GetClipboardData.restype = ctypes.c_void_p
+    kernel32.GlobalLock.restype = ctypes.c_void_p
+    kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+    kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+    if not _open_clipboard(user32):
+        return None
+    try:
+        handle = user32.GetClipboardData(_CF_UNICODETEXT)
+        if not handle:
+            return None
+        pointer = kernel32.GlobalLock(handle)
+        if not pointer:
+            return None
+        try:
+            return ctypes.wstring_at(pointer)
+        finally:
+            kernel32.GlobalUnlock(handle)
+    finally:
+        user32.CloseClipboard()
+
+
+def set_clipboard(text: str) -> bool:
+    _require_windows()
+    user32: Any = ctypes.windll.user32  # pyright: ignore[reportAttributeAccessIssue]
+    kernel32: Any = ctypes.windll.kernel32  # pyright: ignore[reportAttributeAccessIssue]
+    kernel32.GlobalAlloc.restype = ctypes.c_void_p
+    kernel32.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+    kernel32.GlobalLock.restype = ctypes.c_void_p
+    kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+    kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+    user32.SetClipboardData.restype = ctypes.c_void_p
+    user32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+    data = text.encode("utf-16-le") + b"\0\0"
+    if not _open_clipboard(user32):
+        return False
+    try:
+        user32.EmptyClipboard()
+        handle = kernel32.GlobalAlloc(_GMEM_MOVEABLE, len(data))
+        pointer = kernel32.GlobalLock(handle) if handle else None
+        if not pointer:
+            return False
+        ctypes.memmove(pointer, data, len(data))
+        kernel32.GlobalUnlock(handle)
+        return bool(user32.SetClipboardData(_CF_UNICODETEXT, handle))
+    finally:
+        user32.CloseClipboard()
+
+
+def paste_into_window(text: str) -> None:
+    """Cola pelo Ctrl+V e devolve o que estava na área de transferência."""
+    before = get_clipboard()
+    if not set_clipboard(text):
+        type_into_window(text)  # área de transferência ocupada: digita
+        return
+    bring_forward(target_window())
+    _send(combo_events(("ctrl", "v")))
+    time.sleep(0.35)  # o programa lê a área de transferência depois do Ctrl+V
+    if before is not None:
+        set_clipboard(before)
+
+
 def press_into_window(keys: Sequence[str]) -> None:
     bring_forward(target_window())
     _send(combo_events(keys))
@@ -348,6 +426,9 @@ class WindowsDesktopControl:
 
     async def press_keys(self, keys: Sequence[str]) -> None:
         await asyncio.to_thread(press_into_window, tuple(keys))
+
+    async def paste_text(self, text: str) -> None:
+        await asyncio.to_thread(paste_into_window, text)
 
     async def screen(self) -> Screen:
         return await asyncio.to_thread(read_screen)

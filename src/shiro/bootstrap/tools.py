@@ -10,6 +10,7 @@ import httpx
 
 from shiro.application.control.rules import ProgramRules
 from shiro.application.registry import ToolRegistry
+from shiro.application.voice.dictation import Dictation
 from shiro.config.settings import Settings
 from shiro.infrastructure.tools.apps import AppLauncher, AppTarget, CloseAppTool, OpenAppTool
 from shiro.infrastructure.tools.audio import ChangeVolumeTool, SetVolumeTool, VolumeControl
@@ -20,6 +21,7 @@ from shiro.infrastructure.tools.media import MediaControlTool, MediaKeys
 from shiro.infrastructure.tools.programs import ProgramControl, program_tools, spoken_to_name
 from shiro.infrastructure.tools.system import SystemInfoTool, SystemProbe
 from shiro.infrastructure.tools.weather import WeatherTool
+from shiro.infrastructure.tools.writing import writing_tools
 from shiro.infrastructure.tools.youtube import YouTubeFinder
 
 LOCATION_CACHE_FILE = "location.json"
@@ -85,6 +87,7 @@ def build_registry(
     http: httpx.AsyncClient,
     probe: SystemProbe,
     locator: Locator | None = None,
+    dictation: Dictation | None = None,
 ) -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(GetTimeTool(ZoneInfo(settings.general.timezone)))
@@ -101,6 +104,10 @@ def build_registry(
         registry.register(CloseAppTool(targets, desktop.launcher))
     if desktop.control is not None and settings.policy.pc_control:
         for tool in control_tools(desktop.control, YouTubeFinder(http)):
+            registry.register(tool)
+    if desktop.control is not None and settings.policy.pc_control:
+        dictation = dictation or Dictation(desktop.control.paste_text)
+        for tool in writing_tools(desktop.control, desktop.programs, dictation):
             registry.register(tool)
     if desktop.programs is not None and settings.policy.pc_control:
         for tool in program_tools(desktop.programs):
@@ -201,6 +208,18 @@ TOOL_GATES: dict[str, tuple[str, ...]] = {
         "da tela",
         "a tela",
         "janela*",
+        "ditado",
+        "ditar",
+        "dita",
+        "codigo*",
+        "funcao*",
+        "no obsidian",
+        "no vscode",
+        "no vs code",
+        "no visual studio",
+        "no bloco de notas",
+        "no word",
+        "no notion",
         "abre*",
         "abra*",
         "abrir",

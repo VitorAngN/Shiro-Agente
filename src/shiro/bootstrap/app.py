@@ -25,7 +25,7 @@ from shiro.application.agent.context import ContextBuilder
 from shiro.application.agent.loop import AgentLimits, AgentLoop
 from shiro.application.agent.router import IntentRouter
 from shiro.application.bus import EventBus
-from shiro.application.control.rules import SiteRules
+from shiro.application.control.rules import SiteRules, dictation_rule
 from shiro.application.learning.rules import LearningRules
 from shiro.application.learning.service import Lessons
 from shiro.application.learning.tools import learning_tools
@@ -37,6 +37,7 @@ from shiro.application.routines import ListRoutinesTool, Routine, RoutineRules, 
 from shiro.application.scheduler import Scheduler
 from shiro.application.skills.service import Skills
 from shiro.application.skills.tools import skill_tools
+from shiro.application.voice.dictation import Dictation
 from shiro.bootstrap.llm import build_cloud_llm, build_local_llm, build_web_searcher
 from shiro.bootstrap.skills import step_catalog, step_check, step_words
 from shiro.bootstrap.tools import (
@@ -98,6 +99,7 @@ class App:
     memory: MemoryService | None = None
     trash: Trash | None = None
     bus: EventBus | None = None
+    dictation: Dictation | None = None
     routines: dict[str, Routine] = field(default_factory=dict[str, Routine])
     problems: list[str] = field(default_factory=list[str])
     """Avisos da montagem (rotina inválida etc.), para a CLI e a bandeja mostrarem."""
@@ -162,9 +164,11 @@ async def build_app(
         cloud_llm, cloud_status = build_cloud_llm(settings, SqliteUsageLedger(database))
     if cloud_llm is not None:
         providers[Tier.T2] = cloud_llm
+    dictation = Dictation(desktop.control.paste_text) if desktop.control is not None else None
     registry = build_registry(
         settings,
         desktop=desktop,
+        dictation=dictation,
         http=http,
         probe=probe or PsutilProbe(),
         locator=build_locator(settings, http, data_dir),
@@ -237,6 +241,7 @@ async def build_app(
             ActivityRules(clock.now),
             *((MemoryRules(clock.now),) if memory is not None else ()),
             *((SiteRules(),) if registry.get("open_url") is not None else ()),
+            *((dictation_rule,) if registry.get("start_dictation") is not None else ()),
             *(
                 (program_rules(desktop.programs),)
                 if desktop.programs is not None and registry.get("open_program") is not None
@@ -287,6 +292,7 @@ async def build_app(
         memory=memory,
         trash=trash,
         bus=bus,
+        dictation=dictation,
         routines=routines,
         problems=problems,
         _closers=closers,

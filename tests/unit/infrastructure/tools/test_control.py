@@ -60,6 +60,9 @@ class FakeControl:
     async def press_keys(self, keys: Sequence[str]) -> None:
         self.calls.append(("keys", tuple(keys)))
 
+    async def paste_text(self, text: str) -> None:
+        self.calls.append(("paste", text))
+
     async def screen(self) -> Screen:
         return self._screen
 
@@ -235,3 +238,32 @@ async def test_program_tools() -> None:
     assert programs.calls[-1] == ("focus", "Wikipedia - Google Chrome")
     await switch.run(switch.spec.args_model(name="calculadora"), CTX)
     assert programs.calls[-1] == ("launch", "Calculadora")
+
+
+async def test_write_text_goes_to_the_named_window() -> None:
+    from shiro.infrastructure.tools.writing import WriteTextTool
+
+    class Programs:
+        def __init__(self) -> None:
+            self.focused: list[str] = []
+
+        def program_names(self) -> list[str]:
+            return ["Obsidian"]
+
+        def window_titles(self) -> list[str]:
+            return ["Notas - Obsidian v1.7"]
+
+        async def launch(self, name: str) -> None:
+            raise AssertionError(name)
+
+        async def focus(self, title: str) -> None:
+            self.focused.append(title)
+
+    control, programs = FakeControl(), Programs()
+    tool = WriteTextTool(control, programs)
+    note = "## Compras\n- [ ] leite\n- [ ] pão"
+    done = await tool.run(tool.spec.args_model(content=note, window="obsidian"), CTX)
+    assert done.ok and programs.focused == ["Notas - Obsidian v1.7"]
+    assert control.calls[-1] == ("paste", note)
+    missing = await tool.run(tool.spec.args_model(content="x", window="photoshop"), CTX)
+    assert not missing.ok and control.calls[-1] == ("paste", note)

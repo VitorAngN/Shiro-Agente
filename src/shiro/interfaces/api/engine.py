@@ -24,6 +24,7 @@ from fastapi import FastAPI
 from shiro.application.bus import EventBus
 from shiro.application.devices.confirmations import Pending, RemoteConfirmations
 from shiro.application.devices.service import DeviceRegistry
+from shiro.application.voice.dictation import is_stop, spoken_punctuation
 from shiro.bootstrap.app import App
 from shiro.domain.devices.models import Device
 from shiro.domain.events import TurnFinished, TurnProgress, TurnStarted
@@ -81,6 +82,9 @@ class _Quiet(io.StringIO):
 
     def write(self, text: str) -> int:
         return len(text)
+
+
+_DICTATION_SILENCES = 3  # tantas escutas seguidas sem fala encerram o ditado
 
 
 class Activity:
@@ -209,13 +213,14 @@ class VoiceBox:
             finally:
                 self.activity.idle()
 
-    async def _listen(self, session: VoiceSession) -> str | None:
+    async def _listen(self, session: VoiceSession, *, quiet: bool = False) -> str | None:
         """Escuta com prazo de relógio: se o microfone parar de mandar som, não fica preso."""
         settings = getattr(self._app, "settings", None)
         listen = settings.voice.listen if settings is not None else None
         limit = (listen.start_timeout_s + listen.max_utterance_s + 10) if listen else 40.0
         try:
-            return await asyncio.wait_for(session.listen(), limit)
+            listening = session.listen(quiet=True) if quiet else session.listen()
+            return await asyncio.wait_for(listening, limit)
         except TimeoutError:
             log.warning("voz: o microfone não respondeu em %.0f s", limit)
             self.problem = "o microfone parou de responder; tente de novo"
@@ -252,8 +257,43 @@ class VoiceBox:
         del self.history[:-50]
         self.activity.set("speaking", "respondendo")
         await session.say(result.text)
+        await self._dictate(session)
         self.activity.idle()
         return result
+
+    async def _dictate(self, session: VoiceSession) -> None:
+        """Modo ditado (ADR-0026): escreve cada frase falada até ouvir "parar ditado"."""
+        dictation = getattr(self._app, "dictation", None)
+        if dictation is None or not dictation.requested:
+            return
+        dictation.requested = False
+        silences = 0
+        while silences < _DICTATION_SILENCES:
+            self.activity.set("listening", 'ditado: fale o texto ("parar ditado" encerra)')
+            heard = await self._listen(session, quiet=True)
+            if heard is None:
+                silences += 1
+                continue
+            silences = 0
+            if is_stop(heard):
+                break
+            written = spoken_punctuation(heard)
+            self.activity.set("tool", "ditado: escrevendo")
+            await dictation.write(written if written.endswith(("\n", "\t")) else written + " ")
+            self.history.append(
+                {
+                    "id": len(self.history) + 1,
+                    "source": "nome",
+                    "heard": heard,
+                    "text": "(escrito)",
+                    "tier": "T0",
+                    "latency_ms": 0,
+                    "tools": ["dictation"],
+                }
+            )
+            del self.history[:-50]
+        self.activity.set("speaking", "respondendo")
+        await session.say("Ditado encerrado.")
 
     # ------------------------------------------------------------ confirmação por voz
 
@@ -384,7 +424,10 @@ def engine_api(
     async def chat(text: str, device: Device) -> AgentResult:
         async with turn:
             log.info("pedido de %s", device.name)
-            return await app.agent.run_turn(text)
+            result = await app.agent.run_turn(text)
+            if app.dictation is not None:
+                app.dictation.requested = False  # ditado só começa em pedido feito por voz
+            return result
 
     def lessons() -> list[dict[str, str]]:
         return [{"trigger": x.trigger, "meaning": x.meaning} for x in app.lessons.lessons()]

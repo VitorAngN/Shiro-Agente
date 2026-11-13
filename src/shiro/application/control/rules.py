@@ -187,3 +187,16 @@ class ProgramRules:
         if (start := _START.match(command)) and self._program(start["name"]) is not None:
             return [("open_program", {"name": start["name"]})]
         return None
+
+
+# --- ditado -------------------------------------------------------------------
+
+_DICTATE = re.compile(
+    _CALL + r"(?:(?:liga|ligue|ativa|ative|inicia|inicie|comeca|comece|abre|abra|entra no|"
+    r"vou|quero)\s+)?(?:(?:o|um)\s+)?(?:modo\s+)?(?:ditado|ditar)" + _POLITE
+)
+
+
+def dictation_rule(text: str) -> Calls | None:
+    """ "modo ditado", "liga o ditado", "vou ditar": liga sem passar pelo modelo."""
+    return [("start_dictation", {})] if _DICTATE.match(normalize(text)) else None
