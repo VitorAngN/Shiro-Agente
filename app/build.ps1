@@ -70,6 +70,7 @@ if ($model) { Copy-Item $model (Join-Path $avatar 'SHIRO.vrm') -Force; "modelo 3
 else { 'modelo 3D: SHIRO.vrm não encontrado em Documentos (o programa usa o núcleo no lugar)' }
 
 flutter build windows --release
+if ($LASTEXITCODE -ne 0) { Write-Error 'a compilacao falhou; veja os erros acima'; exit 1 }
 $exe = Join-Path $PSScriptRoot 'build\windows\x64\runner\Release\shiro_app.exe'
 $link = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'SHIRO.lnk'))
 $link.TargetPath = $exe

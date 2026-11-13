@@ -20,6 +20,7 @@ shiro.toml
 .env
 logs/
 models/
+!app/lib/core/models/
 voices/
 recordings/
 
