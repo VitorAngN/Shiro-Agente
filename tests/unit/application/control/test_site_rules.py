@@ -99,3 +99,13 @@ def test_programs_and_windows(text: str, call: tuple[str, dict[str, object]]) ->
 @pytest.mark.parametrize("text", ["abre a pasta downloads", "vai pra cama", "abre o jogo xyzzy"])
 def test_unknown_programs_go_to_the_model(text: str) -> None:
     assert _programs_rules()(text) is None  # type: ignore[operator]
+
+
+def test_launcher_prefix_is_ignored() -> None:
+    from shiro.application.control.rules import ProgramRules
+    from shiro.infrastructure.tools.programs import spoken_to_name
+
+    rules = ProgramRules(
+        program=lambda s: spoken_to_name(s, ["Half-Life", "Steam"]), window=lambda s: None
+    )
+    assert rules("Na Steam, abra Half-Life.") == [("open_program", {"name": "half life"})]

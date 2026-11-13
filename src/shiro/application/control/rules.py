@@ -154,7 +154,8 @@ _GO_TO = re.compile(
 )
 _START = re.compile(
     _CALL
-    + r"(?:abre|abra|abrir|inicia|inicie|iniciar|executa|execute|roda|rode|liga|ligue)\s+"
+    + r"(?:(?:no|na|pelo|pela)\s+[a-z0-9]+\s+)?"  # "na Steam, abra Half-Life"
+    + r"(?:abre|abra|abrir|inicia|inicie|iniciar|executa|execute|roda|rode|liga|ligue|joga)\s+"
     + _ARTICLE
     + r"(?:programa\s+|aplicativo\s+|app\s+|jogo\s+)?(?P<name>[a-z0-9 ]+?)"
     + _POLITE

@@ -202,12 +202,24 @@ class VoiceBox:
             try:
                 session = await self._ready()
                 self.activity.set("listening", "ouvindo você")
-                heard = await session.listen()
+                heard = await self._listen(session)
                 if heard is None:
                     return None
                 return heard, await self._answer(session, heard, device.name, source="botão")
             finally:
                 self.activity.idle()
+
+    async def _listen(self, session: VoiceSession) -> str | None:
+        """Escuta com prazo de relógio: se o microfone parar de mandar som, não fica preso."""
+        settings = getattr(self._app, "settings", None)
+        listen = settings.voice.listen if settings is not None else None
+        limit = (listen.start_timeout_s + listen.max_utterance_s + 10) if listen else 40.0
+        try:
+            return await asyncio.wait_for(session.listen(), limit)
+        except TimeoutError:
+            log.warning("voz: o microfone não respondeu em %.0f s", limit)
+            self.problem = "o microfone parou de responder; tente de novo"
+            return None
 
     async def _answer(
         self, session: VoiceSession, heard: str, who: str, *, source: str
@@ -215,10 +227,17 @@ class VoiceBox:
         async with self._turn:
             log.info("pedido por voz de %s", who)
             self._voice_turn = True
+            started = time.monotonic()
             try:
                 result = await self._app.agent.run_turn(heard)
             finally:
                 self._voice_turn = False
+            log.info(
+                "voz: turno %s em %.1f s (%s)",
+                result.tier.value,
+                time.monotonic() - started,
+                ", ".join(c.call.name for c in result.calls) or "sem ação",
+            )
         self.history.append(
             {
                 "id": len(self.history) + 1,
@@ -292,8 +311,12 @@ class VoiceBox:
                 session = await self._ready()
                 if not text:
                     self.activity.set("listening", "ouvindo o pedido")
-                heard = text or await session.listen()
+                started = time.monotonic()
+                heard = text or await self._listen(session)
                 if heard:
+                    log.info(
+                        "voz: pedido pronto em %.1f s depois do nome", time.monotonic() - started
+                    )
                     await self._answer(session, heard, "voz", source="nome")
             finally:
                 self.activity.idle()
