@@ -268,14 +268,14 @@ def engine_api(
 
 def add_voice_routes(api: FastAPI, voice: VoiceBox) -> None:
     """Histórico das conversas por voz e a chave da escuta do nome."""
-    from fastapi import Depends, Request
+    from fastapi import Depends
 
     from shiro.interfaces.api.devices import require_device
 
     paired = Depends(require_device)
 
     @api.get("/v1/voice/history")
-    async def history(request: Request, after: int = 0, current: Device = paired) -> dict[str, Any]:
+    async def history(after: int = 0, current: Device = paired) -> dict[str, Any]:
         return {
             "listening": voice.listening_for_name,
             "problem": voice.problem,
@@ -283,9 +283,7 @@ def add_voice_routes(api: FastAPI, voice: VoiceBox) -> None:
         }
 
     @api.post("/v1/voice/listening")
-    async def listening(
-        request: Request, body: dict[str, bool], current: Device = paired
-    ) -> dict[str, Any]:
+    async def listening(body: dict[str, bool], current: Device = paired) -> dict[str, Any]:
         try:
             await voice.set_listening(bool(body.get("enabled")))
         except Exception as exc:

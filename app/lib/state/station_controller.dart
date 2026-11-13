@@ -245,6 +245,13 @@ class StationController extends ChangeNotifier {
         }
         pending.replaceWith(waiting);
       });
+    } on EngineError catch (error) {
+      // o motor respondeu: só a chave recusada pede reconexão; o resto é um aviso
+      if (error.status == null || error.status == 401 || error.status == 403) {
+        _lostEngine();
+      } else {
+        _set(() => voiceProblem = error.message);
+      }
     } catch (_) {
       _lostEngine();
     } finally {

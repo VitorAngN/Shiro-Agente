@@ -243,3 +243,19 @@ async def test_voice_box_answers_after_the_name_and_keeps_history() -> None:
     assert {item["source"] for item in box.history} == {"nome"}
     assert said == ["resposta para abre a steam", "resposta para que horas são"]
     assert not box.listening_for_name
+
+
+def test_voice_routes_take_no_stray_query() -> None:
+    """Regressão: ``request`` sem tipo resolvido virava parâmetro obrigatório (422 em laço)."""
+    from fastapi import FastAPI
+
+    from shiro.interfaces.api.engine import add_voice_routes
+
+    api = FastAPI()
+    add_voice_routes(api, object())  # type: ignore[arg-type]
+    from fastapi.routing import APIRoute
+
+    voice = [r for r in api.routes if isinstance(r, APIRoute) and r.path.startswith("/v1/voice")]
+    assert len(voice) == 2
+    for route in voice:
+        assert "request" not in {p.name for p in route.dependant.query_params}
