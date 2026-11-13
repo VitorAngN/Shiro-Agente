@@ -7,6 +7,7 @@ from shiro.domain.ports import LLMProvider
 from shiro.infrastructure.llm.gemini import GeminiProvider
 from shiro.infrastructure.llm.guard import CloudLimits, FallbackProvider, GuardedProvider
 from shiro.infrastructure.llm.ollama import OllamaProvider
+from shiro.infrastructure.llm.vision import GeminiVision
 from shiro.infrastructure.persistence.usage import SqliteUsageLedger
 from shiro.infrastructure.system.secrets import get_api_key
 from shiro.infrastructure.tools.web import GuardedSearch
@@ -65,3 +66,20 @@ def build_cloud_llm(
     if not chain:
         return None, f"nuvem sem chave: rode 'shiro secrets set {cloud.provider}'"
     return FallbackProvider(chain), f"nuvem: {cloud.provider}/{cloud.model}"
+
+
+def build_vision(settings: Settings, ledger: SqliteUsageLedger) -> GeminiVision | None:
+    """Visão da tela pelo Gemini, nos mesmos limites do Tier 2 (precisa da chave)."""
+    cloud = settings.llm.cloud
+    key = get_api_key("gemini") if cloud.enabled else None
+    if not key:
+        return None
+    limits = CloudLimits(
+        rpm_limit=cloud.rpm_limit,
+        daily_request_limit=cloud.daily_request_limit,
+        daily_budget_usd=cloud.daily_budget_usd,
+        price_input_per_mtok=cloud.price_input_per_mtok,
+        price_output_per_mtok=cloud.price_output_per_mtok,
+    )
+    gemini = GeminiProvider(api_key=key, model=cloud.model)
+    return GeminiVision(gemini, GuardedProvider(gemini, limits=limits, ledger=ledger))

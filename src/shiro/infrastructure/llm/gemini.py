@@ -119,6 +119,33 @@ class GeminiProvider:
     async def warm_up(self, request: CompletionRequest) -> None:
         """A nuvem não tem modelo para carregar."""
 
+    async def look(self, png: bytes, instruction: str, *, as_json: bool) -> tuple[str, int, int]:
+        """Pergunta sobre uma imagem: (texto da resposta, tokens de entrada, tokens de saída)."""
+        config = types.GenerateContentConfig(
+            temperature=0.0,
+            response_mime_type="application/json" if as_json else None,
+        )
+        contents = types.Content(
+            role="user",
+            parts=[
+                types.Part.from_bytes(data=png, mime_type="image/png"),
+                types.Part.from_text(text=instruction),
+            ],
+        )
+        try:
+            response = await self._client.aio.models.generate_content(  # pyright: ignore[reportUnknownMemberType]
+                model=self._model, contents=contents, config=config
+            )
+        except _ERRORS as exc:
+            msg = f"Gemini ({self._model}): {exc}"
+            raise LLMError(msg) from exc
+        usage = response.usage_metadata
+        return (
+            (response.text or "").strip(),
+            (usage.prompt_token_count or 0) if usage else 0,
+            (usage.candidates_token_count or 0) if usage else 0,
+        )
+
 
 def to_gemini_tool(tools: tuple[ToolDefinition, ...]) -> types.Tool:
     return types.Tool(

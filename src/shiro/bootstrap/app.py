@@ -38,7 +38,12 @@ from shiro.application.scheduler import Scheduler
 from shiro.application.skills.service import Skills
 from shiro.application.skills.tools import skill_tools
 from shiro.application.voice.dictation import Dictation
-from shiro.bootstrap.llm import build_cloud_llm, build_local_llm, build_web_searcher
+from shiro.bootstrap.llm import (
+    build_cloud_llm,
+    build_local_llm,
+    build_vision,
+    build_web_searcher,
+)
 from shiro.bootstrap.skills import step_catalog, step_check, step_words
 from shiro.bootstrap.tools import (
     GATE_EXCEPTIONS,
@@ -165,10 +170,12 @@ async def build_app(
     if cloud_llm is not None:
         providers[Tier.T2] = cloud_llm
     dictation = Dictation(desktop.control.paste_text) if desktop.control is not None else None
+    vision = build_vision(settings, SqliteUsageLedger(database)) if desktop.control else None
     registry = build_registry(
         settings,
         desktop=desktop,
         dictation=dictation,
+        vision=vision,
         http=http,
         probe=probe or PsutilProbe(),
         locator=build_locator(settings, http, data_dir),

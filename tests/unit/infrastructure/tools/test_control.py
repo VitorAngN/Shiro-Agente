@@ -22,6 +22,7 @@ from shiro.infrastructure.tools.control import (
     ReadScreenTool,
     Screen,
     ScreenElement,
+    ScreenShot,
     TypeTextTool,
     describe_screen,
     find_element,
@@ -62,6 +63,15 @@ class FakeControl:
 
     async def paste_text(self, text: str) -> None:
         self.calls.append(("paste", text))
+
+    async def hold_keys(self, keys: Sequence[str], seconds: float) -> None:
+        self.calls.append(("hold", tuple(keys), seconds))
+
+    async def scroll(self, notches: int) -> None:
+        self.calls.append(("scroll", notches))
+
+    async def capture(self) -> ScreenShot:
+        return ScreenShot(png=b"png", left=100, top=50, width=1000, height=500, window="Jogo")
 
     async def screen(self) -> Screen:
         return self._screen
@@ -267,3 +277,40 @@ async def test_write_text_goes_to_the_named_window() -> None:
     assert control.calls[-1] == ("paste", note)
     missing = await tool.run(tool.spec.args_model(content="x", window="photoshop"), CTX)
     assert not missing.ok and control.calls[-1] == ("paste", note)
+
+
+async def test_click_falls_back_to_vision_and_new_tools() -> None:
+    from shiro.infrastructure.llm.vision import parse_spot
+    from shiro.infrastructure.tools.control import (
+        HoldKeysTool,
+        LookAtScreenTool,
+        ScrollTool,
+        Spot,
+    )
+
+    class Vision:
+        async def locate(self, png: bytes, target: str) -> Spot | None:
+            return Spot(500, 200, "botão Aceitar") if "aceitar" in target.lower() else None
+
+        async def describe(self, png: bytes, question: str) -> str:
+            return "Tela de fila do jogo."
+
+    control = FakeControl(Screen(window="Jogo"))
+    click = ClickOnTool(control, Vision())
+    done = await click.run(click.spec.args_model(target="Aceitar partida"), CTX)
+    assert done.ok and control.calls[-1] == ("click", 600, 150, "esquerdo", False)
+    missing = await click.run(click.spec.args_model(target="Sair"), CTX)
+    assert not missing.ok and "Olhei" in missing.content
+
+    look = await LookAtScreenTool(control, Vision()).run(LookAtScreenTool.spec.args_model(), CTX)
+    assert "fila" in look.content
+    await ScrollTool(control).run(ScrollTool.spec.args_model(direction="baixo", amount=3), CTX)
+    assert control.calls[-1] == ("scroll", -3)
+    await HoldKeysTool(control).run(HoldKeysTool.spec.args_model(keys="shift+w", seconds=2), CTX)
+    assert control.calls[-1] == ("hold", ("shift", "w"), 2.0)
+
+    assert parse_spot('{"found": true, "x": 10, "y": 990, "what": "x"}') == Spot(10, 990, "x")
+    assert parse_spot('[{"found": true, "x": 1, "y": 2}]') == Spot(1, 2, "")
+    assert parse_spot('{"found": false}') is None
+    assert parse_spot("bobagem") is None
+    assert parse_spot('{"found": true, "x": 5000, "y": 2}') is None

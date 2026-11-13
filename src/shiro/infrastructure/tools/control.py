@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from shiro.domain.models import RiskLevel, ToolResult
 from shiro.domain.ports import Tool, ToolContext, ToolSpec
-from shiro.infrastructure.tools._base import Args, expect
+from shiro.infrastructure.tools._base import Args, br_number, expect
 
 Browser = Literal["padrao", "chrome", "edge", "firefox", "brave", "opera"]
 SearchSite = Literal["google", "youtube", "wikipedia", "github", "maps"]
@@ -185,6 +185,41 @@ def describe_screen(screen: Screen, limit: int = 40) -> str:
     return f"Janela: {screen.window}\nElementos:\n" + "\n".join(f"- {s}" for s in seen)
 
 
+@dataclass(frozen=True)
+class ScreenShot:
+    """Print da janela em uso e onde ela está na tela (para converter coordenadas)."""
+
+    png: bytes
+    left: int
+    top: int
+    width: int
+    height: int
+    window: str
+
+    def to_screen(self, x: float, y: float) -> tuple[int, int]:
+        """Ponto em milésimos da imagem (0 a 1000) → pixel da tela."""
+        px = self.left + round(min(max(x, 0.0), 1000.0) / 1000 * self.width)
+        py = self.top + round(min(max(y, 0.0), 1000.0) / 1000 * self.height)
+        return px, py
+
+
+@dataclass(frozen=True)
+class Spot:
+    """Onde a visão achou o alvo, em milésimos da imagem."""
+
+    x: float
+    y: float
+    what: str = ""
+
+
+class ScreenVision(Protocol):
+    """Olha um print e responde (Gemini com imagem): onde clicar, o que tem na tela."""
+
+    async def locate(self, png: bytes, target: str) -> Spot | None: ...
+
+    async def describe(self, png: bytes, question: str) -> str: ...
+
+
 # --- porta ------------------------------------------------------------------
 
 
@@ -206,6 +241,14 @@ class DesktopControl(Protocol):
         ...
 
     async def click(self, x: int, y: int, *, button: MouseButton, double: bool) -> None: ...
+
+    async def hold_keys(self, keys: Sequence[str], seconds: float) -> None: ...
+
+    async def scroll(self, notches: int) -> None:
+        """Positivo sobe, negativo desce."""
+        ...
+
+    async def capture(self) -> ScreenShot: ...
 
 
 # --- abrir sites ------------------------------------------------------------
@@ -420,16 +463,20 @@ class ClickOnTool:
     spec = ToolSpec(
         name="click_on",
         description=(
-            "Clica num botão, link, aba ou campo da janela em uso, pelo nome que aparece na tela."
+            "Clica em qualquer coisa visível na janela em uso, descrita como aparece: botão, "
+            "link, ícone, linha de texto, item de jogo ('o checkbox abaixo de Checklist "
+            "básico', 'o botão Jogar'). Tenta pelo nome; se não achar, olha a tela."
         ),
         args_model=ClickArgs,
         risk=RiskLevel.R2,
-        timeout_s=20.0,
+        timeout_s=40.0,
+        external=True,
         group="control",
     )
 
-    def __init__(self, control: DesktopControl) -> None:
+    def __init__(self, control: DesktopControl, vision: ScreenVision | None = None) -> None:
         self._control = control
+        self._vision = vision
 
     def describe(self, args: BaseModel) -> str:
         return f'clicar em "{expect(args, ClickArgs).target}"'
@@ -438,24 +485,147 @@ class ClickOnTool:
         parsed = expect(args, ClickArgs)
         screen = await self._control.screen()
         found = find_element(screen.elements, parsed.target)
-        if found is None:
-            names = list(dict.fromkeys(e.name for e in screen.elements))[:12]
-            hint = f" Tem: {', '.join(names)}." if names else ""
-            return ToolResult.failure(
-                f'Não achei "{parsed.target}" na janela {screen.window}.{hint}'
+        if found is not None:
+            await self._control.click(found.x, found.y, button=parsed.button, double=parsed.double)
+            return ToolResult.success(
+                f"Cliquei em {found.name} ({found.kind}) na janela {screen.window}.",
+                say=f"Cliquei em {found.name}.",
             )
-        await self._control.click(found.x, found.y, button=parsed.button, double=parsed.double)
-        return ToolResult.success(
-            f"Cliquei em {found.name} ({found.kind}) na janela {screen.window}.",
-            say=f"Cliquei em {found.name}.",
-        )
+        if self._vision is not None:
+            shot = await self._control.capture()
+            spot = await self._vision.locate(shot.png, parsed.target)
+            if spot is not None:
+                x, y = shot.to_screen(spot.x, spot.y)
+                await self._control.click(x, y, button=parsed.button, double=parsed.double)
+                what = spot.what or parsed.target
+                return ToolResult.success(
+                    f"Cliquei em {what} (achei olhando a tela) na janela {shot.window}.",
+                    say="Cliquei.",
+                )
+            return ToolResult.failure(
+                f'Olhei a janela {shot.window} e não achei "{parsed.target}".'
+            )
+        names = list(dict.fromkeys(e.name for e in screen.elements))[:12]
+        hint = f" Tem: {', '.join(names)}." if names else ""
+        return ToolResult.failure(f'Não achei "{parsed.target}" na janela {screen.window}.{hint}')
 
 
-def control_tools(control: DesktopControl, videos: VideoFinder | None = None) -> list[Tool]:
-    return [
+class LookArgs(Args):
+    question: str = Field(
+        default="O que tem na tela? Descreva o que dá para clicar e fazer.",
+        max_length=300,
+        description="O que você quer saber da tela",
+    )
+
+
+class LookAtScreenTool:
+    spec = ToolSpec(
+        name="look_at_screen",
+        description=(
+            "Olha a janela em uso (print) e responde: o que aparece, onde está algo, em que "
+            "estado o jogo ou o programa está. Use antes de agir quando não souber o que tem."
+        ),
+        args_model=LookArgs,
+        risk=RiskLevel.R0,
+        timeout_s=40.0,
+        output_trusted=False,
+        external=True,
+        group="control",
+    )
+
+    def __init__(self, control: DesktopControl, vision: ScreenVision) -> None:
+        self._control = control
+        self._vision = vision
+
+    def describe(self, args: BaseModel) -> str:
+        return "olhar a tela"
+
+    async def run(self, args: BaseModel, ctx: ToolContext) -> ToolResult:
+        shot = await self._control.capture()
+        answer = await self._vision.describe(shot.png, expect(args, LookArgs).question)
+        return ToolResult.success(f"Janela: {shot.window}\n{answer}")
+
+
+class ScrollArgs(Args):
+    direction: Literal["baixo", "cima"] = "baixo"
+    amount: int = Field(default=5, ge=1, le=50, description="Quanto rolar (1 = pouco, 10 = muito)")
+
+
+class ScrollTool:
+    spec = ToolSpec(
+        name="scroll",
+        description="Rola a janela em uso para baixo ou para cima (roda do mouse).",
+        args_model=ScrollArgs,
+        risk=RiskLevel.R1,
+        timeout_s=10.0,
+        group="control",
+    )
+
+    def __init__(self, control: DesktopControl) -> None:
+        self._control = control
+
+    def describe(self, args: BaseModel) -> str:
+        parsed = expect(args, ScrollArgs)
+        return f"rolar para {parsed.direction}"
+
+    async def run(self, args: BaseModel, ctx: ToolContext) -> ToolResult:
+        parsed = expect(args, ScrollArgs)
+        await self._control.scroll(parsed.amount if parsed.direction == "cima" else -parsed.amount)
+        return ToolResult.success(f"Rolei para {parsed.direction}.", say="Pronto.")
+
+
+class HoldKeysArgs(Args):
+    keys: str = Field(
+        min_length=1, max_length=60, description="Tecla ou teclas juntas: w, shift+w, espaço"
+    )
+    seconds: float = Field(default=1.0, gt=0, le=15, description="Por quanto tempo segurar")
+
+    @field_validator("keys")
+    @classmethod
+    def _known(cls, value: str) -> str:
+        return "+".join(parse_keys(value))
+
+
+class HoldKeysTool:
+    spec = ToolSpec(
+        name="hold_keys",
+        description=(
+            "Segura teclas por um tempo e solta: andar num jogo ('anda pra frente 3 segundos' = "
+            "w por 3 s), correr (shift+w), segurar espaço."
+        ),
+        args_model=HoldKeysArgs,
+        risk=RiskLevel.R2,
+        timeout_s=25.0,
+        group="control",
+    )
+
+    def __init__(self, control: DesktopControl) -> None:
+        self._control = control
+
+    def describe(self, args: BaseModel) -> str:
+        parsed = expect(args, HoldKeysArgs)
+        return f"segurar {parsed.keys} por {br_number(parsed.seconds)} s"
+
+    async def run(self, args: BaseModel, ctx: ToolContext) -> ToolResult:
+        parsed = expect(args, HoldKeysArgs)
+        await self._control.hold_keys(tuple(parsed.keys.split("+")), parsed.seconds)
+        return ToolResult.success(f"Segurei {parsed.keys}.", say="Pronto.")
+
+
+def control_tools(
+    control: DesktopControl,
+    videos: VideoFinder | None = None,
+    vision: ScreenVision | None = None,
+) -> list[Tool]:
+    tools: list[Tool] = [
         OpenUrlTool(control, videos),
         TypeTextTool(control),
         PressKeysTool(control),
+        HoldKeysTool(control),
+        ScrollTool(control),
         ReadScreenTool(control),
-        ClickOnTool(control),
+        ClickOnTool(control, vision),
     ]
+    if vision is not None:
+        tools.append(LookAtScreenTool(control, vision))
+    return tools

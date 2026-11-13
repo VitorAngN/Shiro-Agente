@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import ctypes
 import importlib
+import io
 import os
 import subprocess
 import sys
@@ -22,7 +23,13 @@ from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any
 
-from shiro.infrastructure.tools.control import Browser, MouseButton, Screen, ScreenElement
+from shiro.infrastructure.tools.control import (
+    Browser,
+    MouseButton,
+    Screen,
+    ScreenElement,
+    ScreenShot,
+)
 
 OWN_TITLES = frozenset({"SHIRO"})
 _SKIP_CLASSES = frozenset({"Shell_TrayWnd", "Progman", "WorkerW", "Shell_SecondaryTrayWnd"})
@@ -161,14 +168,33 @@ def unicode_events(text: str) -> list[_Input]:
     return events
 
 
-def combo_events(keys: Sequence[str]) -> list[_Input]:
+_KEYEVENTF_SCANCODE = 0x8
+
+
+def _scan_of(vk: int) -> int:
+    """Código físico da tecla: jogos (DirectInput/Raw Input) leem este, não o virtual."""
+    if sys.platform != "win32":
+        return 0
+    return int(ctypes.windll.user32.MapVirtualKeyW(vk, 0))  # MAPVK_VK_TO_VSC
+
+
+def key_events(keys: Sequence[str]) -> tuple[list[_Input], list[_Input]]:
+    """(apertar, soltar) de cada tecla, com o código físico quando o Windows conhece."""
     down: list[_Input] = []
     up: list[_Input] = []
     for key in keys:
         vk = _vk_of(key)
-        extended = _KEYEVENTF_EXTENDEDKEY if vk in _EXTENDED else 0
-        down.append(_key_input(vk, 0, extended))
-        up.insert(0, _key_input(vk, 0, extended | _KEYEVENTF_KEYUP))
+        scan = _scan_of(vk)
+        flags = _KEYEVENTF_EXTENDEDKEY if vk in _EXTENDED else 0
+        if scan:
+            flags |= _KEYEVENTF_SCANCODE
+        down.append(_key_input(vk, scan, flags))
+        up.insert(0, _key_input(vk, scan, flags | _KEYEVENTF_KEYUP))
+    return down, up
+
+
+def combo_events(keys: Sequence[str]) -> list[_Input]:
+    down, up = key_events(keys)
     return down + up
 
 
@@ -290,6 +316,84 @@ def click_at(x: int, y: int, button: MouseButton, *, double: bool) -> None:
     down, up = _MOUSE_FLAGS[button]
     clicks = [_mouse_input(down), _mouse_input(up)]
     _send(clicks * (2 if double else 1))
+
+
+def hold_keys(keys: Sequence[str], seconds: float) -> None:
+    """Segura as teclas (andar num jogo, segurar um botão) e solta."""
+    bring_forward(target_window())
+    down, up = key_events(keys)
+    _send(down)
+    try:
+        time.sleep(seconds)
+    finally:
+        _send(up)
+
+
+_MOUSEEVENTF_WHEEL = 0x0800
+_WHEEL_DELTA = 120
+
+
+def window_rect(hwnd: int) -> tuple[int, int, int, int]:
+    """(esquerda, topo, direita, baixo) da janela, em pixels da tela."""
+
+    class _Rect(ctypes.Structure):
+        _fields_ = (
+            ("left", ctypes.c_long),
+            ("top", ctypes.c_long),
+            ("right", ctypes.c_long),
+            ("bottom", ctypes.c_long),
+        )
+
+    rect = _Rect()
+    _user32().GetWindowRect(ctypes.c_void_p(hwnd), ctypes.byref(rect))
+    return rect.left, rect.top, rect.right, rect.bottom
+
+
+def scroll_window(notches: int) -> None:
+    """Rola a janela em uso: positivo sobe, negativo desce (cada passo = um "clique" da roda)."""
+    hwnd = target_window()
+    bring_forward(hwnd)
+    if hwnd:
+        left, top, right, bottom = window_rect(hwnd)
+        _user32().SetCursorPos((left + right) // 2, (top + bottom) // 2)
+    event = _Input(type=_INPUT_MOUSE)
+    data = (notches * _WHEEL_DELTA) & 0xFFFFFFFF
+    event.u.mi = _MouseInput(
+        dx=0, dy=0, mouseData=data, dwFlags=_MOUSEEVENTF_WHEEL, time=0, dwExtraInfo=0
+    )
+    _send([event])
+
+
+_CAPTURE_MAX_WIDTH = 1600
+
+
+def capture_window() -> ScreenShot:
+    """Print da janela em uso (a SHIRO fica de fora), em PNG, com onde ela está na tela."""
+    _require_windows()
+    from PIL import ImageGrab
+
+    hwnd = target_window()
+    if hwnd:
+        bring_forward(hwnd)
+        left, top, right, bottom = window_rect(hwnd)
+    else:
+        left, top = 0, 0
+        right = _user32().GetSystemMetrics(0)
+        bottom = _user32().GetSystemMetrics(1)
+    image = ImageGrab.grab(bbox=(left, top, right, bottom), all_screens=True)
+    if image.width > _CAPTURE_MAX_WIDTH:  # menos bytes para a nuvem; as coordenadas são relativas
+        ratio = _CAPTURE_MAX_WIDTH / image.width
+        image = image.resize((_CAPTURE_MAX_WIDTH, round(image.height * ratio)))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=True)
+    return ScreenShot(
+        png=buffer.getvalue(),
+        left=left,
+        top=top,
+        width=right - left,
+        height=bottom - top,
+        window=_title(hwnd) if hwnd else "tela inteira",
+    )
 
 
 def type_into_window(text: str) -> None:
@@ -435,6 +539,15 @@ class WindowsDesktopControl:
 
     async def click(self, x: int, y: int, *, button: MouseButton, double: bool) -> None:
         await asyncio.to_thread(click_at, x, y, button, double=double)
+
+    async def hold_keys(self, keys: Sequence[str], seconds: float) -> None:
+        await asyncio.to_thread(hold_keys, tuple(keys), seconds)
+
+    async def scroll(self, notches: int) -> None:
+        await asyncio.to_thread(scroll_window, notches)
+
+    async def capture(self) -> ScreenShot:
+        return await asyncio.to_thread(capture_window)
 
 
 def enable_dpi_awareness() -> None:

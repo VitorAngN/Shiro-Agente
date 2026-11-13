@@ -15,7 +15,7 @@ from shiro.config.settings import Settings
 from shiro.infrastructure.tools.apps import AppLauncher, AppTarget, CloseAppTool, OpenAppTool
 from shiro.infrastructure.tools.audio import ChangeVolumeTool, SetVolumeTool, VolumeControl
 from shiro.infrastructure.tools.clock import GetTimeTool
-from shiro.infrastructure.tools.control import DesktopControl, control_tools
+from shiro.infrastructure.tools.control import DesktopControl, ScreenVision, control_tools
 from shiro.infrastructure.tools.location import IpLocator, Locator
 from shiro.infrastructure.tools.media import MediaControlTool, MediaKeys
 from shiro.infrastructure.tools.programs import ProgramControl, program_tools, spoken_to_name
@@ -88,6 +88,7 @@ def build_registry(
     probe: SystemProbe,
     locator: Locator | None = None,
     dictation: Dictation | None = None,
+    vision: ScreenVision | None = None,
 ) -> ToolRegistry:
     registry = ToolRegistry()
     registry.register(GetTimeTool(ZoneInfo(settings.general.timezone)))
@@ -103,7 +104,7 @@ def build_registry(
         registry.register(OpenAppTool(targets, desktop.launcher))
         registry.register(CloseAppTool(targets, desktop.launcher))
     if desktop.control is not None and settings.policy.pc_control:
-        for tool in control_tools(desktop.control, YouTubeFinder(http)):
+        for tool in control_tools(desktop.control, YouTubeFinder(http), vision):
             registry.register(tool)
     if desktop.control is not None and settings.policy.pc_control:
         dictation = dictation or Dictation(desktop.control.paste_text)
@@ -208,6 +209,21 @@ TOOL_GATES: dict[str, tuple[str, ...]] = {
         "da tela",
         "a tela",
         "janela*",
+        "olha*",
+        "olhe*",
+        "veja*",
+        "rola*",
+        "role*",
+        "desce*",
+        "segura*",
+        "segure*",
+        "anda*",
+        "jogo*",
+        "partida*",
+        "aceita*",
+        "quando aparecer",
+        "espera*",
+        "aguarda*",
         "ditado",
         "ditar",
         "dita",
