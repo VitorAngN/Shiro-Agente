@@ -12,13 +12,11 @@ class EngineLauncher {
   EngineLauncher(this._paths);
 
   final ShiroPaths _paths;
-  bool _started = false;
-
-  bool get started => _started;
-
   /// `null` se ligou; senão, a explicação para mostrar na tela.
+  ///
+  /// Pode ser chamado de novo se o motor cair: um segundo motor não sobe por
+  /// engano, porque ele mesmo desiste quando a porta já está em uso.
   Future<String?> start() async {
-    if (_started) return null;
     final Map<String, dynamic> spec;
     try {
       spec = jsonDecode(await _paths.engineSpec.readAsString()) as Map<String, dynamic>;
@@ -31,7 +29,6 @@ class EngineLauncher {
         [for (final arg in spec['args'] as List<dynamic>) arg as String],
         mode: ProcessStartMode.detached,
       );
-      _started = true;
       return null;
     } catch (error) {
       return 'Não consegui ligar o motor ($error). Rode na pasta do projeto: uv run shiro serve';

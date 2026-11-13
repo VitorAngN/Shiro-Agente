@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import atexit
 import contextlib
+import logging
+import os
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -177,6 +180,26 @@ async def _dashboard(settings: Settings, args: argparse.Namespace) -> int:
     return 0
 
 
+_crash_log: list[object] = []  # o arquivo precisa ficar aberto enquanto o motor roda
+
+
+def _record_crashes(folder: Path) -> None:
+    """Queda dura (biblioteca nativa de áudio, Whisper...) deixa a pilha em ``crash.log``."""
+    import faulthandler
+
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        handle = (folder / "crash.log").open("a", encoding="utf-8")
+    except OSError:
+        return
+    handle.write(f"--- motor iniciado (pid {os.getpid()})\n")
+    handle.flush()
+    faulthandler.enable(handle)
+    _crash_log.append(handle)
+    # saída normal do Python deixa rastro; se o log terminar sem isto, o processo foi morto
+    atexit.register(lambda: logging.getLogger("shiro").warning("motor saiu (atexit)"))
+
+
 async def _serve(settings: Settings) -> int:
     from zoneinfo import ZoneInfo
 
@@ -202,6 +225,7 @@ async def _serve(settings: Settings) -> int:
     configure_logging(settings.logging, paths.log_dir(), console=sys.stderr is not None)
     log_lifecycle("serve")
     watch_event_loop()
+    _record_crashes(paths.log_dir())
     from shiro.infrastructure.llm.ollama_service import OllamaService
 
     print(await OllamaService(settings.llm.local.base_url).ensure())
@@ -244,6 +268,10 @@ async def _serve(settings: Settings) -> int:
         print("Ctrl+C para encerrar.")
         try:
             await asyncio.Event().wait()
+        except BaseException as exc:
+            # sem terminal ninguém vê por que o motor parou: fica no log
+            logging.getLogger("shiro").warning("serve encerrando: %r", exc)
+            raise
         finally:
             warm.cancel()
             await voice.aclose()
