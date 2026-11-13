@@ -203,9 +203,10 @@ def _cloaked(hwnd: int) -> bool:
     return value.value != 0
 
 
-def _usable(hwnd: int) -> bool:
+def usable_window(hwnd: int, *, minimized: bool = False) -> bool:
+    """Janela de verdade do usuário: visível, com título, fora a SHIRO e a barra de tarefas."""
     user32 = _user32()
-    if not user32.IsWindowVisible(hwnd) or user32.IsIconic(hwnd):
+    if not user32.IsWindowVisible(hwnd) or (user32.IsIconic(hwnd) and not minimized):
         return False
     title = _title(hwnd)
     return (
@@ -223,7 +224,7 @@ def target_window() -> int:
     user32.GetForegroundWindow.restype = ctypes.c_void_p
     hwnd = int(user32.GetForegroundWindow() or 0)
     for _ in range(200):
-        if not hwnd or _usable(hwnd):
+        if not hwnd or usable_window(hwnd):
             return hwnd
         hwnd = int(user32.GetWindow(ctypes.c_void_p(hwnd), _GW_HWNDNEXT) or 0)
     return 0

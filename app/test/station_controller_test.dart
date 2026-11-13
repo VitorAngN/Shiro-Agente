@@ -45,8 +45,9 @@ class FakeEngine implements EngineApi {
   Future<Pairing> pairing() => throw UnimplementedError();
 
   @override
-  Future<({bool listening, String problem, List<VoiceEntry> items})> voiceHistory(int after) async =>
-      (listening: listening, problem: '', items: const <VoiceEntry>[]);
+  Future<({bool listening, String problem, List<VoiceEntry> items, Activity activity})> voiceHistory(
+          int after) async =>
+      (listening: listening, problem: '', items: const <VoiceEntry>[], activity: Activity.idle);
 
   @override
   Future<({bool listening, String problem})> setListening(bool on) async {

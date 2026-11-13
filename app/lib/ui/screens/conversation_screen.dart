@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/tokens.dart';
 import '../../core/models/mood.dart';
 import '../../state/station_controller.dart';
+import '../widgets/activity_bar.dart';
 import '../widgets/confirm_banner.dart';
 import '../widgets/pill_button.dart';
 import '../widgets/turn_card.dart';
@@ -66,6 +67,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                 itemBuilder: (context, index) => TurnCard(turn: c.turns[index]),
               ),
       ),
+      ActivityBar(activity: c.activity, sending: c.mood == Mood.thinking && !c.activity.active),
       for (final item in c.pending)
         ConfirmBanner(
           prompt: item.prompt,

@@ -27,7 +27,7 @@ abstract interface class EngineApi {
   Future<List<LinkedDevice>> devices();
   Future<void> revoke(String deviceId);
   Future<Pairing> pairing();
-  Future<({bool listening, String problem, List<VoiceEntry> items})> voiceHistory(int after);
+  Future<({bool listening, String problem, List<VoiceEntry> items, Activity activity})> voiceHistory(int after);
   Future<({bool listening, String problem})> setListening(bool on);
 }
 
@@ -108,11 +108,13 @@ class HttpEngineClient implements EngineApi {
   Future<Pairing> pairing() async => Pairing.fromJson(await _object('POST', '/v1/pairing'));
 
   @override
-  Future<({bool listening, String problem, List<VoiceEntry> items})> voiceHistory(int after) async {
+  Future<({bool listening, String problem, List<VoiceEntry> items, Activity activity})> voiceHistory(
+      int after) async {
     final json = await _object('GET', '/v1/voice/history?after=$after');
     return (
       listening: json['listening'] as bool? ?? false,
       problem: json['problem'] as String? ?? '',
+      activity: Activity.fromJson(json['activity'] as Map<String, dynamic>?),
       items: [for (final item in json['items'] as List<dynamic>) VoiceEntry.fromJson(item as Map<String, dynamic>)],
     );
   }

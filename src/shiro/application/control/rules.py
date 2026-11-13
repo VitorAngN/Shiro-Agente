@@ -8,6 +8,7 @@ inglês são comparados pela pronúncia (``sound_key``), então "iutubi" e
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from shiro.domain.text import normalize, similarity, sound_key
@@ -132,3 +133,56 @@ def site_phrases(sites: tuple[Site, ...] = SITES) -> list[str]:
 
 def site_words(sites: tuple[Site, ...] = SITES) -> list[str]:
     return [site.label for site in sites]
+
+
+# --- programas e janelas ------------------------------------------------------
+
+_ARTICLE = r"(?:(?:o|a|os|as)\s+)?"
+_FOCUS = re.compile(
+    _CALL + r"(?:(?:vai|volta|muda|troca|passa)\s+(?:pra|para|pro|pros|pras)\s+"
+    r"|(?:abre|abra|mostra|mostre|traz|traga)\s+)"
+    + _ARTICLE
+    + r"janela\s+(?:do|da|de)\s+(?P<name>[a-z0-9 ]+?)"
+    + _POLITE
+)
+_GO_TO = re.compile(
+    _CALL
+    + r"(?:vai|volta|muda|troca|passa)\s+(?:pra|para|pro|pros|pras)\s+"
+    + _ARTICLE
+    + r"(?P<name>[a-z0-9 ]+?)"
+    + _POLITE
+)
+_START = re.compile(
+    _CALL
+    + r"(?:abre|abra|abrir|inicia|inicie|iniciar|executa|execute|roda|rode|liga|ligue)\s+"
+    + _ARTICLE
+    + r"(?:programa\s+|aplicativo\s+|app\s+|jogo\s+)?(?P<name>[a-z0-9 ]+?)"
+    + _POLITE
+)
+
+type NameMatcher = Callable[[str], str | None]
+
+
+class ProgramRules:
+    """ "abre a calculadora", "vai pra janela do Claude": sem passar pelo modelo.
+
+    ``program`` e ``window`` acham o nome real (do menu Iniciar ou da janela) a
+    partir do que foi dito; ``None`` quando não há nada parecido, e aí o pedido
+    segue para o modelo.
+    """
+
+    def __init__(self, program: NameMatcher, window: NameMatcher) -> None:
+        self._program = program
+        self._window = window
+
+    def __call__(self, text: str) -> Calls | None:
+        command = normalize(text)
+        focus = _FOCUS.match(command) or _GO_TO.match(command)
+        if focus is not None:
+            name = focus["name"]
+            if self._window(name) is not None or self._program(name) is not None:
+                return [("switch_window", {"name": name})]
+            return None
+        if (start := _START.match(command)) and self._program(start["name"]) is not None:
+            return [("open_program", {"name": start["name"]})]
+        return None

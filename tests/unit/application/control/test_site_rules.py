@@ -66,3 +66,36 @@ def test_router_prefers_apps_then_sites() -> None:
 )
 def test_play_on_youtube(text: str, query: str) -> None:
     assert RULES(text) == [("open_url", {"search": query, "on": "youtube", "play": True})]
+
+
+PROGRAMS = ["Claude", "Calculadora", "Bloco de Notas", "Google Chrome", "Epic Games Launcher"]
+WINDOWS = ["Claude", "Wikipedia - Google Chrome"]
+
+
+def _programs_rules() -> object:
+    from shiro.application.control.rules import ProgramRules
+    from shiro.infrastructure.tools.programs import spoken_to_name
+
+    return ProgramRules(
+        program=lambda s: spoken_to_name(s, PROGRAMS), window=lambda s: spoken_to_name(s, WINDOWS)
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "call"),
+    [
+        ("Abra a janela do Claude.", ("switch_window", {"name": "claude"})),
+        ("vai pro chrome", ("switch_window", {"name": "chrome"})),
+        ("abre a calculadora", ("open_program", {"name": "calculadora"})),
+        ("Shiro, abre o notepad", ("open_program", {"name": "notepad"})),
+        ("inicia o epic games", ("open_program", {"name": "epic games"})),
+    ],
+)
+def test_programs_and_windows(text: str, call: tuple[str, dict[str, object]]) -> None:
+    rules = _programs_rules()
+    assert rules(text) == [call]  # type: ignore[operator]
+
+
+@pytest.mark.parametrize("text", ["abre a pasta downloads", "vai pra cama", "abre o jogo xyzzy"])
+def test_unknown_programs_go_to_the_model(text: str) -> None:
+    assert _programs_rules()(text) is None  # type: ignore[operator]

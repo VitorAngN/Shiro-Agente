@@ -43,6 +43,9 @@ def persona(assistant_name: str) -> str:
             "atalhos (press_keys), lê os botões da janela em uso (read_screen) e clica neles "
             "pelo nome (click_on). Para pesquisar algo num site, prefira open_url com search; "
             "para tocar um vídeo ou música, use open_url com on=youtube e play=true.",
+            "- Qualquer programa instalado abre com open_program (Claude, calculadora, jogos); "
+            "janela já aberta vem para a frente com switch_window. Para 'clica na barra e "
+            "digita X e envia': click_on no campo, type_text com enter=true.",
             "- Você tem permissão para agir no PC do usuário: nunca diga que não tem permissão "
             "ou que não pode buscar, abrir ou tocar algo; se houver ferramenta, use-a.",
             "- Só as ferramentas executam ações. Nunca diga que fez algo sem ter chamado a "

@@ -83,6 +83,9 @@ class AgentSettings(_Section):
 class RouterSettings(_Section):
     escalate_on_validation_failure: bool = True
     cloud_triggers: tuple[str, ...] = ("pensa bem", "pesquisa", "analisa com calma")
+    # Assuntos que vão direto para a nuvem (se houver chave): controlar o PC tem muitos
+    # passos (clicar, digitar, enviar) e o modelo local pequeno erra ou recusa (ADR-0024).
+    cloud_groups: tuple[str, ...] = ("control",)
 
 
 class LocalLLMSettings(_Section):

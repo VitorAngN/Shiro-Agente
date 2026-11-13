@@ -43,6 +43,7 @@ from shiro.bootstrap.tools import (
     app_aliases,
     build_locator,
     build_registry,
+    program_rules,
     windows_desktop,
 )
 from shiro.config import paths
@@ -227,6 +228,11 @@ async def build_app(
             ActivityRules(clock.now),
             *((MemoryRules(clock.now),) if memory is not None else ()),
             *((SiteRules(),) if registry.get("open_url") is not None else ()),
+            *(
+                (program_rules(desktop.programs),)
+                if desktop.programs is not None and registry.get("open_program") is not None
+                else ()
+            ),
         ),
         teaching=(LearningRules(),),
         expand=lessons.expand,
@@ -253,6 +259,7 @@ async def build_app(
             step_timeout_s=agent_settings.step_timeout_s,
             turn_timeout_s=agent_settings.turn_timeout_s,
             max_history_messages=agent_settings.max_history_messages,
+            cloud_groups=frozenset(settings.router.cloud_groups),
         ),
     )
     return App(

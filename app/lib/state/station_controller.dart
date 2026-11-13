@@ -48,6 +48,7 @@ class StationController extends ChangeNotifier {
   bool listeningForName = false;
   bool switchingName = false;
   String voiceProblem = '';
+  Activity activity = Activity.idle;
 
   int _voiceCursor = -1;
   Timer? _poll;
@@ -236,6 +237,7 @@ class StationController extends ChangeNotifier {
       );
       final waiting = await current.confirmations();
       _set(() {
+        activity = voice.activity;
         listeningForName = voice.listening;
         if (!switchingName) voiceProblem = voice.problem;
         for (final item in voice.items) {

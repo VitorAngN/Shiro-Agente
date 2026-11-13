@@ -24,7 +24,7 @@ from shiro.application.agent.claims import claims_action
 from shiro.application.agent.context import CLAIM_CORRECTION, ContextBuilder
 from shiro.application.agent.router import IntentRouter
 from shiro.application.bus import EventBus
-from shiro.domain.events import ToolCallCompleted, TurnFinished, TurnStarted
+from shiro.domain.events import ToolCallCompleted, TurnFinished, TurnProgress, TurnStarted
 from shiro.domain.ids import uuid7
 from shiro.domain.models import (
     AgentResult,
@@ -79,6 +79,8 @@ class AgentLimits(BaseModel):
     max_validation_failures: int = Field(default=2, ge=1)
     max_claim_retries: int = Field(default=1, ge=0)
     max_history_messages: int = Field(default=8, ge=0)
+    cloud_groups: frozenset[str] = frozenset()
+    """Assuntos que vão direto para a nuvem (ex.: controlar o PC, que o modelo local erra)."""
 
 
 class _TurnState:
@@ -141,6 +143,7 @@ class AgentLoop:
         self._confirmation = confirmation
         self._audit = audit
         self._bus = bus
+        self._current_trace = ""
         self._clock = clock
         self._context = context
         self._limits = limits or AgentLimits()
@@ -179,6 +182,7 @@ class AgentLoop:
         )
 
         self._utterances[trace_id] = text
+        self._current_trace = trace_id
         try:
             calls = self._router.match_tier0(text)
             if calls is not None:
@@ -237,7 +241,10 @@ class AgentLoop:
     # ------------------------------------------------------------------ Tier 1/2
 
     async def _run_llm(self, text: str, trace_id: str) -> AgentResult:
-        tier = Tier.T2 if self._router.wants_cloud(text) and Tier.T2 in self._providers else Tier.T1
+        cloud = self._router.wants_cloud(text) or bool(
+            self._limits.cloud_groups & self._tools.groups_for(text)
+        )
+        tier = Tier.T2 if cloud and Tier.T2 in self._providers else Tier.T1
         # Memórias só no modelo local: com elas no contexto, o turno não sobe para a nuvem.
         memories = await self._recall(text) if tier is Tier.T1 else ()
         state = _TurnState(
@@ -307,6 +314,8 @@ class AgentLoop:
         self, state: _TurnState, definitions: tuple[ToolDefinition, ...]
     ) -> CompletionResponse | None:
         request = CompletionRequest(messages=tuple(state.messages), tools=definitions)
+        where = "na nuvem" if state.tier is Tier.T2 else "no modelo local"
+        await self._progress(self._current_trace, "thinking", f"pensando {where}")
         started = time.perf_counter()
         try:
             async with asyncio.timeout(self._limits.step_timeout_s):
@@ -469,6 +478,7 @@ class AgentLoop:
         outcome = CallOutcome.ALLOWED
         if decision.needs_confirmation:
             prompt = _sentence(tool.describe(args)) + "?"
+            await self._progress(trace_id, "confirming", f"esperando você: {prompt}")
             if not await self._confirmation.ask(prompt, decision.kind):
                 return ExecutedCall(
                     call=call,
@@ -482,6 +492,7 @@ class AgentLoop:
                     ),
                 )
             outcome = CallOutcome.CONFIRMED
+        await self._progress(trace_id, "tool", _sentence(_describe(tool, args)))
         result = await self._run_tool(tool, args, trace_id)
         return ExecutedCall(
             call=call, risk=spec.risk, outcome=outcome, reason=decision.reason, result=result
@@ -503,11 +514,21 @@ class AgentLoop:
             log.exception("ferramenta %s falhou", name)
             return ToolResult.failure(f"A ação {name} falhou ({type(exc).__name__}).")
 
+    async def _progress(self, trace_id: str, stage: str, detail: str) -> None:
+        await self._bus.publish(TurnProgress(trace_id=trace_id, stage=stage, detail=detail))
+
     def _remember(self, text: str, reply: str) -> None:
         self._history.append(Message(role=Role.USER, content=text))
         self._history.append(Message(role=Role.ASSISTANT, content=reply))
         keep = max(self._limits.max_history_messages, 2)
         del self._history[:-keep]
+
+
+def _describe(tool: Tool, args: BaseModel) -> str:
+    try:
+        return tool.describe(args)
+    except Exception:  # descrição é só para a tela: nunca derruba a ação
+        return tool.spec.name
 
 
 def _sentence(text: str) -> str:

@@ -100,6 +100,10 @@ class ToolCatalog(Protocol):
 
     def group_of(self, name: str) -> str | None: ...
 
+    def groups_for(self, text: str) -> frozenset[str]:
+        """Assuntos do pedido, pelas palavras-chave (ADR-0018)."""
+        ...
+
 
 class PolicyContext(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")

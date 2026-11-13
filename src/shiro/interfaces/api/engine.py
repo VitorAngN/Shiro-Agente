@@ -14,15 +14,19 @@ import json
 import logging
 import socket
 import sys
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
 
+from shiro.application.bus import EventBus
 from shiro.application.devices.confirmations import Pending, RemoteConfirmations
 from shiro.application.devices.service import DeviceRegistry
 from shiro.bootstrap.app import App
 from shiro.domain.devices.models import Device
+from shiro.domain.events import TurnFinished, TurnProgress, TurnStarted
 from shiro.domain.models import AgentResult, DecisionKind
 from shiro.interfaces.api.devices import create_device_api
 from shiro.interfaces.api.server import _server_class  # pyright: ignore[reportPrivateUsage]
@@ -79,6 +83,55 @@ class _Quiet(io.StringIO):
         return len(text)
 
 
+class Activity:
+    """O que a SHIRO está fazendo agora: o programa mostra isto numa barra de progresso."""
+
+    IDLE = "idle"
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self._clock = clock
+        self.stage = self.IDLE
+        self.detail = ""
+        self._since = clock()
+        self._turn_since: float | None = None
+
+    def set(self, stage: str, detail: str) -> None:
+        if stage != self.IDLE and self._turn_since is None:
+            self._turn_since = self._clock()
+        if stage == self.IDLE:
+            self._turn_since = None
+        self.stage, self.detail, self._since = stage, detail, self._clock()
+
+    def idle(self) -> None:
+        self.set(self.IDLE, "")
+
+    def snapshot(self) -> dict[str, Any]:
+        now = self._clock()
+        return {
+            "stage": self.stage,
+            "detail": self.detail,
+            "seconds": round(now - self._since, 1),
+            "total_seconds": round(now - self._turn_since, 1) if self._turn_since else 0.0,
+        }
+
+    def follow(self, bus: EventBus) -> None:
+        """Acompanha os turnos do agente pelo barramento de eventos."""
+
+        async def started(event: TurnStarted) -> None:
+            self.set("thinking", "entendendo o pedido")
+
+        async def progress(event: TurnProgress) -> None:
+            self.set(event.stage, event.detail)
+
+        async def finished(event: TurnFinished) -> None:
+            if self.stage != "speaking":
+                self.idle()
+
+        bus.subscribe(TurnStarted, started)
+        bus.subscribe(TurnProgress, progress)
+        bus.subscribe(TurnFinished, finished)
+
+
 class VoiceBox:
     """Ouvido e voz do motor: montados no primeiro uso (carregar o Whisper leva alguns segundos).
 
@@ -93,6 +146,7 @@ class VoiceBox:
         self._app = app
         self._turn = turn
         self._confirmations = confirmations
+        self.activity = Activity()
         self._voice_turn = False
         self._asking: set[asyncio.Task[None]] = set()
         if confirmations is not None:
@@ -144,11 +198,16 @@ class VoiceBox:
     async def exchange(self, device: Device) -> tuple[str, AgentResult] | None:
         """Bipe, escuta, responde em voz alta. ``None`` se ninguém falou."""
         async with self._busy:
-            session = await self._ready()
-            heard = await session.listen()
-            if heard is None:
-                return None
-            return heard, await self._answer(session, heard, device.name, source="botão")
+            self.activity.set("listening", "preparando o microfone")
+            try:
+                session = await self._ready()
+                self.activity.set("listening", "ouvindo você")
+                heard = await session.listen()
+                if heard is None:
+                    return None
+                return heard, await self._answer(session, heard, device.name, source="botão")
+            finally:
+                self.activity.idle()
 
     async def _answer(
         self, session: VoiceSession, heard: str, who: str, *, source: str
@@ -172,7 +231,9 @@ class VoiceBox:
             }
         )
         del self.history[:-50]
+        self.activity.set("speaking", "respondendo")
         await session.say(result.text)
+        self.activity.idle()
         return result
 
     # ------------------------------------------------------------ confirmação por voz
@@ -227,10 +288,15 @@ class VoiceBox:
         if self._busy.locked():
             return
         async with self._busy:
-            session = await self._ready()
-            heard = text or await session.listen()
-            if heard:
-                await self._answer(session, heard, "voz", source="nome")
+            try:
+                session = await self._ready()
+                if not text:
+                    self.activity.set("listening", "ouvindo o pedido")
+                heard = text or await session.listen()
+                if heard:
+                    await self._answer(session, heard, "voz", source="nome")
+            finally:
+                self.activity.idle()
 
     async def set_listening(self, enabled: bool) -> None:
         if not enabled:
@@ -289,6 +355,8 @@ def engine_api(
 ) -> FastAPI:
     turn = asyncio.Lock()  # o agente atende um pedido por vez
     voice = VoiceBox(app, turn, confirmations)
+    if app.bus is not None:
+        voice.activity.follow(app.bus)
 
     async def chat(text: str, device: Device) -> AgentResult:
         async with turn:
@@ -328,8 +396,13 @@ def add_voice_routes(api: FastAPI, voice: VoiceBox) -> None:
         return {
             "listening": voice.listening_for_name,
             "problem": voice.problem,
+            "activity": voice.activity.snapshot(),
             "items": [item for item in voice.history if item["id"] > after],
         }
+
+    @api.get("/v1/activity")
+    async def activity(current: Device = paired) -> dict[str, Any]:
+        return voice.activity.snapshot()
 
     @api.post("/v1/voice/listening")
     async def listening(body: dict[str, bool], current: Device = paired) -> dict[str, Any]:

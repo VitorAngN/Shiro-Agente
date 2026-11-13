@@ -204,3 +204,34 @@ async def test_play_opens_the_first_video() -> None:
     assert done.say == "Tocando matue no YouTube."
     await tool.run(OpenUrlArgs(search="nada", on="youtube", play=True), CTX)
     assert "results?search_query=nada" in str(control.calls[-1][1])
+
+
+async def test_program_tools() -> None:
+    from shiro.infrastructure.tools.programs import OpenProgramTool, SwitchWindowTool
+
+    class Programs:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str]] = []
+
+        def program_names(self) -> list[str]:
+            return ["Claude", "Calculadora"]
+
+        def window_titles(self) -> list[str]:
+            return ["Wikipedia - Google Chrome"]
+
+        async def launch(self, name: str) -> None:
+            self.calls.append(("launch", name))
+
+        async def focus(self, title: str) -> None:
+            self.calls.append(("focus", title))
+
+    programs = Programs()
+    opened = await OpenProgramTool(programs).run(OpenProgramTool.spec.args_model(name="cloud"), CTX)
+    assert opened.ok and programs.calls[-1] == ("launch", "Claude")
+    missing = await OpenProgramTool(programs).run(OpenProgramTool.spec.args_model(name="xyz"), CTX)
+    assert not missing.ok
+    switch = SwitchWindowTool(programs)
+    await switch.run(switch.spec.args_model(name="chrome"), CTX)
+    assert programs.calls[-1] == ("focus", "Wikipedia - Google Chrome")
+    await switch.run(switch.spec.args_model(name="calculadora"), CTX)
+    assert programs.calls[-1] == ("launch", "Calculadora")

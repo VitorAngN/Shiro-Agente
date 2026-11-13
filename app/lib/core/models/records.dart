@@ -75,3 +75,27 @@ class VoiceEntry {
 
   bool get calledByName => source == 'nome';
 }
+
+/// O que a SHIRO está fazendo agora (`activity` em `/v1/voice/history`).
+class Activity {
+  const Activity({this.stage = 'idle', this.detail = '', this.seconds = 0, this.totalSeconds = 0});
+
+  factory Activity.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const Activity();
+    return Activity(
+      stage: json['stage'] as String? ?? 'idle',
+      detail: json['detail'] as String? ?? '',
+      seconds: (json['seconds'] as num?)?.toDouble() ?? 0,
+      totalSeconds: (json['total_seconds'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  static const idle = Activity();
+
+  final String stage; // idle, listening, thinking, tool, confirming, speaking
+  final String detail;
+  final double seconds;
+  final double totalSeconds;
+
+  bool get active => stage != 'idle';
+}

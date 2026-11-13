@@ -26,6 +26,17 @@ class TurnStarted(Event):
     text: str
 
 
+class TurnProgress(Event):
+    """O que o turno está fazendo agora, para quem mostra uma barra de progresso.
+
+    ``stage``: "thinking" (modelo pensando), "tool" (rodando uma ação),
+    "confirming" (esperando sim ou não).
+    """
+
+    stage: str
+    detail: str
+
+
 class ToolCallCompleted(Event):
     executed: ExecutedCall
 

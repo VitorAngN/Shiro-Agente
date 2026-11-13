@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Sequence
 
 _PUNCTUATION = re.compile(r"[^\w\s%]")
 _SPACES = re.compile(r"\s+")
@@ -131,3 +132,47 @@ def similarity(a: str, b: str) -> float:
             )
         previous = current
     return 1.0 - previous[-1] / max(len(a), len(b))
+
+
+def closest_name(spoken: str, names: Sequence[str], *, minimum: float = 0.78) -> str | None:
+    """O nome da lista que mais se parece com o que foi dito ("cloud" → "Claude").
+
+    Igual vence; depois, o dito como palavra inteira dentro do nome ("chrome" em
+    "Google Chrome"); depois, parecido na escrita ou na pronúncia. ``None`` se nada
+    passar de ``minimum`` ou se dois nomes diferentes empatarem.
+    """
+    wanted = normalize(spoken)
+    if len(wanted) < 2:
+        return None
+    wanted_sound = sound_key(wanted)
+    scored: list[tuple[float, int, str]] = []
+    for name in names:
+        plain = normalize(name)
+        if not plain:
+            continue
+        if plain == wanted:
+            score = 1.0
+        elif re.search(rf"(?:^| ){re.escape(wanted)}(?: |$)", plain):
+            score = 0.92
+        else:
+            words = plain.split()
+            # o nome inteiro e o começo valem mais que uma palavra solta do meio
+            candidates = [(plain, 1.0), (words[0], 0.97), (" ".join(words[:2]), 0.97)]
+            candidates += [(word, 0.9) for word in words[1:]]
+            score = max(similarity(wanted, c) * w for c, w in candidates)
+            if len(wanted_sound) >= 3:
+                score = max(
+                    score,
+                    *(similarity(wanted_sound, sound_key(c)) * w * 0.97 for c, w in candidates),
+                )
+        scored.append((score, -len(plain), name))
+    if not scored:
+        return None
+    scored.sort(reverse=True)
+    best = scored[0]
+    if best[0] < minimum:
+        return None
+    rival = next((s for s in scored[1:] if normalize(s[2]) != normalize(best[2])), None)
+    if rival is not None and best[0] < 1.0 and best[0] - rival[0] < 0.03 and rival[0] < 0.92:
+        return None
+    return best[2]

@@ -259,3 +259,28 @@ def test_voice_routes_take_no_stray_query() -> None:
     assert len(voice) == 2
     for route in voice:
         assert "request" not in {p.name for p in route.dependant.query_params}
+
+
+async def test_activity_follows_the_turn() -> None:
+    from shiro.application.bus import EventBus
+    from shiro.domain.events import TurnProgress, TurnStarted
+    from shiro.interfaces.api.engine import Activity
+
+    now = [100.0]
+    activity = Activity(clock=lambda: now[0])
+    bus = EventBus()
+    activity.follow(bus)
+    assert activity.snapshot()["stage"] == "idle"
+    await bus.publish(TurnStarted(trace_id="t", session_id="s", channel="api", text="oi"))
+    now[0] = 103.0
+    await bus.publish(TurnProgress(trace_id="t", stage="tool", detail="Abrir youtube.com"))
+    now[0] = 104.5
+    snap = activity.snapshot()
+    assert snap == {
+        "stage": "tool",
+        "detail": "Abrir youtube.com",
+        "seconds": 1.5,
+        "total_seconds": 4.5,
+    }
+    activity.idle()
+    assert activity.snapshot()["total_seconds"] == 0.0

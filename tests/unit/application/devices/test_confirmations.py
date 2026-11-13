@@ -1,5 +1,3 @@
-
-
 async def test_listener_hears_each_question() -> None:
     import asyncio
 

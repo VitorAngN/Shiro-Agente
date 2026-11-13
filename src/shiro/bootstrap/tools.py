@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from shiro.application.control.rules import ProgramRules
 from shiro.application.registry import ToolRegistry
 from shiro.config.settings import Settings
 from shiro.infrastructure.tools.apps import AppLauncher, AppTarget, CloseAppTool, OpenAppTool
@@ -16,6 +17,7 @@ from shiro.infrastructure.tools.clock import GetTimeTool
 from shiro.infrastructure.tools.control import DesktopControl, control_tools
 from shiro.infrastructure.tools.location import IpLocator, Locator
 from shiro.infrastructure.tools.media import MediaControlTool, MediaKeys
+from shiro.infrastructure.tools.programs import ProgramControl, program_tools, spoken_to_name
 from shiro.infrastructure.tools.system import SystemInfoTool, SystemProbe
 from shiro.infrastructure.tools.weather import WeatherTool
 from shiro.infrastructure.tools.youtube import YouTubeFinder
@@ -31,6 +33,7 @@ class Desktop:
     media: MediaKeys | None = None
     launcher: AppLauncher | None = None
     control: DesktopControl | None = None
+    programs: ProgramControl | None = None
 
 
 def windows_desktop() -> Desktop:  # pragma: no cover - exercitado no Windows real
@@ -41,6 +44,7 @@ def windows_desktop() -> Desktop:  # pragma: no cover - exercitado no Windows re
         enable_dpi_awareness,
     )
     from shiro.infrastructure.tools.windows.media import WindowsMediaKeys
+    from shiro.infrastructure.tools.windows.programs import WindowsPrograms
 
     enable_dpi_awareness()
     return Desktop(
@@ -48,6 +52,7 @@ def windows_desktop() -> Desktop:  # pragma: no cover - exercitado no Windows re
         media=WindowsMediaKeys(),
         launcher=WindowsAppLauncher(),
         control=WindowsDesktopControl(),
+        programs=WindowsPrograms(),
     )
 
 
@@ -96,6 +101,9 @@ def build_registry(
         registry.register(CloseAppTool(targets, desktop.launcher))
     if desktop.control is not None and settings.policy.pc_control:
         for tool in control_tools(desktop.control, YouTubeFinder(http)):
+            registry.register(tool)
+    if desktop.programs is not None and settings.policy.pc_control:
+        for tool in program_tools(desktop.programs):
             registry.register(tool)
     return registry
 
@@ -177,6 +185,21 @@ TOOL_GATES: dict[str, tuple[str, ...]] = {
         "da tela",
         "a tela",
         "janela*",
+        "abre*",
+        "abra*",
+        "abrir",
+        "inicia*",
+        "executa*",
+        "programa*",
+        "aplicativo*",
+        "vai pra",
+        "vai pro",
+        "volta pra",
+        "volta pro",
+        "muda pra",
+        "muda pro",
+        "troca pra",
+        "troca pro",
         "botao*",
         "entra no",
         "entra na",
@@ -223,3 +246,11 @@ GATE_EXCEPTIONS = (
     "memoria livre",
     "memoria usada",
 )
+
+
+def program_rules(programs: ProgramControl) -> ProgramRules:
+    """Tier 0 de programas e janelas, com os nomes reais do menu Iniciar e das janelas."""
+    return ProgramRules(
+        program=lambda spoken: spoken_to_name(spoken, programs.program_names()),
+        window=lambda spoken: spoken_to_name(spoken, programs.window_titles()),
+    )
