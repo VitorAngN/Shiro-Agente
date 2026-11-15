@@ -365,3 +365,4 @@ def test_only_the_translation_is_kept() -> None:
     assert translation_from('{"original": "Hello", "traducao": "Olá"}') == "Olá"
     assert translation_from('Claro! {"traducao": "Oi"} pronto') == "Oi"
     assert translation_from("Oi sem json") == "Oi sem json"
+    assert translation_from('{"traducao": ""}') == ""

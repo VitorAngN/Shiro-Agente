@@ -58,8 +58,9 @@ def translation_from(text: str) -> str:
         data = cast("dict[str, Any]", raw)
         for key in ("traducao", "tradução", "translation", "texto"):
             value = data.get(key)
-            if isinstance(value, str) and value.strip():
-                return value.strip()
+            if isinstance(value, str):
+                return value.strip()  # vazio = não havia texto: nunca falar o JSON
+        return ""
     return text.strip()
 
 
