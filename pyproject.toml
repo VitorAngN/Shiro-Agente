@@ -42,6 +42,13 @@ dependencies = [
     "miniaudio>=1.61",
 ]
 
+[project.optional-dependencies]
+# Whisper na placa de vídeo NVIDIA (CUDA 12 + cuDNN 9 para o CTranslate2): uv sync --extra gpu
+gpu = [
+    "nvidia-cublas-cu12>=12.4 ; sys_platform == 'win32' or sys_platform == 'linux'",
+    "nvidia-cudnn-cu12>=9.1,<10 ; sys_platform == 'win32' or sys_platform == 'linux'",
+]
+
 [project.scripts]
 shiro = "shiro.interfaces.cli.main:main"
 

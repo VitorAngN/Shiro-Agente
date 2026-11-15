@@ -8,6 +8,7 @@ modelo do Hugging Face para o cache do usuário.
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import time
 from collections.abc import Callable, Sequence
@@ -39,9 +40,25 @@ class _Segment(Protocol):
 type ModelFactory = Callable[[STTSettings, str], Any]
 
 
+_log = logging.getLogger(__name__)
+
+
 def _whisper(settings: STTSettings, source: str) -> Any:
     from faster_whisper import WhisperModel  # pyright: ignore[reportMissingTypeStubs]
 
+    if settings.device == "cuda":
+        from shiro.infrastructure.voice import cuda
+
+        if not cuda.prepare():
+            _log.warning("Whisper na GPU pedido, mas falta 'uv sync --extra gpu': usando a CPU")
+        else:
+            try:
+                return WhisperModel(
+                    source, device="cuda", compute_type=settings.compute_type, cpu_threads=2
+                )
+            except (RuntimeError, OSError, ValueError) as exc:
+                _log.warning("Whisper na GPU falhou (%s): usando a CPU", exc)
+        return WhisperModel(source, device="cpu", compute_type="int8", cpu_threads=settings.threads)
     return WhisperModel(
         source,
         device=settings.device,
