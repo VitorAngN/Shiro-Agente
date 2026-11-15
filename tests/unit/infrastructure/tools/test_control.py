@@ -316,9 +316,10 @@ async def test_click_falls_back_to_vision_and_new_tools() -> None:
     assert parse_spot('{"found": true, "x": 5000, "y": 2}') is None
 
 
-async def test_read_aloud_turns_the_page_and_speaks_the_text() -> None:
+async def test_read_aloud_remembers_the_book() -> None:
     from shiro.infrastructure.tools.control import ReadAloudTool, Spot
 
+    pages = iter(["Página 1.", "Página 2.", "Page 3 traduzida."])
     asked: list[str] = []
 
     class Vision:
@@ -327,13 +328,25 @@ async def test_read_aloud_turns_the_page_and_speaks_the_text() -> None:
 
         async def describe(self, png: bytes, question: str) -> str:
             asked.append(question)
-            return "Era uma vez um livro."
+            return next(pages)
 
     control = FakeControl()
     tool = ReadAloudTool(control, Vision())
-    done = await tool.run(
-        tool.spec.args_model(next_page=True, translate_to="inglês", page_key="right"), CTX
-    )
-    assert done.ok and done.say == "Era uma vez um livro."
-    assert control.calls[0] == ("keys", ("right",))
-    assert "inglês" in asked[-1]
+    args = tool.spec.args_model
+
+    async def read(**kwargs: object) -> str:
+        done = await tool.run(args(**kwargs), CTX)
+        assert done.ok
+        return done.say or ""
+
+    assert await read(page_key="right") == "Página 1."
+    assert await read(next_page=True) == "Página 2."
+    assert control.calls[-1] == ("keys", ("right",))
+    assert await read(again=True) == "Página 2."  # da memória, sem olhar a tela
+    assert await read(previous_page=True) == "Página 1."
+    assert control.calls[-1] == ("keys", ("left",))
+    assert await read(next_page=True) == "Página 2."  # já lida: memória
+    assert len(asked) == 2
+    assert await read(next_page=True, translate_to="português") == "Page 3 traduzida."
+    assert "português" in asked[-1]
+    assert tool.memory.language == "português"

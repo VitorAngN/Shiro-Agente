@@ -621,23 +621,61 @@ _READ_PROMPT = (
 )
 
 
+_BACK_KEYS = {"pagedown": "pageup", "right": "left", "space": "shift+space", "down": "up"}
+_MAX_PAGES = 200
+
+
 class ReadAloudArgs(Args):
     next_page: bool = Field(default=False, description="Passa para a próxima página antes de ler")
+    previous_page: bool = Field(default=False, description="Volta uma página e lê")
+    again: bool = Field(default=False, description="Lê de novo a última página lida")
     translate_to: str | None = Field(
         default=None,
         max_length=40,
-        description="Idioma para traduzir antes de ler (ex.: português). Vazio = como está.",
+        description="Idioma para traduzir antes de ler (ex.: português). Vazio = como está; "
+        "ao virar a página, continua no idioma que estava.",
     )
-    page_key: str = Field(
-        default="pagedown",
+    page_key: str | None = Field(
+        default=None,
         max_length=20,
         description="Tecla que vira a página no leitor (pagedown, right, space)",
     )
 
     @field_validator("page_key")
     @classmethod
-    def _known(cls, value: str) -> str:
-        return "+".join(parse_keys(value))
+    def _known(cls, value: str | None) -> str | None:
+        return "+".join(parse_keys(value)) if value else None
+
+
+class ReadingMemory:
+    """O livro que está sendo lido: páginas já lidas, onde está, idioma e tecla de virar.
+
+    "Próxima", "volta" e "de novo" usam isto: voltar ou repetir sai da memória, na hora e
+    sem gastar a nuvem; a tecla é apertada do mesmo jeito para a tela acompanhar.
+    """
+
+    def __init__(self) -> None:
+        self.pages: list[str] = []
+        self.position = -1
+        self.language: str | None = None
+        self.page_key = "pagedown"
+
+    @property
+    def current(self) -> str | None:
+        return self.pages[self.position] if 0 <= self.position < len(self.pages) else None
+
+    def add(self, text: str) -> None:
+        del self.pages[self.position + 1 :]  # leu algo novo depois de voltar: o resto some
+        if self.pages and self.pages[-1] == text:
+            return
+        self.pages.append(text)
+        del self.pages[:-_MAX_PAGES]
+        self.position = len(self.pages) - 1
+
+    def start_over(self, language: str | None) -> None:
+        self.pages.clear()
+        self.position = -1
+        self.language = language
 
 
 class ReadAloudTool:
@@ -645,8 +683,8 @@ class ReadAloudTool:
         name="read_aloud",
         description=(
             "Lê em voz alta o texto que está na tela (livro, PDF, artigo), opcionalmente "
-            "traduzido. Use para 'lê essa página pra mim', 'lê a próxima página', 'traduz e "
-            "lê'. O texto lido é falado direto para o usuário."
+            "traduzido, e lembra as páginas: 'lê essa página', 'próxima página', 'volta uma "
+            "página', 'lê de novo'. O texto lido é falado direto para o usuário."
         ),
         args_model=ReadAloudArgs,
         risk=RiskLevel.R1,
@@ -660,28 +698,63 @@ class ReadAloudTool:
     def __init__(self, control: DesktopControl, vision: ScreenVision) -> None:
         self._control = control
         self._vision = vision
+        self.memory = ReadingMemory()
 
     def describe(self, args: BaseModel) -> str:
         parsed = expect(args, ReadAloudArgs)
-        what = "a próxima página" if parsed.next_page else "o texto da tela"
+        if parsed.again:
+            return "ler de novo a última página"
+        what = (
+            "a próxima página"
+            if parsed.next_page
+            else "a página anterior"
+            if parsed.previous_page
+            else "o texto da tela"
+        )
         return f"ler {what}" + (f" em {parsed.translate_to}" if parsed.translate_to else "")
+
+    async def _turn(self, key: str) -> None:
+        await self._control.press_keys(tuple(key.split("+")))
+        await asyncio.sleep(0.8)  # o leitor desenha a página nova
 
     async def run(self, args: BaseModel, ctx: ToolContext) -> ToolResult:
         parsed = expect(args, ReadAloudArgs)
+        memory = self.memory
+        if parsed.page_key:
+            memory.page_key = parsed.page_key
+        continuing = parsed.next_page or parsed.previous_page or parsed.again
+        if parsed.translate_to:
+            memory.language = parsed.translate_to
+        elif not continuing:
+            memory.start_over(None)
+
+        if parsed.again and memory.current is not None:
+            return ToolResult.success(memory.current, say=memory.current)
+        if parsed.previous_page:
+            await self._turn(_BACK_KEYS.get(memory.page_key, "pageup"))
+            if memory.position > 0 and not parsed.translate_to:
+                memory.position -= 1
+                text = memory.pages[memory.position]
+                return ToolResult.success(text, say=text)
         if parsed.next_page:
-            await self._control.press_keys(tuple(parsed.page_key.split("+")))
-            await asyncio.sleep(0.8)  # o leitor desenha a página nova
+            await self._turn(memory.page_key)
+            if memory.position < len(memory.pages) - 1 and not parsed.translate_to:
+                memory.position += 1  # já tinha lido esta (voltou antes)
+                text = memory.pages[memory.position]
+                return ToolResult.success(text, say=text)
+
         shot = await self._control.capture()
         translate = (
-            f" Depois traduza o texto para {parsed.translate_to}, natural e fiel, e responda "
+            f" Depois traduza o texto para {memory.language}, natural e fiel, e responda "
             "só com a tradução."
-            if parsed.translate_to
+            if memory.language
             else ""
         )
         text = await self._vision.describe(shot.png, _READ_PROMPT.format(translate=translate))
         text = text.strip()
         if not text or text.startswith("Não consegui olhar a tela"):
             return ToolResult.failure(text or "Não achei texto para ler na tela.")
+        memory.add(text)
         return ToolResult.success(text, say=text)
 
 

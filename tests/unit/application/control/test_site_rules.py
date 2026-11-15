@@ -164,3 +164,22 @@ def test_reading_with_translation(text: str, args: dict[str, object]) -> None:
     from shiro.application.control.rules import reading_rule
 
     assert reading_rule(text) == [("read_aloud", args)]
+
+
+@pytest.mark.parametrize(
+    ("text", "args"),
+    [
+        ("volte e leia de novo a última página", {"again": True}),
+        ("lê de novo", {"again": True}),
+        ("repete", {"again": True}),
+        ("repete a última página pra mim", {"again": True}),
+        ("volta uma página", {"previous_page": True}),
+        ("volta a página e lê", {"previous_page": True}),
+        ("página anterior", {"previous_page": True}),
+        ("lê a página anterior", {"previous_page": True}),
+    ],
+)
+def test_reading_navigation(text: str, args: dict[str, object]) -> None:
+    from shiro.application.control.rules import reading_rule
+
+    assert reading_rule(text) == [("read_aloud", args)]

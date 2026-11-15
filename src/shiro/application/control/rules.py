@@ -237,9 +237,25 @@ def _target_language(command: str) -> str:
     return "português"
 
 
+_READ_AGAIN = re.compile(
+    _CALL + r"(?:(?:volta|volte)\s+e\s+)?(?:(?:le|leia|ler|lê)\s+(?:de novo|novamente|outra vez)"
+    r"|repete|repita|repetir)(?:\s+(?:a|o|essa|esse|isso)?\s*(?:ultima|mesma)?\s*"
+    r"(?:pagina|trecho|parte|texto)?)?(?:\s+(?:de novo|pra mim))?" + _POLITE
+)
+_READ_BACK = re.compile(
+    _CALL + r"(?:(?:volta|volte|retorna|retorne)\s+(?:uma|a|para a|pra)\s+pagina(?:\s+anterior)?"
+    r"(?:\s+e\s+(?:le|leia|ler))?|(?:le|leia|ler|lê)\s+a\s+pagina\s+anterior|pagina anterior)"
+    + _POLITE
+)
+
+
 def reading_rule(text: str) -> Calls | None:
     """ "lê essa página pra mim", "lê a próxima página", "próxima página": sem o modelo."""
     command = normalize(text)
+    if _READ_AGAIN.match(command):
+        return [("read_aloud", {"again": True})]
+    if _READ_BACK.match(command):
+        return [("read_aloud", {"previous_page": True})]
     translating = re.search(r"\btraduz", command) is not None
     if _READ_WHAT_IS.match(command) or _TRANSLATE_PAGE.match(command):
         args: dict[str, object] = {}
