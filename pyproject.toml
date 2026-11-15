@@ -62,7 +62,7 @@ Documentation = "https://github.com/VitorAngN/Shiro-Agente/tree/main/docs"
 
 [dependency-groups]
 dev = [
-    "hypothesis>=6.100",
+    "hypothesis>=6.170.15",
     "import-linter>=2.1",
     "pre-commit>=4.0",
     "pyright[nodejs]>=1.1.400",
