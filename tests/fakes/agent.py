@@ -99,6 +99,7 @@ class FakeTool:
         local_only: bool = False,
         timeout_s: float = 10.0,
         group: str = "core",
+        final: bool = False,
     ) -> None:
         self._spec = ToolSpec(
             name=name,
@@ -108,6 +109,7 @@ class FakeTool:
             output_trusted=output_trusted,
             local_only=local_only,
             timeout_s=timeout_s,
+            final=final,
             group=group,
         )
         self._result = result

@@ -281,6 +281,9 @@ class AgentLoop:
 
             if response.tool_calls:
                 await self._handle_tool_calls(state, response, trace_id)
+                spoken = self._final_answer(state)
+                if spoken is not None:
+                    return state.result(spoken, step)
                 if state.invalid >= limits.max_validation_failures:
                     if self._escalate(state):
                         state.invalid = 0
@@ -312,6 +315,14 @@ class AgentLoop:
             return state.result(final or _REPLY_EMPTY, step)
 
         return state.result(_REPLY_TOO_MANY_STEPS, limits.max_steps)
+
+    def _final_answer(self, state: _TurnState) -> str | None:
+        """Texto de uma ferramenta ``final`` que acabou de dar certo (vira a resposta inteira)."""
+        for done in reversed(state.executed):
+            tool = self._tools.get(done.call.name)
+            if tool is not None and tool.spec.final and done.result.ok:
+                return done.result.say or done.result.content
+        return None
 
     def _recent_groups(self) -> frozenset[str]:
         """Grupos de ferramentas usados nos últimos turnos ("e o outro arquivo?")."""

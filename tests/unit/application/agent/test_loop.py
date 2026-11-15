@@ -393,3 +393,13 @@ async def test_local_refusal_is_retried_in_the_cloud() -> None:
     )
     kept = await without_cloud_groups.agent.run_turn("faz algo")
     assert kept.tier is Tier.T1
+
+
+async def test_final_tool_result_is_the_answer() -> None:
+    text = "Capítulo 1. Era uma vez..."
+    reader = FakeTool(
+        "read_aloud", risk=RiskLevel.R0, result=ToolResult.success(text, say=text), final=True
+    )
+    h = Harness([reply("", ("read_aloud", {"value": 1})), reply("Li a página.")], tools=[reader])
+    result = await h.agent.run_turn("lê isso aí traduzido")
+    assert result.text == text

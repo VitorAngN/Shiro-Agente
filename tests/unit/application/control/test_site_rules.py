@@ -145,3 +145,22 @@ def test_reading_rule(text: str, args: dict[str, object] | None) -> None:
 
     expected = None if args is None else [("read_aloud", args)]
     assert reading_rule(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "args"),
+    [
+        ("Leia o que está na tela do Chrome. Traduzindo para mim.", {"translate_to": "português"}),
+        (
+            "Eu quero que você leia o que tem na página e traduzindo para mim.",
+            {"translate_to": "português"},
+        ),
+        ("lê o que está na tela", {}),
+        ("traduz essa página pra inglês", {"translate_to": "inglês"}),
+        ("traduz e lê a página", {"translate_to": "português"}),
+    ],
+)
+def test_reading_with_translation(text: str, args: dict[str, object]) -> None:
+    from shiro.application.control.rules import reading_rule
+
+    assert reading_rule(text) == [("read_aloud", args)]

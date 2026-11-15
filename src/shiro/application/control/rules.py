@@ -219,9 +219,35 @@ _NEXT_ONLY = re.compile(
 _LANGS = {"portugues": "português", "ingles": "inglês", "espanhol": "espanhol"}
 
 
+_READ_WHAT_IS = re.compile(
+    _CALL + r"(?:(?:eu\s+)?quero\s+que\s+(?:voce\s+)?)?(?:me\s+)?(?:le|leia|ler|lê)\s+"
+    r"(?:pra mim\s+)?(?:o\s+)?(?:que|oque)\s+(?:esta|ta|tem|aparece)\s+(?:escrito\s+)?"
+    r"(?:na|no)\s+(?:a\s+)?(?:tela|pagina|chrome|navegador|livro|pdf)\b"
+)
+_TRANSLATE_PAGE = re.compile(
+    _CALL + r"(?:traduz|traduza|traduzir)\s+(?:pra mim\s+)?(?:e\s+(?:le|leia)\s+)?"
+    r"(?:a|o|essa|esse|esta|este)\s+(?:pagina|tela|texto|livro|trecho|capitulo)\b"
+)
+
+
+def _target_language(command: str) -> str:
+    for spoken, language in _LANGS.items():
+        if re.search(rf"\b{spoken}\b", command):
+            return language
+    return "português"
+
+
 def reading_rule(text: str) -> Calls | None:
     """ "lê essa página pra mim", "lê a próxima página", "próxima página": sem o modelo."""
     command = normalize(text)
+    translating = re.search(r"\btraduz", command) is not None
+    if _READ_WHAT_IS.match(command) or _TRANSLATE_PAGE.match(command):
+        args: dict[str, object] = {}
+        if translating:
+            args["translate_to"] = _target_language(command)
+        if re.search(r"\b(?:proxima|seguinte)\b", command):
+            args["next_page"] = True
+        return [("read_aloud", args)]
     if _NEXT_ONLY.match(command):
         return [("read_aloud", {"next_page": True})]
     match = _READ.match(command)

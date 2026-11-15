@@ -646,7 +646,7 @@ class ReadAloudTool:
         description=(
             "Lê em voz alta o texto que está na tela (livro, PDF, artigo), opcionalmente "
             "traduzido. Use para 'lê essa página pra mim', 'lê a próxima página', 'traduz e "
-            "lê'. O texto lido volta como resposta: repita-o inteiro, sem resumir."
+            "lê'. O texto lido é falado direto para o usuário."
         ),
         args_model=ReadAloudArgs,
         risk=RiskLevel.R1,
@@ -654,6 +654,7 @@ class ReadAloudTool:
         output_trusted=False,
         external=True,
         group="control",
+        final=True,
     )
 
     def __init__(self, control: DesktopControl, vision: ScreenVision) -> None:

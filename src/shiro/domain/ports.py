@@ -61,6 +61,9 @@ class ToolSpec(BaseModel):
     """Manda dados para fora do PC (ex.: pesquisa na web)."""
     group: str = "core"
     """Grupo de assunto: fora de "core", só aparece para o modelo quando o pedido é do assunto."""
+    final: bool = False
+    """O resultado já é a resposta (ex.: o texto lido da tela): o turno termina com ele, sem o
+    modelo resumir ("li a página") no lugar de falar o texto."""
     parameters: dict[str, Any] | None = None
     """Schema enviado ao modelo; quando ``None``, é gerado a partir de ``args_model``."""
 
