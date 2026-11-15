@@ -284,3 +284,35 @@ async def test_activity_follows_the_turn() -> None:
     }
     activity.idle()
     assert activity.snapshot()["total_seconds"] == 0.0
+
+
+def test_mobile_page_and_pairing_url() -> None:
+    from fastapi.testclient import TestClient
+
+    from shiro.config.settings import DevicesSettings
+
+    registry = DeviceRegistry(MemoryStore(), MovableClock())
+    local: list[str] = []
+
+    async def chat(text: str, device: Device) -> AgentResult:
+        return AgentResult(text="ok", tier=Tier.T0)
+
+    api = create_device_api(
+        registry=registry,
+        chat=chat,
+        can_pair=lambda device: device.id in local,
+        public_url="https://pc.tail1234.ts.net",
+    )
+    with TestClient(api) as client:
+        page = client.get("/m")
+        assert page.status_code == 200 and "SHIRO" in page.text and "/v1/pair" in page.text
+        pc = pair(client, registry, "Este PC")
+        local.append(client.get("/v1/me", headers=pc).json()["id"])
+        opened = client.post("/v1/pairing", headers=pc).json()
+        assert opened["url"] == f"https://pc.tail1234.ts.net/m#pair={opened['code']}"
+    assert DevicesSettings(public_url="https://pc.tail1234.ts.net/x").public_url == (
+        "https://pc.tail1234.ts.net"
+    )
+    for bad in ("http://pc.tail1234.ts.net", "https://example.com"):
+        with pytest.raises(ValueError, match="public_url"):
+            DevicesSettings(public_url=bad)

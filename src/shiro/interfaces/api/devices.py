@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from shiro import __version__
@@ -95,6 +96,14 @@ class PairingResponse(BaseModel):
     expires_at: str
     host: str
     port: int
+    url: str | None = None
+    """Endereço que o celular abre (``[devices] public_url``); vai no QR."""
+
+
+def _mobile_page() -> str:
+    from importlib.resources import files
+
+    return (files("shiro.interfaces.api") / "web" / "mobile.html").read_text(encoding="utf-8")
 
 
 async def require_device(request: Request) -> Device:
@@ -116,6 +125,7 @@ def create_device_api(
     voice: Voice | None = None,
     can_pair: Callable[[Device], bool] | None = None,
     address: tuple[str, int] = ("127.0.0.1", 8766),
+    public_url: str = "",
 ) -> FastAPI:
     api = FastAPI(title="SHIRO · aparelhos", version=__version__, docs_url=None, redoc_url=None)
 
@@ -200,7 +210,13 @@ def create_device_api(
             expires_at=pairing.expires_at.isoformat(),
             host=address[0],
             port=address[1],
+            url=f"{public_url.rstrip('/')}/m#pair={pairing.code}" if public_url else None,
         )
+
+    @api.get("/m", include_in_schema=False)
+    async def mobile() -> HTMLResponse:
+        """Página do celular: conversa, microfone e confirmações (sem dado nenhum dentro)."""
+        return HTMLResponse(_mobile_page(), headers={"Cache-Control": "no-cache"})
 
     @api.delete("/v1/devices/{device_id}")
     async def revoke_device(device_id: str, current: Device = paired) -> dict[str, bool]:

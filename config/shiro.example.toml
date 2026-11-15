@@ -160,3 +160,8 @@ backups = 5
 # [mcp.servers.home_assistant]    # Fase 5
 # url = ""                        # URL do servidor MCP exposto pelo Home Assistant
 # default_risk = "R2"
+
+[devices]
+# Celular (ADR-0022): o motor fica só neste PC; o Tailscale leva o celular até ele em HTTPS
+# ("tailscale serve --bg 8766"). Ponha aqui o endereço que o Tailscale mostrar: ele vai no QR.
+# public_url = "https://meupc.tailXXXX.ts.net"

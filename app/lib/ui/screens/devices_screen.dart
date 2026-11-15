@@ -86,7 +86,7 @@ class _DevicesScreenState extends State<DevicesScreen> {
               borderRadius: Corners.large,
               border: Border.all(color: Palette.cyan, width: 2),
             ),
-            child: QrImageView(data: jsonEncode(pairing.qrPayload), size: 220, backgroundColor: Palette.fg),
+            child: QrImageView(data: pairing.qrData, size: 220, backgroundColor: Palette.fg),
           ),
           const SizedBox(width: 24),
           Expanded(
@@ -95,13 +95,22 @@ class _DevicesScreenState extends State<DevicesScreen> {
                   style: const TextStyle(fontSize: 40, fontFamily: Fonts.mono, color: Palette.cyan)),
               const Text('O código vale uma vez só.', style: TextStyle(fontSize: 14, color: Palette.muted)),
               const SizedBox(height: 14),
-              const Text('No app da SHIRO no celular, toque em "Ligar a um PC" e aponte para o código.',
-                  style: TextStyle(fontSize: 14, height: 1.5)),
+              Text(
+                  pairing.url != null
+                      ? 'Com o Tailscale ligado no celular, aponte a câmera para o código. '
+                          'Ou digite o código ${pairing.code} na página do celular.'
+                      : 'Código: ${pairing.code}',
+                  style: const TextStyle(fontSize: 14, height: 1.5)),
+              if (pairing.url != null) ...[
+                const SizedBox(height: 10),
+                SelectableText(pairing.url!.split('#').first,
+                    style: const TextStyle(fontSize: 13, fontFamily: Fonts.mono, color: Palette.cyan)),
+              ],
               if (pairing.onlyThisPc) ...[
                 const SizedBox(height: 14),
                 const Text(
-                    'O motor está escutando só neste PC. Para o celular alcançar, ponha o endereço do '
-                    'Tailscale em [devices] host no shiro.toml.',
+                    'O celular ainda não alcança este PC: falta o endereço do Tailscale em '
+                    '[devices] public_url no shiro.toml.',
                     style: TextStyle(fontSize: 13, color: Palette.yellow, height: 1.5)),
               ],
             ]),

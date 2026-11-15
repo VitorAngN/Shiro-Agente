@@ -20,6 +20,7 @@ import tomllib
 from datetime import time
 from pathlib import Path
 from typing import Annotated, Any, Literal, Self
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import (
@@ -335,6 +336,21 @@ class DevicesSettings(_Section):
     enabled: bool = False
     host: str = "127.0.0.1"  # o endereço deste PC no Tailscale (100.x.y.z) para o celular alcançar
     port: int = Field(default=8766, ge=1024, le=65535)
+    # Endereço HTTPS do Tailscale que leva a este motor (``tailscale serve``), ex.:
+    # https://meupc.tail1234.ts.net. Vai no QR; o celular precisa de HTTPS para o microfone.
+    public_url: str = ""
+
+    @field_validator("public_url")
+    @classmethod
+    def _tailnet_only(cls, value: str) -> str:
+        if not value:
+            return ""
+        parsed = urlparse(value.strip())
+        host = parsed.hostname or ""
+        if parsed.scheme != "https" or not host.endswith(".ts.net"):
+            msg = "public_url precisa ser https://<pc>.<tailnet>.ts.net (só a rede do Tailscale)"
+            raise ValueError(msg)
+        return f"https://{host}"
 
     @field_validator("host")
     @classmethod

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Registros que o motor devolve, já tipados (em vez de Map soltos pela tela).
 class Lesson {
   const Lesson({required this.trigger, required this.meaning});
@@ -32,13 +34,20 @@ class PendingConfirmation {
 }
 
 class Pairing {
-  const Pairing({required this.code, required this.host, required this.port, required this.expiresAt});
+  const Pairing({
+    required this.code,
+    required this.host,
+    required this.port,
+    required this.expiresAt,
+    this.url,
+  });
 
   factory Pairing.fromJson(Map<String, dynamic> json) => Pairing(
         code: json['code'] as String,
         host: json['host'] as String,
         port: json['port'] as int,
         expiresAt: DateTime.parse(json['expires_at'] as String),
+        url: json['url'] as String?,
       );
 
   final String code;
@@ -47,9 +56,13 @@ class Pairing {
   final DateTime expiresAt;
 
   /// O que vai no QR: o celular lê e já sabe onde e com que código entrar.
-  Map<String, Object> get qrPayload => {'shiro': 1, 'host': host, 'port': port, 'code': code};
+  /// Endereço que o celular abre (o motor pelo Tailscale em HTTPS); `null` sem `public_url`.
+  final String? url;
 
-  bool get onlyThisPc => host.startsWith('127.') || host == '::1';
+  /// O QR leva direto para a página do celular quando há endereço; senão, só os dados.
+  String get qrData => url ?? jsonEncode({'shiro': 1, 'host': host, 'port': port, 'code': code});
+
+  bool get onlyThisPc => url == null && (host.startsWith('127.') || host == '::1');
 
   Duration remaining(DateTime now) {
     final left = expiresAt.difference(now);

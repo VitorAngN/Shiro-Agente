@@ -5,6 +5,11 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (celular pelo navegador)
+- Página do celular servida pelo motor em `/m`: conversa, microfone (reconhecimento de voz do Chrome), resposta falada, confirmações com Sim/Não ou pela voz e "Atender pelo nome" com a tela ligada.
+- `[devices] public_url` (o endereço HTTPS do Tailscale, `tailscale serve`): o QR do programa leva direto à página e já pareia.
+- A escuta tolera transcrição lenta (processador ocupado) antes de desistir.
+
 ### Adicionado (ler a tela)
 - `read_aloud`: "lê essa página pra mim", "lê a próxima página", "lê em inglês/traduzido pra português". Lê o texto da tela (livro, PDF, artigo) pela visão e fala; pode traduzir antes. Sem passar pelo modelo.
 - Falar "Shiro" (ou "Shiro, para") enquanto ela fala interrompe a fala.

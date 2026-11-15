@@ -229,7 +229,9 @@ class VoiceBox:
         """Escuta com prazo de relógio: se o microfone parar de mandar som, não fica preso."""
         settings = getattr(self._app, "settings", None)
         listen = settings.voice.listen if settings is not None else None
-        limit = (listen.start_timeout_s + listen.max_utterance_s + 10) if listen else 40.0
+        # Ouvir + transcrever. Com o processador ocupado (jogo, Discord), o Whisper na CPU
+        # leva bem mais que a fala: o prazo só pega um microfone que nunca entrega nada.
+        limit = (listen.start_timeout_s + listen.max_utterance_s + 90) if listen else 120.0
         for attempt in range(2):  # fluxo travado: reabre o microfone uma vez e tenta de novo
             try:
                 listening = session.listen(quiet=True) if quiet else session.listen()
@@ -504,6 +506,7 @@ def engine_api(
         voice=voice.exchange,
         can_pair=can_pair,
         address=(app.settings.devices.host, app.settings.devices.port),
+        public_url=app.settings.devices.public_url,
     )
     add_voice_routes(api, voice)
     api.state.voice = voice
