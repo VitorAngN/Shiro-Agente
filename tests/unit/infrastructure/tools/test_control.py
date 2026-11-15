@@ -366,3 +366,35 @@ def test_only_the_translation_is_kept() -> None:
     assert translation_from('Claro! {"traducao": "Oi"} pronto') == "Oi"
     assert translation_from("Oi sem json") == "Oi sem json"
     assert translation_from('{"traducao": ""}') == ""
+
+
+async def test_reading_paragraph_by_paragraph() -> None:
+    from shiro.infrastructure.tools.control import ReadAloudTool, Spot
+
+    pages = iter(["Um.\n\nDois.", "Três.\n\nQuatro."])
+
+    class Vision:
+        async def locate(self, png: bytes, target: str) -> Spot | None:
+            return None
+
+        async def describe(self, png: bytes, question: str) -> str:
+            raise AssertionError(question)
+
+        async def read_text(self, png: bytes, translate_to: str | None) -> str:
+            return next(pages)
+
+    control = FakeControl()
+    tool = ReadAloudTool(control, Vision())
+
+    async def read(**kwargs: object) -> str:
+        done = await tool.run(tool.spec.args_model(**kwargs), CTX)
+        return done.say or ""
+
+    assert await read(unit="paragrafo") == "Um."
+    assert await read(advance=True) == "Dois. (Fim da página.)"
+    assert await read(advance=True) == "Três."  # virou a página sozinha
+    assert control.calls[-1] == ("keys", ("pagedown",))
+    assert await read(again=True) == "Três."
+    assert await read(back=True) == "Dois. (Fim da página.)"  # volta para a página anterior
+    assert await read(advance=True) == "Três."  # memória, sem olhar a tela de novo
+    assert await read(advance=True) == "Quatro. (Fim da página.)"

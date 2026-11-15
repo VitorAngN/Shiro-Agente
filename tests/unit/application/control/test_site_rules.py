@@ -132,8 +132,8 @@ def test_dictation_rule_and_spoken_punctuation() -> None:
         ("lê o texto da tela", {}),
         ("lê a próxima página", {"next_page": True}),
         ("próxima página", {"next_page": True}),
-        ("continua lendo", None),
-        ("continua a ler", {"next_page": True}),
+        ("continua lendo", {"advance": True}),
+        ("continua a ler", {"advance": True}),
         ("lê essa página em inglês", {"translate_to": "inglês"}),
         ("lê o texto traduzido pra português", {"translate_to": "português"}),
         ("lê", None),
@@ -180,6 +180,28 @@ def test_reading_with_translation(text: str, args: dict[str, object]) -> None:
     ],
 )
 def test_reading_navigation(text: str, args: dict[str, object]) -> None:
+    from shiro.application.control.rules import reading_rule
+
+    assert reading_rule(text) == [("read_aloud", args)]
+
+
+@pytest.mark.parametrize(
+    ("text", "args"),
+    [
+        ("lê parágrafo por parágrafo", {"unit": "paragrafo"}),
+        (
+            "leia um parágrafo por vez traduzindo pra português",
+            {"unit": "paragrafo", "translate_to": "português"},
+        ),
+        ("continua", {"advance": True}),
+        ("pode continuar", {"advance": True}),
+        ("próximo parágrafo", {"advance": True, "unit": "paragrafo"}),
+        ("lê o próximo", {"advance": True}),
+        ("parágrafo anterior", {"back": True, "unit": "paragrafo"}),
+        ("volta um parágrafo", {"back": True, "unit": "paragrafo"}),
+    ],
+)
+def test_paragraph_reading(text: str, args: dict[str, object]) -> None:
     from shiro.application.control.rules import reading_rule
 
     assert reading_rule(text) == [("read_aloud", args)]

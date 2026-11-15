@@ -249,9 +249,44 @@ _READ_BACK = re.compile(
 )
 
 
+_CONTINUE = re.compile(
+    _CALL + r"(?:(?:pode\s+)?(?:continua|continue|continuar|segue|siga|prossiga|prossegue)"
+    r"(?:\s+(?:a\s+)?(?:lendo|ler|leitura))?"
+    r"|(?:(?:le|leia|ler|lê)\s+(?:o\s+)?)?proximo(?:\s+paragrafo)?)" + _POLITE
+)
+_PARAGRAPH_BACK = re.compile(
+    _CALL + r"(?:(?:volta|volte)\s+(?:um|o|uma)\s+paragrafo|(?:(?:le|leia|ler|lê)\s+(?:o\s+)?)?"
+    r"paragrafo\s+anterior)" + _POLITE
+)
+_READ_VERB = re.compile(r"\b(?:le|leia|ler|lendo|lê)\b")
+
+
+def _reading_extras(command: str, args: dict[str, object]) -> dict[str, object]:
+    """Modo (parágrafo/página) e tradução ditos junto do pedido de leitura."""
+    if re.search(r"\bparagrafo", command):
+        args["unit"] = "paragrafo"
+    elif re.search(r"\bpagina (?:inteira|toda)\b|\btoda a pagina\b", command):
+        args["unit"] = "pagina"
+    if re.search(r"\btraduz", command) or re.search(
+        r"\bem (?:portugues|ingles|espanhol)\b", command
+    ):
+        args.setdefault("translate_to", _target_language(command))
+    return args
+
+
 def reading_rule(text: str) -> Calls | None:
     """ "lê essa página pra mim", "lê a próxima página", "próxima página": sem o modelo."""
     command = normalize(text)
+    if _CONTINUE.match(command):
+        args: dict[str, object] = {"advance": True}
+        if "paragrafo" in command:
+            args["unit"] = "paragrafo"
+        return [("read_aloud", args)]
+    if _PARAGRAPH_BACK.match(command):
+        return [("read_aloud", {"back": True, "unit": "paragrafo"})]
+    if "paragrafo" in command and _READ_VERB.search(command):
+        # "lê parágrafo por parágrafo", "lê um parágrafo por vez traduzido"
+        return [("read_aloud", _reading_extras(command, {}))]
     if _READ_AGAIN.match(command):
         return [("read_aloud", {"again": True})]
     if _READ_BACK.match(command):
@@ -272,8 +307,10 @@ def reading_rule(text: str) -> Calls | None:
     what = match["what"] or ""
     if not what and "continu" not in command:
         return None  # "lê" sozinho é vago demais: fica para o modelo
-    args: dict[str, object] = {}
-    if "proxima" in what or "seguinte" in what or "continu" in command:
+    args = {}
+    if "continu" in command:
+        return [("read_aloud", {"advance": True})]
+    if "proxima" in what or "seguinte" in what:
         args["next_page"] = True
     if match["lang"]:
         args["translate_to"] = _LANGS[match["lang"]]

@@ -32,13 +32,15 @@ _READ = (
     "A imagem é o print de uma janela do Windows. Pegue o texto principal que aparece (a "
     "página do livro, o artigo, o documento), na ordem de leitura. Deixe de fora menus, "
     "botões, barras do programa, cabeçalhos e números de página. Junte palavras quebradas "
-    "por hífen no fim da linha. Responda só com o texto, sem comentários."
+    "por hífen no fim da linha. Separe os parágrafos com uma linha em branco. Responda só "
+    "com o texto, sem comentários."
 )
 _READ_TRANSLATED = (
     "A imagem é o print de uma janela do Windows. Pegue o texto principal que aparece (a "
     "página do livro, o artigo, o documento), sem menus, botões, cabeçalhos nem números de "
     "página, e traduza para {language}, de forma natural e fiel. Responda só com JSON: "
-    '{{"traducao": "o texto inteiro traduzido"}}. Não inclua o texto original.'
+    '{{"traducao": "o texto inteiro traduzido"}}. Mantenha os parágrafos, separados por '
+    "uma linha em branco. Não inclua o texto original."
 )
 
 
