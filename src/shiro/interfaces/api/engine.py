@@ -31,7 +31,7 @@ from shiro.domain.events import BackgroundNotice, TurnFinished, TurnProgress, Tu
 from shiro.domain.models import AgentResult, DecisionKind
 from shiro.interfaces.api.devices import create_device_api
 from shiro.interfaces.api.server import _server_class  # pyright: ignore[reportPrivateUsage]
-from shiro.interfaces.voice.session import VoiceSession
+from shiro.interfaces.voice.session import Phase, VoiceSession
 
 log = logging.getLogger(__name__)
 
@@ -371,12 +371,25 @@ class VoiceBox:
 
     # ------------------------------------------------------------ escuta do nome
 
+    def _speaking(self) -> bool:
+        return self._session is not None and self._session.phase is Phase.SPEAKING
+
+    def _hears_name(self) -> bool:
+        """Escuta o nome quando está livre e também enquanto fala (para poder ser interrompida)."""
+        return not self._busy.locked() or self._speaking()
+
     def wake(self) -> None:
-        """Ouviu só o nome ("Shiro"): bipe e escuta o pedido."""
+        """Ouviu só o nome ("Shiro"): bipe e escuta o pedido; se estiver falando, para."""
+        if self._speaking() and self._session is not None:
+            self._session.interrupt()
+            return
         asyncio.get_running_loop().create_task(self._after_name(None))
 
     def command(self, text: str) -> None:
-        """Ouviu o nome junto do pedido ("Shiro, abre a Steam")."""
+        """Ouviu o nome junto do pedido ("Shiro, abre a Steam"); falando, só para."""
+        if self._speaking() and self._session is not None:
+            self._session.interrupt()  # "Shiro, para" no meio de uma leitura longa
+            return
         asyncio.get_running_loop().create_task(self._after_name(text))
 
     async def _after_name(self, text: str | None) -> None:
@@ -417,7 +430,7 @@ class VoiceBox:
         self._wake = WakeListener(
             microphone=self._microphone(),
             events=self,
-            is_idle=lambda: not self._busy.locked(),
+            is_idle=self._hears_name,
         )
 
         async def run() -> None:

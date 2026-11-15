@@ -5,6 +5,10 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e
 
 ## [Não lançado]
 
+### Adicionado (ler a tela)
+- `read_aloud`: "lê essa página pra mim", "lê a próxima página", "lê em inglês/traduzido pra português". Lê o texto da tela (livro, PDF, artigo) pela visão e fala; pode traduzir antes. Sem passar pelo modelo.
+- Falar "Shiro" (ou "Shiro, para") enquanto ela fala interrompe a fala.
+
 ### Adicionado (visão e esperas, ADR-0027)
 - `click_on` olha a tela quando o item não tem nome (linha de texto, ícone, jogo); `look_at_screen`, `scroll` e `hold_keys`; teclas com código físico para jogos.
 - `wait_then` ("daqui a 3 minutos pausa") e `when_visible` ("quando aparecer Aceitar, clica"), em segundo plano, com aviso em voz e na conversa; `list_waits` e `cancel_waits`.

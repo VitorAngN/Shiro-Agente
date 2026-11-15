@@ -24,7 +24,7 @@ _LOCATE = (
 )
 _DESCRIBE = (
     "A imagem é o print de uma janela do Windows do usuário. Responda em português do "
-    "Brasil, em poucas frases, só sobre o que aparece: {question}"
+    "Brasil, só sobre o que aparece: {question}"
 )
 
 

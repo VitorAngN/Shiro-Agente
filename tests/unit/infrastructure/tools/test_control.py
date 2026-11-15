@@ -314,3 +314,26 @@ async def test_click_falls_back_to_vision_and_new_tools() -> None:
     assert parse_spot('{"found": false}') is None
     assert parse_spot("bobagem") is None
     assert parse_spot('{"found": true, "x": 5000, "y": 2}') is None
+
+
+async def test_read_aloud_turns_the_page_and_speaks_the_text() -> None:
+    from shiro.infrastructure.tools.control import ReadAloudTool, Spot
+
+    asked: list[str] = []
+
+    class Vision:
+        async def locate(self, png: bytes, target: str) -> Spot | None:
+            return None
+
+        async def describe(self, png: bytes, question: str) -> str:
+            asked.append(question)
+            return "Era uma vez um livro."
+
+    control = FakeControl()
+    tool = ReadAloudTool(control, Vision())
+    done = await tool.run(
+        tool.spec.args_model(next_page=True, translate_to="inglês", page_key="right"), CTX
+    )
+    assert done.ok and done.say == "Era uma vez um livro."
+    assert control.calls[0] == ("keys", ("right",))
+    assert "inglês" in asked[-1]

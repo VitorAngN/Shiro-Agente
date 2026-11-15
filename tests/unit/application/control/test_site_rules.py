@@ -123,3 +123,25 @@ def test_dictation_rule_and_spoken_punctuation() -> None:
     )
     assert spoken_punctuation("soma abre parênteses a vírgula b fecha parênteses") == "soma (a, b)"
     assert is_stop("Parar ditado.") and is_stop("Shiro, para o ditado") and not is_stop("ditado")
+
+
+@pytest.mark.parametrize(
+    ("text", "args"),
+    [
+        ("Shiro, lê essa página pra mim.", {}),
+        ("lê o texto da tela", {}),
+        ("lê a próxima página", {"next_page": True}),
+        ("próxima página", {"next_page": True}),
+        ("continua lendo", None),
+        ("continua a ler", {"next_page": True}),
+        ("lê essa página em inglês", {"translate_to": "inglês"}),
+        ("lê o texto traduzido pra português", {"translate_to": "português"}),
+        ("lê", None),
+        ("lê minhas mensagens", None),
+    ],
+)
+def test_reading_rule(text: str, args: dict[str, object] | None) -> None:
+    from shiro.application.control.rules import reading_rule
+
+    expected = None if args is None else [("read_aloud", args)]
+    assert reading_rule(text) == expected

@@ -613,6 +613,77 @@ class HoldKeysTool:
         return ToolResult.success(f"Segurei {parsed.keys}.", say="Pronto.")
 
 
+_READ_PROMPT = (
+    "Transcreva o texto principal que aparece (a página do livro, o artigo, o documento), "
+    "na ordem de leitura. Deixe de fora menus, botões, barras do programa, cabeçalhos e "
+    "números de página. Junte palavras quebradas por hífen no fim da linha. Responda só "
+    "com o texto, sem comentários.{translate}"
+)
+
+
+class ReadAloudArgs(Args):
+    next_page: bool = Field(default=False, description="Passa para a próxima página antes de ler")
+    translate_to: str | None = Field(
+        default=None,
+        max_length=40,
+        description="Idioma para traduzir antes de ler (ex.: português). Vazio = como está.",
+    )
+    page_key: str = Field(
+        default="pagedown",
+        max_length=20,
+        description="Tecla que vira a página no leitor (pagedown, right, space)",
+    )
+
+    @field_validator("page_key")
+    @classmethod
+    def _known(cls, value: str) -> str:
+        return "+".join(parse_keys(value))
+
+
+class ReadAloudTool:
+    spec = ToolSpec(
+        name="read_aloud",
+        description=(
+            "Lê em voz alta o texto que está na tela (livro, PDF, artigo), opcionalmente "
+            "traduzido. Use para 'lê essa página pra mim', 'lê a próxima página', 'traduz e "
+            "lê'. O texto lido volta como resposta: repita-o inteiro, sem resumir."
+        ),
+        args_model=ReadAloudArgs,
+        risk=RiskLevel.R1,
+        timeout_s=60.0,
+        output_trusted=False,
+        external=True,
+        group="control",
+    )
+
+    def __init__(self, control: DesktopControl, vision: ScreenVision) -> None:
+        self._control = control
+        self._vision = vision
+
+    def describe(self, args: BaseModel) -> str:
+        parsed = expect(args, ReadAloudArgs)
+        what = "a próxima página" if parsed.next_page else "o texto da tela"
+        return f"ler {what}" + (f" em {parsed.translate_to}" if parsed.translate_to else "")
+
+    async def run(self, args: BaseModel, ctx: ToolContext) -> ToolResult:
+        parsed = expect(args, ReadAloudArgs)
+        if parsed.next_page:
+            await self._control.press_keys(tuple(parsed.page_key.split("+")))
+            await asyncio.sleep(0.8)  # o leitor desenha a página nova
+        shot = await self._control.capture()
+        translate = (
+            f" Depois traduza o texto para {parsed.translate_to}, natural e fiel, e responda "
+            "só com a tradução."
+            if parsed.translate_to
+            else ""
+        )
+        text = await self._vision.describe(shot.png, _READ_PROMPT.format(translate=translate))
+        text = text.strip()
+        if not text or text.startswith("Não consegui olhar a tela"):
+            return ToolResult.failure(text or "Não achei texto para ler na tela.")
+        return ToolResult.success(text, say=text)
+
+
 class PauseArgs(Args):
     seconds: float = Field(gt=0, le=60, description="Quantos segundos esperar")
 
@@ -656,6 +727,7 @@ def control_tools(
     ]
     if vision is not None:
         tools.append(LookAtScreenTool(control, vision))
+        tools.append(ReadAloudTool(control, vision))
     return tools
 
 

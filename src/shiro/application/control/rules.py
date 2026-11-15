@@ -200,3 +200,39 @@ _DICTATE = re.compile(
 def dictation_rule(text: str) -> Calls | None:
     """ "modo ditado", "liga o ditado", "vou ditar": liga sem passar pelo modelo."""
     return [("start_dictation", {})] if _DICTATE.match(normalize(text)) else None
+
+
+# --- ler a tela em voz alta ------------------------------------------------------
+
+_READ = re.compile(
+    _CALL + r"(?:(?:me\s+)?(?:le|leia|ler|lê)|continua(?:\s+a)?\s+ler|continue(?:\s+a)?\s+ler)"
+    r"(?:\s+(?:pra|para)\s+mim)?"
+    r"(?:\s+(?P<what>(?:a|o|essa|esse|esta|este|isso|isto)(?:\s+(?:proxima|seguinte))?"
+    r"(?:\s+(?:pagina|texto|tela|livro|capitulo|trecho|paragrafo))?))?"
+    r"(?:\s+(?:da|na)\s+tela)?(?:\s+(?:pra|para)\s+mim)?"
+    r"(?:\s+(?:traduzid[oa]|em)\s+(?:(?:pra|para)\s+)?(?:o\s+)?(?P<lang>portugues|ingles|espanhol))?"
+    + _POLITE
+)
+_NEXT_ONLY = re.compile(
+    _CALL + r"(?:proxima|vira a|passa a|passa pra|vai pra)\s*(?:a\s+)?pagina" + _POLITE
+)
+_LANGS = {"portugues": "português", "ingles": "inglês", "espanhol": "espanhol"}
+
+
+def reading_rule(text: str) -> Calls | None:
+    """ "lê essa página pra mim", "lê a próxima página", "próxima página": sem o modelo."""
+    command = normalize(text)
+    if _NEXT_ONLY.match(command):
+        return [("read_aloud", {"next_page": True})]
+    match = _READ.match(command)
+    if match is None:
+        return None
+    what = match["what"] or ""
+    if not what and "continu" not in command:
+        return None  # "lê" sozinho é vago demais: fica para o modelo
+    args: dict[str, object] = {}
+    if "proxima" in what or "seguinte" in what or "continu" in command:
+        args["next_page"] = True
+    if match["lang"]:
+        args["translate_to"] = _LANGS[match["lang"]]
+    return [("read_aloud", args)]
