@@ -220,6 +220,10 @@ class ScreenVision(Protocol):
 
     async def describe(self, png: bytes, question: str) -> str: ...
 
+    async def read_text(self, png: bytes, translate_to: str | None) -> str:
+        """O texto principal da tela; com ``translate_to``, só a tradução (sem o original)."""
+        ...
+
 
 # --- porta ------------------------------------------------------------------
 
@@ -613,14 +617,6 @@ class HoldKeysTool:
         return ToolResult.success(f"Segurei {parsed.keys}.", say="Pronto.")
 
 
-_READ_PROMPT = (
-    "Transcreva o texto principal que aparece (a página do livro, o artigo, o documento), "
-    "na ordem de leitura. Deixe de fora menus, botões, barras do programa, cabeçalhos e "
-    "números de página. Junte palavras quebradas por hífen no fim da linha. Responda só "
-    "com o texto, sem comentários.{translate}"
-)
-
-
 _BACK_KEYS = {"pagedown": "pageup", "right": "left", "space": "shift+space", "down": "up"}
 _MAX_PAGES = 200
 
@@ -744,14 +740,7 @@ class ReadAloudTool:
                 return ToolResult.success(text, say=text)
 
         shot = await self._control.capture()
-        translate = (
-            f" Depois traduza o texto para {memory.language}, natural e fiel, e responda "
-            "só com a tradução."
-            if memory.language
-            else ""
-        )
-        text = await self._vision.describe(shot.png, _READ_PROMPT.format(translate=translate))
-        text = text.strip()
+        text = (await self._vision.read_text(shot.png, memory.language)).strip()
         if not text or text.startswith("Não consegui olhar a tela"):
             return ToolResult.failure(text or "Não achei texto para ler na tela.")
         memory.add(text)

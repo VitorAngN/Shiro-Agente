@@ -28,6 +28,41 @@ _DESCRIBE = (
 )
 
 
+_READ = (
+    "A imagem é o print de uma janela do Windows. Pegue o texto principal que aparece (a "
+    "página do livro, o artigo, o documento), na ordem de leitura. Deixe de fora menus, "
+    "botões, barras do programa, cabeçalhos e números de página. Junte palavras quebradas "
+    "por hífen no fim da linha. Responda só com o texto, sem comentários."
+)
+_READ_TRANSLATED = (
+    "A imagem é o print de uma janela do Windows. Pegue o texto principal que aparece (a "
+    "página do livro, o artigo, o documento), sem menus, botões, cabeçalhos nem números de "
+    "página, e traduza para {language}, de forma natural e fiel. Responda só com JSON: "
+    '{{"traducao": "o texto inteiro traduzido"}}. Não inclua o texto original.'
+)
+
+
+def translation_from(text: str) -> str:
+    """Só a tradução, mesmo que o modelo mande mais campos ou texto em volta do JSON."""
+    try:
+        raw: object = json.loads(text)
+    except json.JSONDecodeError:
+        start, end = text.find("{"), text.rfind("}")
+        if start < 0 or end <= start:
+            return text.strip()
+        try:
+            raw = json.loads(text[start : end + 1])
+        except json.JSONDecodeError:
+            return text.strip()
+    if isinstance(raw, dict):
+        data = cast("dict[str, Any]", raw)
+        for key in ("traducao", "tradução", "translation", "texto"):
+            value = data.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return text.strip()
+
+
 class Looker(Protocol):
     async def look(
         self, png: bytes, instruction: str, *, as_json: bool
@@ -81,6 +116,17 @@ class GeminiVision:
             log.warning("visão: %s", exc)
             return None
         return parse_spot(text)
+
+    async def read_text(self, png: bytes, translate_to: str | None) -> str:
+        try:
+            if not translate_to:
+                return await self._ask(png, _READ, as_json=False)
+            answer = await self._ask(
+                png, _READ_TRANSLATED.format(language=translate_to), as_json=True
+            )
+        except LLMError as exc:
+            return f"Não consegui olhar a tela agora ({exc})."
+        return translation_from(answer)
 
     async def describe(self, png: bytes, question: str) -> str:
         try:

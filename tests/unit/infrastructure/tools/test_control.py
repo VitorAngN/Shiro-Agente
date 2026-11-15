@@ -295,6 +295,9 @@ async def test_click_falls_back_to_vision_and_new_tools() -> None:
         async def describe(self, png: bytes, question: str) -> str:
             return "Tela de fila do jogo."
 
+        async def read_text(self, png: bytes, translate_to: str | None) -> str:
+            return ""
+
     control = FakeControl(Screen(window="Jogo"))
     click = ClickOnTool(control, Vision())
     done = await click.run(click.spec.args_model(target="Aceitar partida"), CTX)
@@ -327,7 +330,10 @@ async def test_read_aloud_remembers_the_book() -> None:
             return None
 
         async def describe(self, png: bytes, question: str) -> str:
-            asked.append(question)
+            raise AssertionError(question)
+
+        async def read_text(self, png: bytes, translate_to: str | None) -> str:
+            asked.append(translate_to or "")
             return next(pages)
 
     control = FakeControl()
@@ -350,3 +356,12 @@ async def test_read_aloud_remembers_the_book() -> None:
     assert await read(next_page=True, translate_to="português") == "Page 3 traduzida."
     assert "português" in asked[-1]
     assert tool.memory.language == "português"
+
+
+def test_only_the_translation_is_kept() -> None:
+    from shiro.infrastructure.llm.vision import translation_from
+
+    assert translation_from('{"traducao": "Olá, mundo."}') == "Olá, mundo."
+    assert translation_from('{"original": "Hello", "traducao": "Olá"}') == "Olá"
+    assert translation_from('Claro! {"traducao": "Oi"} pronto') == "Oi"
+    assert translation_from("Oi sem json") == "Oi sem json"
